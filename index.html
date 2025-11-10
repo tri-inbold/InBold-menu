@@ -6,7 +6,7 @@
     <title>Inbold Menu</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Toàn bộ nội dung file style.css được dán vào đây */
+        /* CSS được giữ nguyên từ phiên bản trước */
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
         :root { --primary-gradient: linear-gradient(90deg, #8E2DE2, #4A00E0); --secondary-color: #6c5ce7; --background-color: #12101e; --card-bg-color: rgba(29, 25, 46, 0.7); --text-color: #f0f0f0; --text-muted-color: #a0a0b0; --border-color: rgba(255, 255, 255, 0.1); --success-color: #00b894; --border-radius: 16px; --font-family: 'Poppins', sans-serif; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -72,7 +72,6 @@
 
         <main id="main-content"></main>
 
-        <!-- Loader hiển thị mặc định để giải quyết vấn đề "đăng nhập 2 lần" -->
         <div id="loader"><div class="spinner"></div></div>
         
         <div id="settings-modal" class="modal hidden">
@@ -85,8 +84,8 @@
 
                 <label data-lang-key="shift_type">Loại ca</label>
                 <div class="shift-toggle">
-                    <input type="radio" id="sang" name="shift-type" value="Sáng" checked><label for="sang" data-lang-key="morning_shift">Ca sáng</label>
-                    <input type="radio" id="chieu" name="shift-type" value="Chiều"><label for="chieu" data-lang-key="evening_shift">Ca Chiều</label>
+                    <input type="radio" id="sang" name="shift-type" value="Sáng" checked><label for="sang">Ca sáng</label>
+                    <input type="radio" id="chieu" name="shift-type" value="Chiều"><label for="chieu">Ca Chiều</label>
                 </div>
                 
                 <label data-lang-key="language">Ngôn ngữ</label>
@@ -95,7 +94,7 @@
                     <button data-lang="en" class="lang-btn">EN</button>
                 </div>
 
-                <button id="save-settings-btn" class="btn-primary" data-lang-key="save_settings">Lưu thay đổi</button>
+                <button id="save-settings-btn" class="btn-primary">Lưu thay đổi</button>
             </div>
         </div>
 
@@ -107,13 +106,13 @@
     </div>
     
     <script type="module">
-        // Toàn bộ nội dung file script.js được viết lại và dán vào đây
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getAuth, GoogleAuthProvider, signInWithRedirect, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         // --- KHỞI TẠO FIREBASE ---
         const firebaseConfig = {
+            // apiKey của bạn ở đây. Việc này là an toàn.
             apiKey: "AIzaSyCDrCaGUyr9xLkT-xOqzFd9grp6tN2u7Zo",
             authDomain: "hp-orders.firebaseapp.com",
             projectId: "hp-orders",
@@ -164,17 +163,15 @@
 
         // --- HÀM RENDER CHÍNH ---
         async function render() {
-            showLoader();
+            // Không hiển thị loader ở đây, để hàm cha quản lý
             switch (state.currentTab) {
                 case 'today': await renderToday(); break;
                 case 'menu': await renderMenu(); break;
                 case 'order': await renderOrder(); break;
             }
-            hideLoader();
         }
 
-        // --- RENDER CÁC TAB ---
-        async function renderToday() {
+        async function renderToday() { /* Giữ nguyên */
             const dayKey = getDayKey();
             if (['sun', 'sat'].includes(dayKey)) {
                 mainContent.innerHTML = `<div class="card glass"><h2>Hôm nay không phục vụ bữa ăn.</h2></div>`;
@@ -203,8 +200,7 @@
             }
             mainContent.innerHTML = content + `</div>`;
         }
-
-        async function renderMenu() {
+        async function renderMenu() { /* Giữ nguyên */
             const dayKey = getDayKey();
             const weekString = getWeekString(new Date());
             const docRef = doc(db, weekString, dayKey);
@@ -225,9 +221,8 @@
                 document.getElementById('staff-list-container').innerHTML = `<p style="text-align:center;">Chưa có dữ liệu cho hôm nay.</p>`;
             }
         }
-
-        function updateStaffListView(dayData, searchTerm = '') {
-            const container = document.getElementById('staff-list-container');
+        function updateStaffListView(dayData, searchTerm = '') { /* Giữ nguyên */
+             const container = document.getElementById('staff-list-container');
             const staffOrders = Object.entries(dayData).map(([name, order]) => ({ name, ...order }));
             const filtered = staffOrders.filter(o => o.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -254,8 +249,7 @@
             
             container.innerHTML = html || `<p style="text-align:center;">Không tìm thấy kết quả.</p>`;
         }
-
-        async function renderOrder() {
+        async function renderOrder() { /* Giữ nguyên */
             const today = new Date();
             const targetWeek = today.getDay() >= 1 && today.getDay() <= 3 
                 ? getWeekString(today) 
@@ -296,19 +290,21 @@
 
         // --- LOGIC XÁC THỰC VÀ QUẢN LÝ USER ---
         onAuthStateChanged(auth, async (user) => {
+            // Không hiển thị loader ở đây nữa
             if (user) {
                 state.currentUser = user;
                 await syncUserProfile();
                 updateUIForUser(user);
-                await render();
+                await render(); // Render nội dung chính
+                hideLoader(); // **SỬA LỖI:** Chỉ ẩn loader sau khi mọi thứ đã sẵn sàng
             } else {
                 state.currentUser = null;
                 updateUIForUser(null);
+                hideLoader(); // **SỬA LỖI:** Cũng ẩn loader nếu người dùng chưa đăng nhập
             }
-            hideLoader(); // Ẩn loader sau khi xác thực xong
         });
 
-        async function syncUserProfile() {
+        async function syncUserProfile() { /* Giữ nguyên */
             const user = state.currentUser;
             const staffRef = doc(db, "staff_list", "staffs");
             const staffSnap = await getDoc(staffRef);
@@ -321,10 +317,18 @@
                 }
                 state.staffProfile = allStaff[user.displayName];
                 state.language = state.staffProfile.lan || 'vi';
+            } else {
+                // Document "staffs" chưa tồn tại, tạo mới
+                const newStaffData = {
+                    [user.displayName]: { email: user.email, depart: "", shift: "Sáng", lan: "vi" }
+                };
+                await setDoc(staffRef, newStaffData);
+                state.staffProfile = newStaffData[user.displayName];
+                state.language = 'vi';
             }
         }
 
-        function updateUIForUser(user) {
+        function updateUIForUser(user) { /* Giữ nguyên */
             if (user) {
                 userProfileDiv.innerHTML = `
                     <div style="display: flex; align-items: center; gap: 10px;">
@@ -347,15 +351,20 @@
             }
         }
         
-        // --- EVENT LISTENERS ---
+        // --- EVENT DELEGATION LISTENER ---
         document.body.addEventListener('click', async (e) => {
+            const target = e.target;
+
             // Nút đăng nhập/đăng xuất
-            if (e.target.id === 'login-btn') signInWithRedirect(auth, provider);
-            if (e.target.id === 'logout-btn') signOut(auth);
+            if (target.id === 'login-btn') {
+                showLoader(); // Hiển thị loader trước khi chuyển hướng
+                signInWithRedirect(auth, provider);
+            }
+            if (target.id === 'logout-btn') signOut(auth);
 
             // Tab bar
-            if (e.target.closest('.tab-link')) {
-                const tabButton = e.target.closest('.tab-link');
+            const tabButton = target.closest('.tab-link');
+            if (tabButton) {
                 if (tabButton.dataset.tab === state.currentTab) return;
                 document.querySelector('.tab-link.active').classList.remove('active');
                 tabButton.classList.add('active');
@@ -364,19 +373,19 @@
             }
 
             // Mở/đóng Cài đặt
-            if (e.target.closest('#settings-btn')) {
+            if (target.closest('#settings-btn')) {
                 const profile = state.staffProfile;
                 document.getElementById('department-input').value = profile.depart || '';
                 document.querySelector(`input[name="shift-type"][value="${profile.shift}"]`).checked = true;
                 document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.lang === profile.lan));
                 settingsModal.classList.remove('hidden');
             }
-            if (e.target.id === 'close-settings-btn' || e.target === settingsModal) {
+            if (target.id === 'close-settings-btn' || target === settingsModal) {
                 settingsModal.classList.add('hidden');
             }
 
             // Lưu cài đặt
-            if (e.target.id === 'save-settings-btn') {
+            if (target.id === 'save-settings-btn') {
                 showLoader();
                 const newProfile = {
                     ...state.staffProfile,
@@ -394,47 +403,47 @@
             }
 
             // Chọn món trong tab Đặt món
-            const dishOption = e.target.closest('.dish-option');
+            const dishOption = target.closest('.dish-option');
             if (dishOption) {
                 const dayKey = dishOption.dataset.dayKey;
                 state.orderSelection[dayKey] = dishOption.dataset.dish;
-                // Cập nhật lại UI cho ngày đó để hiển thị lựa chọn
-                const currentDay = document.querySelector('.day-tab.active').dataset.day;
+                
+                const currentDayTab = document.querySelector('.day-tab.active');
                 await renderOrder(); // Render lại để cập nhật
-                document.querySelector(`.day-tab[data-day="${currentDay}"]`).click(); // Giữ lại tab ngày hiện tại
+                document.querySelector(`.day-tab[data-day="${currentDayTab.dataset.day}"]`).classList.add('active');
 
-                // Kiểm tra nếu đã chọn đủ 5 ngày thì hiện nút submit
                 if (Object.values(state.orderSelection).every(dish => dish !== null)) {
                     document.getElementById('submit-order-btn').classList.remove('hidden');
                 }
             }
             
             // Submit đơn hàng
-            if (e.target.id === 'submit-order-btn') {
+            if (target.id === 'submit-order-btn') {
                 showLoader();
                 const today = new Date();
                 const targetWeek = today.getDay() >= 1 && today.getDay() <= 3 
                     ? getWeekString(today) 
                     : getWeekString(new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000));
 
-                const updates = {};
                 for (const dayKey in state.orderSelection) {
                     const dayDocRef = doc(db, targetWeek, dayKey);
-                    updates[`${state.currentUser.displayName}`] = {
-                        food: state.orderSelection[dayKey],
-                        status: 'not',
-                        shift: state.staffProfile.shift,
-                        depart: state.staffProfile.depart,
+                    const updatePayload = {
+                        [`${state.currentUser.displayName}`]: {
+                            food: state.orderSelection[dayKey],
+                            status: 'not',
+                            shift: state.staffProfile.shift,
+                            depart: state.staffProfile.depart,
+                        }
                     };
-                    // Dùng setDoc với merge để cập nhật 1 nhân viên mà không xóa người khác
-                    await setDoc(dayDocRef, updates, { merge: true });
+                    await setDoc(dayDocRef, updatePayload, { merge: true });
                 }
-                hideLoader();
+                
                 alert('Đặt món thành công!');
-                // Reset và chuyển về tab today
                 state.orderSelection = { mon: null, tue: null, wed: null, thu: null, fri: null };
-                document.querySelector('.tab-link[data-tab="today"]').click();
+                document.querySelector('.tab-link[data-tab="today"]').click(); // Tự động click
             }
+
+            // ... các listener khác có thể thêm vào đây
         });
     </script>
 </body>
