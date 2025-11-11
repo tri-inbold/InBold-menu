@@ -97,4 +97,82 @@
             }
         });
         
-        loginBtn.addEventListener('click', () => signInWithPopup(auth, provider).catch(err =>
+        loginBtn.addEventListener('click', () => signInWithPopup(auth, provider).catch(err => log('Đăng nhập thất bại: ' + err.message, true)));
+        logoutBtn.addEventListener('click', () => signOut(auth));
+        fileInput.addEventListener('change', () => {
+            importBtn.disabled = !fileInput.files.length > 0;
+        });
+
+        importBtn.addEventListener('click', () => {
+            const file = fileInput.files[0];
+            if (!file) {
+                log('Vui lòng chọn một file.', true);
+                return;
+            }
+
+            importBtn.disabled = true;
+            logEl.innerHTML = ''; // Xóa log cũ
+            log(`Đã chọn file: ${file.name}`);
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    log('Đang đọc file...');
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    log(`Đọc thành công, tìm thấy ${rows.length} dòng.`);
+
+                    log('<span class="step">Bắt đầu chuyển đổi dữ liệu...</span>');
+                    const staffsObject = {};
+                    let processedCount = 0;
+
+                    for (const row of rows) {
+                        const email = row[0];
+                        const name = row[1];
+                        const depart = row[2];
+                        const language = row[3];
+
+                        if (email && typeof email === 'string' && email.includes('@')) {
+                            const emailKey = emailToKey(email);
+                            // *** SỬA LỖI TẠI ĐÂY: Đã loại bỏ trường "shift" ***
+                            staffsObject[emailKey] = {
+                                name: name || 'Chưa có tên',
+                                email: email,
+                                depart: depart || 'Chưa phân loại',
+                                lan: (language || 'vi').toLowerCase()
+                            };
+                            processedCount++;
+                        }
+                    }
+
+                    if (processedCount === 0) {
+                        throw new Error('Không tìm thấy dữ liệu hợp lệ trong file. Hãy chắc chắn cột A là email.');
+                    }
+                    log(`Chuyển đổi thành công ${processedCount} nhân viên.`);
+                    log('<span class="step">Bắt đầu upload lên Firestore...</span>');
+
+                    await setDoc(doc(db, "staff_list", "staffs"), staffsObject);
+
+                    log('<span style="color: lightgreen;">HOÀN TẤT! Dữ liệu đã được import thành công.</span>');
+
+                } catch (error) {
+                    console.error(error);
+                    log(`Lỗi nghiêm trọng: ${error.message}`, true);
+                } finally {
+                    importBtn.disabled = false;
+                }
+            };
+
+            reader.onerror = (error) => {
+                log('Lỗi khi đọc file: ' + error, true);
+                importBtn.disabled = false;
+            };
+
+            reader.readAsArrayBuffer(file);
+        });
+    </script>
+</body>
+</html>
