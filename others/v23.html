@@ -74,12 +74,12 @@
         /* Main Content */
         main {
             flex-grow: 1;
-            padding: 0 1rem;
+            padding: 1.5rem 1rem 0;
         }
         
         @media (min-width: 769px) {
             main {
-                padding: 0 1.5rem;
+                padding: 1.5rem 1.5rem 0;
             }
         }
         
@@ -464,6 +464,31 @@
             margin-bottom: 2rem;
         }
         
+        .profile-language-toggle {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .profile-language-toggle button {
+            padding: 0.5rem 1.5rem;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--card-bg);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        
+        .profile-language-toggle button.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        
         .profile-menu {
             display: flex;
             flex-direction: column;
@@ -497,10 +522,7 @@
             align-items: center;
             justify-content: center;
             font-size: 18px;
-        }
-        
-        .profile-menu-icon.blue {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
         }
         
         .profile-menu-icon.green {
@@ -1631,18 +1653,16 @@
                         <div class="profile-name">${profile.name}</div>
                         <div class="profile-depart">${profile.depart || 'Chưa cập nhật'}</div>
                         
+                        <div class="profile-language-toggle">
+                            <button class="lang-toggle-btn ${profile.lan === 'vi' ? 'active' : ''}" data-lang="vi">
+                                🇻🇳 Tiếng Việt
+                            </button>
+                            <button class="lang-toggle-btn ${profile.lan === 'en' ? 'active' : ''}" data-lang="en">
+                                🇬🇧 English
+                            </button>
+                        </div>
+                        
                         <div class="profile-menu">
-                            <div class="profile-menu-item" id="language-menu-item">
-                                <div class="profile-menu-icon blue">
-                                    <i class="fas fa-language"></i>
-                                </div>
-                                <div class="profile-menu-text">
-                                    <div class="profile-menu-label">Ngôn ngữ</div>
-                                    <div class="profile-menu-value">${profile.lan === 'vi' ? 'Tiếng Việt' : 'English'}</div>
-                                </div>
-                                <i class="fas fa-chevron-right" style="color: var(--text-muted);"></i>
-                            </div>
-                            
                             <a href="mailto:${SUPPORT_EMAIL}" class="profile-menu-item" style="text-decoration: none; color: inherit;">
                                 <div class="profile-menu-icon green">
                                     <i class="fas fa-headset"></i>
@@ -1918,8 +1938,76 @@
                         </table>
                     </div>
                 `;
-            } else {
-                statsContent.innerHTML = `<p class="text-center" style="color: var(--text-muted);">Chức năng đang được xây dựng</p>`;
+            } else if (state.statsViewMode === 'month') {
+                // Get all weeks in current month
+                const currentDate = state.statsViewDate;
+                const year = currentDate.getFullYear();
+                const month = currentDate.getMonth();
+                const firstDay = new Date(year, month, 1);
+                const lastDay = new Date(year, month + 1, 0);
+                
+                const departStats = {};
+                
+                // Loop through all days in month
+                for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
+                    const dayOfWeek = d.getDay();
+                    if (dayOfWeek === 0 || dayOfWeek === 6) continue; // Skip weekends
+                    
+                    const weekString = getWeekString(d);
+                    const dayKey = getDayKey(d);
+                    const dayData = await getDocument(weekString, dayKey);
+                    
+                    if (!dayData) continue;
+                    
+                    Object.values(dayData).forEach(order => {
+                        const depart = order.depart || 'Chưa rõ';
+                        if (!departStats[depart]) {
+                            departStats[depart] = { ordered: 0, eaten: 0, notEaten: 0 };
+                        }
+                        departStats[depart].ordered++;
+                        if (order.status === 'eaten') {
+                            departStats[depart].eaten++;
+                        } else {
+                            departStats[depart].notEaten++;
+                        }
+                    });
+                }
+                
+                const totalOrdered = Object.values(departStats).reduce((sum, s) => sum + s.ordered, 0);
+                const totalEaten = Object.values(departStats).reduce((sum, s) => sum + s.eaten, 0);
+                const totalNotEaten = Object.values(departStats).reduce((sum, s) => sum + s.notEaten, 0);
+                
+                statsContent.innerHTML = `
+                    <h4 style="color: var(--primary); margin: 0 0 1rem;">Tháng ${month + 1}/${year}</h4>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Phòng ban</th>
+                                    <th>Đã đặt</th>
+                                    <th>Đã ăn</th>
+                                    <th>Chưa ăn</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${Object.entries(departStats).map(([depart, data]) => `
+                                    <tr>
+                                        <td>${depart}</td>
+                                        <td>${data.ordered}</td>
+                                        <td>${data.eaten}</td>
+                                        <td>${data.notEaten}</td>
+                                    </tr>
+                                `).join('')}
+                                <tr style="font-weight: 600; background: rgba(102, 126, 234, 0.1);">
+                                    <td>Tổng</td>
+                                    <td>${totalOrdered}</td>
+                                    <td>${totalEaten}</td>
+                                    <td>${totalNotEaten}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
             }
         }
 
@@ -1940,12 +2028,15 @@
                 
                 for (const [key, name] of Object.entries(days)) {
                     const dishes = menuData?.[key] || [];
+                    // Ensure dishes is always an array
+                    const dishesArray = Array.isArray(dishes) ? dishes : [];
+                    
                     html += `
                         <div class="form-group">
                             <label class="form-label">${name}</label>
                             ${editable ? `
                                 <div id="menu-dishes-${key}">
-                                    ${dishes.map((dish, idx) => `
+                                    ${dishesArray.map((dish, idx) => `
                                         <div class="menu-item">
                                             <div class="menu-item-icon">${getFoodIcon(idx)}</div>
                                             <div class="menu-item-text">${dish}</div>
@@ -1963,12 +2054,12 @@
                                 </div>
                             ` : `
                                 <div>
-                                    ${dishes.map((dish, idx) => `
+                                    ${dishesArray.length > 0 ? dishesArray.map((dish, idx) => `
                                         <div class="menu-item">
                                             <div class="menu-item-icon">${getFoodIcon(idx)}</div>
                                             <div class="menu-item-text">${dish}</div>
                                         </div>
-                                    `).join('')}
+                                    `).join('') : '<p style="color: var(--text-muted); font-size: 13px; padding: 0.5rem 0;">Chưa có món</p>'}
                                 </div>
                             `}
                         </div>
@@ -1994,9 +2085,9 @@
                     `;
                 } else {
                     html += `
-                        <button class="btn btn-secondary btn-block mt-2" disabled>
-                            <i class="fas fa-lock"></i>
-                            Đã khóa chỉnh sửa
+                        <button id="export-menu-btn-${weekStr}" class="btn btn-secondary btn-block mt-2">
+                            <i class="fas fa-file-export"></i>
+                            Export XLSX
                         </button>
                     `;
                 }
@@ -2153,6 +2244,29 @@
                     showToast('Đăng nhập thất bại. Tài khoản của bạn có thể không được phép.', 'error');
                     hideLoader();
                 }
+                return;
+            }
+
+            // Language toggle in profile
+            if (target.classList.contains('lang-toggle-btn')) {
+                const newLang = target.dataset.lang;
+                if (newLang === state.staffProfile.lan) return;
+                
+                showLoader();
+                try {
+                    await updateDoc(doc(db, "staff_list", "staffs"), {
+                        [`${emailToKey(state.currentUser.email)}.lan`]: newLang
+                    });
+                    state.staffProfile.lan = newLang;
+                    state.cachedData.delete("staff_list/staffs");
+                    state.cachedData.delete('render_today');
+                    state.cachedData.delete('render_order');
+                    showToast(`Đã chuyển sang ${newLang === 'vi' ? 'Tiếng Việt' : 'English'}`);
+                    await renderProfile();
+                } catch (error) {
+                    showToast('Cập nhật ngôn ngữ thất bại', 'error');
+                }
+                hideLoader();
                 return;
             }
 
@@ -2442,7 +2556,8 @@
                 
                 for (const [key, name] of Object.entries(days)) {
                     const dishes = menuData[key] || [];
-                    dishes.forEach((dish, idx) => {
+                    const dishesArray = Array.isArray(dishes) ? dishes : [];
+                    dishesArray.forEach((dish, idx) => {
                         exportData.push({
                             'Ngày': name,
                             'STT': idx + 1,
@@ -2675,10 +2790,84 @@
                         const ws = XLSX.utils.json_to_sheet(data);
                         const wb = XLSX.utils.book_new();
                         XLSX.utils.book_append_sheet(wb, ws, "Thống kê");
-                        XLSX.writeFile(wb, `thong-ke-${weekString}-${dayKey}.xlsx`);
+                        XLSX.writeFile(wb, `thong-ke-ngay-${weekString}-${dayKey}.xlsx`);
                         showToast('Đã tải về file Excel');
-                    } else {
-                        showToast('Chức năng đang được xây dựng', 'info');
+                    } else if (state.statsViewMode === 'week') {
+                        const weekString = getWeekString(state.statsViewDate);
+                        const days = ['mon', 'tue', 'wed', 'thu', 'fri'];
+                        const allOrders = [];
+                        
+                        for (const day of days) {
+                            const dayData = await getDocument(weekString, day);
+                            if (!dayData) continue;
+                            
+                            Object.entries(dayData).forEach(([key, order]) => {
+                                allOrders.push({
+                                    'Tên': order.name,
+                                    'Email': order.email,
+                                    'Món ăn': parseDish(order.food),
+                                    'Ca': order.shift === 'M' ? 'Sáng' : 'Chiều',
+                                    'Phòng ban': order.depart,
+                                    'Ngày': {'mon': 'Thứ 2', 'tue': 'Thứ 3', 'wed': 'Thứ 4', 'thu': 'Thứ 5', 'fri': 'Thứ 6'}[day],
+                                    'Trạng thái': order.status === 'eaten' ? 'Đã ăn' : 'Chưa ăn'
+                                });
+                            });
+                        }
+                        
+                        if (allOrders.length === 0) {
+                            showToast('Không có dữ liệu để xuất', 'error');
+                            hideLoader();
+                            return;
+                        }
+                        
+                        const ws = XLSX.utils.json_to_sheet(allOrders);
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, "Thống kê");
+                        XLSX.writeFile(wb, `thong-ke-tuan-${weekString}.xlsx`);
+                        showToast('Đã tải về file Excel');
+                    } else if (state.statsViewMode === 'month') {
+                        const currentDate = state.statsViewDate;
+                        const year = currentDate.getFullYear();
+                        const month = currentDate.getMonth();
+                        const firstDay = new Date(year, month, 1);
+                        const lastDay = new Date(year, month + 1, 0);
+                        
+                        const allOrders = [];
+                        
+                        for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
+                            const dayOfWeek = d.getDay();
+                            if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+                            
+                            const weekString = getWeekString(d);
+                            const dayKey = getDayKey(d);
+                            const dayData = await getDocument(weekString, dayKey);
+                            
+                            if (!dayData) continue;
+                            
+                            Object.entries(dayData).forEach(([key, order]) => {
+                                allOrders.push({
+                                    'Tên': order.name,
+                                    'Email': order.email,
+                                    'Món ăn': parseDish(order.food),
+                                    'Ca': order.shift === 'M' ? 'Sáng' : 'Chiều',
+                                    'Phòng ban': order.depart,
+                                    'Ngày': `${d.getDate()}/${month + 1}/${year}`,
+                                    'Trạng thái': order.status === 'eaten' ? 'Đã ăn' : 'Chưa ăn'
+                                });
+                            });
+                        }
+                        
+                        if (allOrders.length === 0) {
+                            showToast('Không có dữ liệu để xuất', 'error');
+                            hideLoader();
+                            return;
+                        }
+                        
+                        const ws = XLSX.utils.json_to_sheet(allOrders);
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, "Thống kê");
+                        XLSX.writeFile(wb, `thong-ke-thang-${month + 1}-${year}.xlsx`);
+                        showToast('Đã tải về file Excel');
                     }
                 } catch (error) {
                     showToast('Xuất file thất bại', 'error');
