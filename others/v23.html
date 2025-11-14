@@ -724,13 +724,17 @@
             } else if (dataset.subtab) {
                 state.adminSubTab = dataset.subtab;
                 await renderAdmin();
-            } else if (id === 'login-btn') {
+            }
+            // Authentication
+            else if (id === 'login-btn') {
                 showLoader();
                 try { await signInWithPopup(auth, provider); } catch(err) { showToast(t('loginFail'), 'error'); } 
                 finally { hideLoader(); }
             } else if (id === 'logout-menu-item') {
                 if (confirm(t('logoutConfirm'))) { await signOut(auth); showToast(t('loggedOut')); }
-            } else if (classList.contains('lang-toggle-btn')) {
+            }
+            // User Actions
+            else if (classList.contains('lang-toggle-btn')) {
                 if (dataset.lang === state.staffProfile.lan) return;
                 showLoader();
                 try {
@@ -738,9 +742,7 @@
                     state.staffProfile.lan = dataset.lang; state.cachedData.clear();
                     await render(); showToast(t('langChanged'));
                 } catch { showToast(t('errorOccurred'), 'error'); } finally { hideLoader(); }
-            }
-            // Ordering
-            else if (classList.contains('order-dish-item') && !classList.contains('guest-dish-item')) {
+            } else if (classList.contains('order-dish-item') && !classList.contains('guest-dish-item')) {
                 const { dayKey, dish } = dataset;
                 state.orderSelection[dayKey] = dish;
                 document.querySelectorAll(`.order-dish-item[data-day-key="${dayKey}"]`).forEach(item => item.classList.remove('selected'));
@@ -762,7 +764,8 @@
             // Admin Actions
             else if (id === 'menu-filter-btn') {
                 state.menuFilterMode = state.menuFilterMode === 'auto' ? 'all' : 'auto';
-                updateStaffListView(await getDocument(getWeekString(new Date()), getDayKey(), true));
+                const dayData = await getDocument(getWeekString(new Date()), getDayKey(), true);
+                if (dayData) { updateStaffListView(dayData); applyTranslations();}
             } else if (classList.contains('remove-dish-btn')) {
                 const { week, day, index } = dataset;
                 if (state.tempMenuData[week]?.[day]?.splice(parseInt(index), 1)) {
@@ -828,7 +831,7 @@
                     const email = el('personnel-email-input').value.trim();
                     const depart = el('personnel-depart-select').value;
                     const originalKey = el('personnel-original-email-key').value;
-                    if (!name || !email) throw new Error("Vui lòng điền đủ thông tin");
+                    if (!name || !email) throw new Error(t('errorOccurred')); // Simplified error
                     const newKey = emailToKey(email);
                     const allStaff = await getDocument("staff_list", "staffs", true) || {};
                     if (originalKey && originalKey !== newKey) delete allStaff[originalKey];
@@ -854,12 +857,13 @@
                     await renderAdmin();
                 } catch { showToast(t('errorOccurred'), 'error'); }
                 finally { hideLoader(); }
-            } else if (dataset.modal) {
+            }
+            
+            else if(dataset.modal){
                  el(dataset.modal).classList.add('hidden');
             }
         });
 
-        // --- Main App Initialization ---
         async function main() {
             showLoader();
             try {
