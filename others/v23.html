@@ -804,10 +804,10 @@
                 <div class="modal-header"><h2 class="modal-title" id="guest-order-modal-title">Đặt món cho khách</h2><button class="close-btn" data-modal="guest-order-modal"><i class="fas fa-times"></i></button></div>
                 <div class="form-group"><label class="form-label" id="guest-name-label">Tên khách</label><input type="text" id="guest-name-input" class="form-input" placeholder="Nhập tên"></div>
                 <div class="form-group"><label class="form-label" id="guest-depart-label">Phòng ban/Công ty</label><input type="text" id="guest-depart-input" class="form-input" placeholder="Nhập tên công ty"></div>
-                <div class="form-group"><label class="form-label" id="guest-shift-label">Ca ăn</label><div class="shift-toggle"><input type="radio" id="guest-shift-m" name="guest-shift" value="M" checked><label for="guest-shift-m" id="guest-shift-m-label">Sáng</label><input type="radio" id="guest-shift-e" name="guest-shift" value="E"><label for="guest-shift-e" id="guest-shift-e-label">Chiều</label></div></div>
                 <div class="form-group"><label class="form-label" id="guest-week-label">Tuần</label><div class="shift-toggle"><input type="radio" id="guest-week-this" name="guest-week" value="this" checked><label for="guest-week-this" id="guest-week-this-label">Tuần này</label><input type="radio" id="guest-week-next" name="guest-week" value="next"><label for="guest-week-next" id="guest-week-next-label">Tuần sau</label></div></div>
+                <!-- Guest order days will be rendered here as tabs -->
                 <div id="guest-order-days-container"></div>
-                <button id="save-guest-order-btn" class="btn btn-primary btn-block mt-3">Hoàn tất</button>
+                <button id="save-guest-order-btn" class="btn btn-primary btn-block mt-3 hidden">Hoàn tất</button>
             </div>
         </div>
         
@@ -858,7 +858,8 @@
             currentUser: null, staffProfile: null, isAdmin: false,
             currentTab: 'today', adminSubTab: 'support', authReady: false,
             menuFilterMode: 'auto', orderSelection: {},
-            currentOrderDay: 'mon', // NEW: To track current day tab
+            currentOrderDay: 'mon', userShiftSelection: 'M',
+            guestCurrentOrderDay: 'mon', guestShiftSelection: 'M',
             reopenTarget: { key: null, name: null }, deleteTarget: { key: null, name: null },
             cachedData: new Map(), statsViewMode: 'day',
             statsViewDate: new Date(), guestOrderSelection: {}
@@ -1040,7 +1041,6 @@
                 return;
             }
 
-            // Check if all dishes are selected for the summary view
             const allSelected = dayKeys.every(day => state.orderSelection[day]);
             if (allSelected) {
                 let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${weekString.split('_')[1]}</h2></div><ul class="staff-list">`;
@@ -1058,10 +1058,12 @@
                 return;
             }
 
-            // Tabbed ordering view
+            // Giao diện đặt món theo tab
+            const shiftToggleHTML = `<div class="form-group"><label class="form-label">${__('shift')}</label><div class="shift-toggle"><input type="radio" id="user-shift-m" name="user-shift" value="M" ${state.userShiftSelection === 'M' ? 'checked' : ''}><label for="user-shift-m">${__('morning')}</label><input type="radio" id="user-shift-e" name="user-shift" value="E" ${state.userShiftSelection === 'E' ? 'checked' : ''}><label for="user-shift-e">${__('evening')}</label></div></div>`;
+            
             let tabsHTML = `<div class="tabs">`;
             for (const dayKey of dayKeys) {
-                tabsHTML += `<button class="tab-btn ${state.currentOrderDay === dayKey ? 'active' : ''}" data-day-key="${dayKey}">${dayNames[dayKey]}</button>`;
+                tabsHTML += `<button class="tab-btn order-day-tab-btn ${state.currentOrderDay === dayKey ? 'active' : ''}" data-day-key="${dayKey}">${dayNames[dayKey]}</button>`;
             }
             tabsHTML += `</div>`;
             
@@ -1072,13 +1074,14 @@
                 if (Array.isArray(dishes) && dishes.length > 0) {
                     daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item" data-dish="${dish}" data-day-key="${dayKey}"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
                 } else {
-                    daysContentHTML += `<p class="text-center text-muted p-3">${__('noDishes')}</p>`;
+                    daysContentHTML += `<p class="text-center text-muted p-3">${__('noDishes')}</p><div class="order-dish-list"><div class="order-dish-item" data-dish="Nghỉ" data-day-key="${dayKey}"><div class="order-dish-name">${__('rest')}</div></div></div>`;
                 }
                 daysContentHTML += `</div>`;
             }
             
-            container.innerHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderForWeek')} ${weekString.split('_')[1]}</h2></div>${tabsHTML}${daysContentHTML}</div>`;
+            container.innerHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderForWeek')} ${weekString.split('_')[1]}</h2></div>${shiftToggleHTML}${tabsHTML}${daysContentHTML}</div>`;
         }
+
 
         async function renderMenu() {
             el('main-content').innerHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('todayList')}</h2><button id="menu-filter-btn" class="icon-btn"><i class="fas fa-filter"></i></button></div><div class="search-bar"><div class="search-wrapper"><i class="fas fa-search search-icon"></i><input type="text" id="search-staff" class="search-input" placeholder="${__('searchStaff')}"></div></div><div id="staff-list-container"></div></div>`;
@@ -1299,7 +1302,6 @@
                 <button id="save-menu-nextWeek" class="btn btn-primary btn-block" style="margin-top:1rem;" data-week="${nextWeek}"><i class="fas fa-save"></i> ${__('save')} ${__('menuNextWeek')}</button>
             </div>`;
 
-            // NEW: Initialize auto-resizing for all textareas after rendering
             document.querySelectorAll('.menu-dish-textarea').forEach(autoResizeTextarea);
         }
 
@@ -1336,19 +1338,52 @@
         }
         
         async function renderGuestOrderDays(weekType, forceRefresh = false) {
+            const container = el('guest-order-days-container');
+            const saveBtn = el('save-guest-order-btn');
             const today = new Date();
             const targetWeek = weekType === 'next' ? getWeekString(new Date(today.getTime() + 7 * 86400000)) : getWeekString(today);
             const menu = await getDocument(targetWeek, "menu", forceRefresh);
-            const container = el('guest-order-days-container');
-            if (!menu) { container.innerHTML = `<p class="text-center text-muted mt-2">${__('noMenu')}</p>`; return; }
-            let html = '';
-            for (const [dayKey, dayName] of Object.entries({ mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') })) {
-                const dishes = menu[dayKey] || [];
-                if (Array.isArray(dishes) && dishes.length > 0) {
-                    html += `<div class="order-day-card"><div class="order-day-header"><div class="order-day-title">${dayName}</div></div><div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item guest-dish-item ${state.guestOrderSelection[dayKey] === dish ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div></div>`;
-                }
+            const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
+            const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
+
+            if (!menu) {
+                container.innerHTML = `<p class="text-center text-muted mt-2">${__('noMenu')}</p>`;
+                saveBtn.classList.add('hidden');
+                return;
             }
-            container.innerHTML = html || `<p class="text-center text-muted mt-2">${__('noDishes')}</p>`;
+
+            const allSelected = dayKeys.every(day => state.guestOrderSelection[day]);
+            if (allSelected) {
+                saveBtn.classList.remove('hidden');
+                let summaryHTML = `<h4 style="color:var(--primary);margin-top:1.5rem;margin-bottom:0.5rem;">${__('orderedWeek')} ${targetWeek.split('_')[1]}</h4><ul class="staff-list">`;
+                for (const dayKey of dayKeys) {
+                    summaryHTML += `<li class="staff-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(state.guestOrderSelection[dayKey])}</div></div></li>`;
+                }
+                container.innerHTML = summaryHTML + `</ul>`;
+                return;
+            }
+            
+            saveBtn.classList.add('hidden');
+            const shiftToggleHTML = `<div class="form-group"><label class="form-label">${__('shift')}</label><div class="shift-toggle"><input type="radio" id="guest-shift-m" name="guest-shift" value="M" ${state.guestShiftSelection === 'M' ? 'checked' : ''}><label for="guest-shift-m">${__('morning')}</label><input type="radio" id="guest-shift-e" name="guest-shift" value="E" ${state.guestShiftSelection === 'E' ? 'checked' : ''}><label for="guest-shift-e">${__('evening')}</label></div></div>`;
+
+            let tabsHTML = `<div class="tabs mt-2">`;
+            for (const dayKey of dayKeys) {
+                tabsHTML += `<button class="tab-btn guest-order-tab-btn ${state.guestCurrentOrderDay === dayKey ? 'active' : ''}" data-day-key="${dayKey}">${dayNames[dayKey]}</button>`;
+            }
+            tabsHTML += `</div>`;
+            
+            let daysContentHTML = '';
+            for (const dayKey of dayKeys) {
+                const dishes = menu[dayKey] || [];
+                daysContentHTML += `<div id="guest-order-day-${dayKey}" class="${state.guestCurrentOrderDay === dayKey ? '' : 'hidden'}">`;
+                if (Array.isArray(dishes) && dishes.length > 0) {
+                     daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item guest-dish-item" data-dish="${dish}" data-day-key="${dayKey}"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
+                } else {
+                     daysContentHTML += `<p class="text-center text-muted p-3">${__('noDishes')}</p><div class="order-dish-list"><div class="order-dish-item guest-dish-item" data-dish="Nghỉ" data-day-key="${dayKey}"><div class="order-dish-name">${__('rest')}</div></div></div>`;
+                }
+                daysContentHTML += `</div>`;
+            }
+            container.innerHTML = shiftToggleHTML + tabsHTML + daysContentHTML;
         }
 
         async function checkOrderNotification() {
@@ -1370,7 +1405,6 @@
             todayTab.classList.toggle('needs-attention', !hasOrdered);
         }
 
-        // NEW: Helper function for auto-resizing textarea
         function autoResizeTextarea(element) {
             element.style.height = 'auto';
             element.style.height = `${element.scrollHeight}px`;
@@ -1378,15 +1412,23 @@
 
         // --- Event Listeners ---
         document.body.addEventListener('change', async (e) => {
-            const { id, name, value } = e.target;
-            if (id === 'stats-date-picker') { state.statsViewDate = new Date(value); await renderStatsContent(); }
-            else if (name === 'stats-mode') { state.statsViewMode = value; await renderStatsContent(); }
-            else if (name === 'guest-week') { await renderGuestOrderDays(value, true); }
+            const { id, name, value, type, checked } = e.target;
+            if (id === 'stats-date-picker') { 
+                state.statsViewDate = new Date(value); await renderStatsContent(); 
+            } else if (name === 'stats-mode') { 
+                state.statsViewMode = value; await renderStatsContent(); 
+            } else if (name === 'guest-week') { 
+                await renderGuestOrderDays(value, true); 
+            } else if (name === 'user-shift') {
+                if (type === 'radio' && checked) state.userShiftSelection = value;
+            } else if (name === 'guest-shift') {
+                if (type === 'radio' && checked) state.guestShiftSelection = value;
+            }
         });
 
         document.body.addEventListener('input', (e) => {
             if (e.target.classList.contains('menu-dish-textarea')) {
-                autoResizeTextarea(e.target); // Auto-resize on input
+                autoResizeTextarea(e.target);
                 
                 const { week, day } = e.target.dataset;
                 const container = el(`menu-dishes-${week}-${day}`);
@@ -1452,19 +1494,17 @@
                     await render(); 
                     showToast(__('changeLangSuccess'));
                 } catch { showToast(__('error'), 'error'); } finally { hideLoader(); }
+            } else if (classList.contains('order-day-tab-btn')) {
+                state.currentOrderDay = dataset.dayKey;
+                await renderOrderSection(el('order-section-container'));
             } else if (classList.contains('order-dish-item') && !classList.contains('guest-dish-item')) {
                 const { dayKey, dish } = dataset;
                 const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri'];
-                
                 state.orderSelection[dayKey] = dish;
-                
                 const currentIndex = dayOrder.indexOf(dayKey);
-                // If not Friday, advance to the next day
                 if (currentIndex < dayOrder.length - 1) {
                     state.currentOrderDay = dayOrder[currentIndex + 1];
                 }
-                
-                // Re-render the order section to show the next tab or the summary
                 await renderOrderSection(el('order-section-container'));
             } else if (id === 'submit-order-btn') {
                 showLoader();
@@ -1477,12 +1517,12 @@
                         : getWeekString(today);
                     
                     for (const dayKey in state.orderSelection) {
-                        const payload = { [emailToKey(state.currentUser.email)]: { name: state.staffProfile.name, email: state.currentUser.email, food: state.orderSelection[dayKey], status: 'not', shift: 'M', depart: state.staffProfile.depart }};
+                        const payload = { [emailToKey(state.currentUser.email)]: { name: state.staffProfile.name, email: state.currentUser.email, food: state.orderSelection[dayKey], status: 'not', shift: state.userShiftSelection, depart: state.staffProfile.depart }};
                         await setDoc(doc(db, targetWeek, dayKey), payload, { merge: true });
                     }
                     showToast(__('orderSuccess')); 
                     state.orderSelection = {};
-                    state.currentOrderDay = 'mon'; // Reset for next time
+                    state.currentOrderDay = 'mon';
                     state.cachedData.clear();
                     await render();
                     await checkOrderNotification();
@@ -1581,13 +1621,23 @@
                 }
             } else if (id === 'add-guest-order-btn') {
                 state.guestOrderSelection = {};
+                state.guestCurrentOrderDay = 'mon';
                 await renderGuestOrderDays('this', true);
                 el('guest-order-modal').classList.remove('hidden');
+            } else if (classList.contains('guest-order-tab-btn')) {
+                state.guestCurrentOrderDay = dataset.dayKey;
+                const weekType = document.querySelector('input[name="guest-week"]:checked').value;
+                await renderGuestOrderDays(weekType);
             } else if (classList.contains('guest-dish-item')) {
                 const { dayKey, dish } = dataset;
-                state.guestOrderSelection[dayKey] = state.guestOrderSelection[dayKey] === dish ? null : dish;
-                document.querySelectorAll(`.guest-dish-item[data-day-key="${dayKey}"]`).forEach(item => item.classList.remove('selected'));
-                if(state.guestOrderSelection[dayKey]) target.classList.add('selected');
+                const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri'];
+                state.guestOrderSelection[dayKey] = dish;
+                const currentIndex = dayOrder.indexOf(dayKey);
+                if (currentIndex < dayOrder.length - 1) {
+                    state.guestCurrentOrderDay = dayOrder[currentIndex + 1];
+                }
+                const weekType = document.querySelector('input[name="guest-week"]:checked').value;
+                await renderGuestOrderDays(weekType);
             } else if (classList.contains('reopen-order-btn')) {
                  state.reopenTarget = { key: dataset.key, name: dataset.name };
                  el('reopen-order-modal-title').textContent = `${__('reopenOrderFor')} ${dataset.name}?`;
@@ -1633,7 +1683,7 @@
                         }
                     } else if (!user) {
                         state.currentUser = null; state.isAdmin = false; state.authReady = true;
-                        state.orderSelection = {}; state.currentOrderDay = 'mon'; // Reset on logout
+                        state.orderSelection = {}; state.currentOrderDay = 'mon'; state.userShiftSelection = 'M';
                         updateUIForUser(null);
                     }
                     hideLoader();
