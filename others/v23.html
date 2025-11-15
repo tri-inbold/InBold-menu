@@ -1020,21 +1020,24 @@
             const dayOfWeek = today.getDay();
             const userEmailKey = emailToKey(state.currentUser.email);
             
-            // Xác định tuần hiển thị: T7-CN → tuần sau, T2-T6 → tuần này
-            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-            const displayWeekString = isWeekend ? getWeekString(new Date(today.getTime() + 7 * 86400000)) : getWeekString(today);
-            
-            // Kiểm tra đã đặt món tuần này chưa
+            // Xác định tuần để kiểm tra và hiển thị
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // T7 = 6, CN = 0
             const thisWeekString = getWeekString(today);
-            const userOrdersForThisWeek = await getDocument(thisWeekString, 'mon', false);
-            const hasOrderedThisWeek = userOrdersForThisWeek && userOrdersForThisWeek[userEmailKey];
+            const nextWeekString = getWeekString(new Date(today.getTime() + 7 * 86400000));
+            
+            // Kiểm tra đã đặt món chưa
+            const checkWeekString = isWeekend ? nextWeekString : thisWeekString;
+            const checkOrders = await getDocument(checkWeekString, 'mon', true);
+            const hasOrdered = checkOrders && checkOrders[userEmailKey];
 
-            // Nếu đã đặt tuần này, chỉ hiển thị danh sách
-            if (hasOrderedThisWeek && !isWeekend) {
+            // Nếu đã đặt món, chỉ hiển thị danh sách
+            if (hasOrdered) {
+                const displayWeekString = isWeekend ? nextWeekString : thisWeekString;
                 const days = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
-                let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${thisWeekString.split('_')[1]}</h2></div><ul class="staff-list">`;
+                let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${displayWeekString.split('_')[1]}</h2></div><ul class="staff-list">`;
+                
                 for (const [key, name] of Object.entries(days)) {
-                    const dayData = await getDocument(thisWeekString, key, false);
+                    const dayData = await getDocument(displayWeekString, key, true);
                     const dish = dayData?.[userEmailKey]?.food;
                     summaryHTML += `<li class="staff-item"><div class="staff-details"><div class="staff-name">${name}</div><div class="staff-dish">${parseDish(dish) || __('rest')}</div></div></li>`;
                 }
@@ -1042,8 +1045,10 @@
                 return;
             }
 
-            // Hiển thị form đặt món (T7-CN → tuần sau, chưa đặt tuần này)
-            const menu = await getDocument(displayWeekString, "menu", false);
+            // Chưa đặt món - hiển thị form đặt món
+            const orderWeekString = isWeekend ? nextWeekString : thisWeekString;
+            const menu = await getDocument(orderWeekString, "menu", true);
+            
             if (!menu) {
                 container.innerHTML = `<div class="card text-center"><p class="text-muted">${__('noMenu')}</p></div>`;
                 return;
@@ -1051,13 +1056,15 @@
 
             const days = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
             let orderCardsHTML = '';
+            
             for (const [dayKey, dayName] of Object.entries(days)) {
                 const dishes = menu[dayKey] || [];
                 if (Array.isArray(dishes) && dishes.length > 0) {
                     orderCardsHTML += `<div class="order-day-card"><div class="order-day-header"><div class="order-day-title">${dayName}</div></div><div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item ${state.orderSelection[dayKey] === dish ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div></div>`;
                 }
             }
-            container.innerHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderForWeek')} ${displayWeekString.split('_')[1]}</h2></div>${orderCardsHTML}<button id="submit-order-btn" class="btn btn-primary btn-block mt-3" disabled><i class="fas fa-check-circle"></i> ${__('complete')}</button></div>`;
+            
+            container.innerHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderForWeek')} ${orderWeekString.split('_')[1]}</h2></div>${orderCardsHTML}<button id="submit-order-btn" class="btn btn-primary btn-block mt-3" disabled><i class="fas fa-check-circle"></i> ${__('complete')}</button></div>`;
             checkOrderCompletion();
         }
         
@@ -1317,13 +1324,21 @@
         async function checkOrderNotification() {
             const todayTab = document.querySelector('.nav-item[data-tab="today"]');
             if (!todayTab || !state.currentUser) return;
+            
             const today = new Date();
-            if (today.getDay() >= 4 || today.getDay() === 0) {
-                const nextWeekOrders = await getDocument(getWeekString(new Date(today.getTime() + 7 * 86400000)), 'mon');
-                todayTab.classList.toggle('needs-attention', !nextWeekOrders || !nextWeekOrders[emailToKey(state.currentUser.email)]);
-            } else {
-                todayTab.classList.remove('needs-attention');
-            }
+            const dayOfWeek = today.getDay();
+            const userEmailKey = emailToKey(state.currentUser.email);
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+            
+            // Kiểm tra tuần tương ứng
+            const checkWeekString = isWeekend 
+                ? getWeekString(new Date(today.getTime() + 7 * 86400000))
+                : getWeekString(today);
+            
+            const checkOrders = await getDocument(checkWeekString, 'mon');
+            const hasOrdered = checkOrders && checkOrders[userEmailKey];
+            
+            todayTab.classList.toggle('needs-attention', !hasOrdered);
         }
 
         // --- Event Listeners ---
@@ -1385,14 +1400,19 @@
                     const today = new Date();
                     const dayOfWeek = today.getDay();
                     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                    const targetWeek = isWeekend ? getWeekString(new Date(today.getTime() + 7 * 86400000)) : getWeekString(today);
+                    const targetWeek = isWeekend 
+                        ? getWeekString(new Date(today.getTime() + 7 * 86400000)) 
+                        : getWeekString(today);
                     
                     for (const dayKey in state.orderSelection) {
                         const payload = { [emailToKey(state.currentUser.email)]: { name: state.staffProfile.name, email: state.currentUser.email, food: state.orderSelection[dayKey], status: 'not', shift: 'M', depart: state.staffProfile.depart }};
                         await setDoc(doc(db, targetWeek, dayKey), payload, { merge: true });
                     }
-                    showToast(__('orderSuccess')); state.orderSelection = {}; state.cachedData.clear();
+                    showToast(__('orderSuccess')); 
+                    state.orderSelection = {}; 
+                    state.cachedData.clear();
                     await render();
+                    await checkOrderNotification();
                 } catch { showToast(__('orderFailed'), 'error'); } finally { hideLoader(); }
             }
 
