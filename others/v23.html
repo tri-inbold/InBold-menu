@@ -1239,16 +1239,20 @@
         }
         async function renderAdminMenu() {
             const today = new Date();
-            const thisWeek = getWeekString(today), nextWeek = getWeekString(new Date(today.getTime() + 7 * 86400000));
+            const thisWeek = getWeekString(today);
+            const nextWeek = getWeekString(new Date(today.getTime() + 7 * 86400000));
             
-            const [thisWeekMenu, nextWeekMenu] = await Promise.all([
-                getDocument(thisWeek, "menu", true) || {},
-                getDocument(nextWeek, "menu", true) || {}
+            // Lấy dữ liệu và đảm bảo chúng là object, kể cả khi không có dữ liệu
+            const [thisWeekData, nextWeekData] = await Promise.all([
+                getDocument(thisWeek, "menu", true),
+                getDocument(nextWeek, "menu", true)
             ]);
+            const thisWeekMenu = thisWeekData || {};
+            const nextWeekMenu = nextWeekData || {};
             
             const thisWeekPassed = today.getDay() === 0 || today.getDay() === 6;
             
-            const renderMenuSection = (weekKey, weekStr, menuData, title, isEditable) => {
+            const renderMenuSection = (weekKey, menuData, title, isEditable) => {
                 let html = `<h3 style="color:var(--primary);margin:1.5rem 0 1rem;font-size:18px;">${title}</h3>`;
                 
                 for (const [dayKey, dayName] of Object.entries({ mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') })) {
@@ -1258,20 +1262,20 @@
                                 <div id="menu-dishes-${weekKey}-${dayKey}" style="display:flex;flex-direction:column;gap:0.5rem;">`;
 
                     if (isEditable) {
-                        // Render existing dishes
+                        // Render các món đã có
                         dishes.forEach((dish, idx) => {
                             html += `<div style="display:flex;gap:0.5rem;align-items:center;">
                                         <textarea class="form-textarea menu-dish-textarea" data-week="${weekKey}" data-day="${dayKey}" data-index="${idx}" placeholder="${__('dish')} ${idx + 1}" style="flex:1;min-height:40px;resize:none;">${dish}</textarea>
                                         <button class="icon-btn remove-menu-dish-btn" data-week="${weekKey}" data-day="${dayKey}" data-index="${idx}"><i class="fas fa-times"></i></button>
                                      </div>`;
                         });
-                        // Always render one extra empty textarea for adding new dishes
+                        // Luôn render thêm một ô trống để nhập món mới
                         html += `<div style="display:flex;gap:0.5rem;align-items:center;">
                                     <textarea class="form-textarea menu-dish-textarea" data-week="${weekKey}" data-day="${dayKey}" data-index="${dishes.length}" placeholder="${__('oneDishPerLine')}" style="flex:1;min-height:40px;resize:none;"></textarea>
                                     <button class="icon-btn remove-menu-dish-btn hidden" data-week="${weekKey}" data-day="${dayKey}" data-index="${dishes.length}"><i class="fas fa-times"></i></button>
                                  </div>`;
                     } else {
-                        // Read-only view
+                        // Chế độ chỉ đọc
                         if (dishes.length > 0) {
                             dishes.forEach(dish => {
                                 html += `<div style="padding:0.5rem;background:rgba(30,41,59,0.5);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);">${dish}</div>`;
@@ -1286,10 +1290,10 @@
             };
             
             el('admin-content').innerHTML = `<div class="mt-3">
-                ${renderMenuSection('thisWeek', thisWeek, thisWeekMenu, `${__('menuThisWeek')} (${thisWeek.split('_')[1]})`, !thisWeekPassed)}
+                ${renderMenuSection('thisWeek', thisWeekMenu, `${__('menuThisWeek')} (${thisWeek.split('_')[1]})`, !thisWeekPassed)}
                 ${!thisWeekPassed ? `<button id="save-menu-thisWeek" class="btn btn-primary btn-block" style="margin-top:1rem;" data-week="${thisWeek}"><i class="fas fa-save"></i> ${__('save')} ${__('menuThisWeek')}</button>` : ''}
                 
-                ${renderMenuSection('nextWeek', nextWeek, nextWeekMenu, `${__('menuNextWeek')} (${nextWeek.split('_')[1]})`, true)}
+                ${renderMenuSection('nextWeek', nextWeekMenu, `${__('menuNextWeek')} (${nextWeek.split('_')[1]})`, true)}
                 <button id="save-menu-nextWeek" class="btn btn-primary btn-block" style="margin-top:1rem;" data-week="${nextWeek}"><i class="fas fa-save"></i> ${__('save')} ${__('menuNextWeek')}</button>
             </div>`;
         }
@@ -1377,13 +1381,13 @@
                 const allTextareas = container.querySelectorAll('.menu-dish-textarea');
                 const lastTextarea = allTextareas[allTextareas.length - 1];
 
-                // Show remove button on the current line if it has content
+                // Hiển thị nút xóa khi có nội dung
                 const removeBtn = e.target.nextElementSibling;
                 if (removeBtn && removeBtn.classList.contains('remove-menu-dish-btn')) {
                     removeBtn.classList.toggle('hidden', e.target.value.trim() === '');
                 }
 
-                // If typing in the last textarea and it has content, add a new one
+                // Nếu nhập vào ô cuối cùng và có nội dung, thêm một ô mới
                 if (e.target === lastTextarea && e.target.value.trim() !== '') {
                     const newIndex = allTextareas.length;
                     const newRow = document.createElement('div');
