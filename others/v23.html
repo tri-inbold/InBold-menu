@@ -196,8 +196,20 @@
             font-size: 13px;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
         }
+
+        .tab-btn .tab-label {
+            max-width: 0;
+            overflow: hidden;
+            white-space: nowrap;
+            transition: max-width 0.3s ease-in-out, margin-left 0.3s ease-in-out;
+        }
+        
+        .tab-btn.active .tab-label {
+            max-width: 100px;
+            margin-left: 8px;
+        }
+
         
         .tab-btn:hover {
             background: var(--card-hover);
@@ -289,7 +301,7 @@
         }
         
         .summary-list-item .staff-name {
-            font-size: 13px;
+            font-size: 10px;
             font-weight: 500;
             color: var(--text-muted);
         }
@@ -311,8 +323,8 @@
         }
         
         .profile-avatar {
-            width: 80px;
-            height: 80px;
+            width: 120px;
+            height: 120px;
             border-radius: 50%;
             border: 3px solid var(--primary);
             margin: 0 auto 1rem;
@@ -367,8 +379,9 @@
         .profile-menu-item {
             display: flex;
             align-items: center;
+            align-self: center
             gap: 1rem;
-            padding: 1rem;
+            padding: 1rem 4rem;
             background: var(--card-bg);
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
@@ -886,7 +899,7 @@
 
         const state = {
             currentUser: null, staffProfile: null, isAdmin: false,
-            currentTab: 'today', adminSubTab: 'support', authReady: false,
+            currentTab: 'today', adminSubTab: 'stats', authReady: false,
             menuFilterMode: 'auto', orderSelection: {},
             currentOrderDay: 'mon', userShiftSelection: 'M',
             guestCurrentOrderDay: 'mon', guestShiftSelection: 'M',
@@ -904,7 +917,7 @@
                 rest: 'Nghỉ', todayList: 'Danh sách hôm nay', searchStaff: 'Tìm nhân viên...',
                 noData: 'Chưa có dữ liệu.', notFound: 'Không tìm thấy.', morning: 'Ca sáng',
                 evening: 'Ca chiều', profile: 'Hồ sơ', notUpdated: 'Chưa cập nhật',
-                vietnamese: 'Tiếng Việt', english: 'English', support: 'Hỗ trợ đặt', logout: 'Đăng xuất',
+                vietnamese: 'Tiếng Việt', english: 'English', support: 'Hỗ trợ', logout: 'Đăng xuất',
                 logoutConfirm: 'Bạn có muốn đăng xuất?', loggedOut: 'Đã đăng xuất',
                 changeLangSuccess: 'Đổi ngôn ngữ thành công', error: 'Lỗi',
                 orderSuccess: 'Đặt món thành công!', orderFailed: 'Đặt món thất bại',
@@ -920,7 +933,7 @@
                 total: 'Tổng', downloadXLSX: 'Tải XLSX', menu: 'Thực đơn',
                 menuThisWeek: 'Tuần này', menuNextWeek: 'Tuần sau', noDishYet: 'Chưa có món',
                 saveMenu: 'Lưu menu cho tuần sau', personnel: 'Nhân sự', name: 'Tên',
-                email: 'Email', actions: 'Reset', save: 'Lưu',
+                email: 'Email', actions: ' ', save: 'Lưu',
                 addDish: 'Thêm món', removedDish: 'Đã xóa món ăn', added: 'Đã thêm',
                 dishes: 'món', exportPersonnel: 'Export nhân sự', mon: 'Thứ 2',
                 tue: 'Thứ 3', wed: 'Thứ 4', thu: 'Thứ 5', fri: 'Thứ 6',
@@ -935,7 +948,7 @@
                 rest: 'Off', todayList: 'Today\'s List', searchStaff: 'Search staff...',
                 noData: 'No data yet.', notFound: 'Not found.', morning: 'Morning shift',
                 evening: 'Evening shift', profile: 'Profile', notUpdated: 'Not updated',
-                vietnamese: 'Tiếng Việt', english: 'English', support: 'Order support', logout: 'Logout',
+                vietnamese: 'Tiếng Việt', english: 'English', support: 'Support', logout: 'Logout',
                 logoutConfirm: 'Do you want to logout?', loggedOut: 'Logged out',
                 changeLangSuccess: 'Language changed successfully', error: 'Error',
                 orderSuccess: 'Order successful!', orderFailed: 'Order failed',
@@ -951,7 +964,7 @@
                 total: 'Total', downloadXLSX: 'Download XLSX', menu: 'Menu',
                 menuThisWeek: 'This week', menuNextWeek: 'Next week', noDishYet: 'No dishes yet',
                 saveMenu: 'Save menu for next week', personnel: 'Personnel', name: 'Name',
-                email: 'Email', actions: 'Reset', save: 'Save',
+                email: 'Email', actions: ' ', save: 'Save',
                 addDish: 'Add dish', removedDish: 'Dish removed', added: 'Added',
                 dishes: 'dishes', exportPersonnel: 'Export personnel', mon: 'Monday',
                 tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday',
@@ -1147,7 +1160,7 @@
                         <i class="fas fa-headset" style="color:var(--primary);"></i><span class="profile-menu-label">${__('support')}</span>
                     </a>
                 </div>
-                <div class="text-center" style="margin-top: 2rem;">
+                <div class="text-center" style="margin-top: 4rem;">
                     <button id="logout-menu-item" class="btn btn-secondary btn-small">
                         <i class="fas fa-sign-out-alt"></i>${__('logout')}
                     </button>
@@ -1157,10 +1170,10 @@
 
         async function renderAdmin() {
             el('main-content').innerHTML = `<div class="card"><div class="tabs">
-                <button class="tab-btn ${state.adminSubTab === 'stats' ? 'active' : ''}" data-subtab="stats"><i class="fas fa-chart-pie"></i>${__('stats')}</button>
-                <button class="tab-btn ${state.adminSubTab === 'support' ? 'active' : ''}" data-subtab="support"><i class="fas fa-headset"></i>${__('support')}</button>
-                <button class="tab-btn ${state.adminSubTab === 'menu' ? 'active' : ''}" data-subtab="menu"><i class="fas fa-utensils"></i>${__('menu')}</button>
-                <button class="tab-btn ${state.adminSubTab === 'personnel' ? 'active' : ''}" data-subtab="personnel"><i class="fas fa-users"></i>${__('personnel')}</button>
+                <button class="tab-btn ${state.adminSubTab === 'support' ? 'active' : ''}" data-subtab="support"><i class="fas fa-headset"></i><span class="tab-label">${__('support')}</span></button>
+                <button class="tab-btn ${state.adminSubTab === 'stats' ? 'active' : ''}" data-subtab="stats"><i class="fas fa-chart-pie"></i><span class="tab-label">${__('stats')}</span></button>
+                <button class="tab-btn ${state.adminSubTab === 'menu' ? 'active' : ''}" data-subtab="menu"><i class="fas fa-utensils"></i><span class="tab-label">${__('menu')}</span></button>
+                <button class="tab-btn ${state.adminSubTab === 'personnel' ? 'active' : ''}" data-subtab="personnel"><i class="fas fa-users"></i><span class="tab-label">${__('personnel')}</span></button>
             </div><div id="admin-content"></div></div>`;
             await renderAdminSubTab();
         }
@@ -1324,12 +1337,12 @@
 
                     dishes.forEach((dish, idx) => {
                         html += `<div style="display:flex;gap:0.5rem;align-items:center;">
-                                    <textarea class="form-textarea menu-dish-textarea" data-week="${weekKey}" data-day="${dayKey}" data-index="${idx}" placeholder="${__('dish')} ${idx + 1}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden">${dish}</textarea>
+                                    <textarea class="form-textarea menu-dish-textarea" data-week="${weekKey}" data-day="${dayKey}" data-index="${idx}" placeholder="${__('dish')} ${idx + 1}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden; width: 40px;">${dish}</textarea>
                                     <button class="icon-btn remove-menu-dish-btn" data-week="${weekKey}" data-day="${dayKey}" data-index="${idx}"><i class="fas fa-times"></i></button>
                                  </div>`;
                     });
                     html += `<div style="display:flex;gap:0.5rem;align-items:center;">
-                                <textarea class="form-textarea menu-dish-textarea" data-week="${weekKey}" data-day="${dayKey}" data-index="${dishes.length}" placeholder="${__('oneDishPerLine')}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden"></textarea>
+                                <textarea class="form-textarea menu-dish-textarea" data-week="${weekKey}" data-day="${dayKey}" data-index="${dishes.length}" placeholder="${__('oneDishPerLine')}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden; width: 40px;"></textarea>
                                 <button class="icon-btn remove-menu-dish-btn hidden" data-week="${weekKey}" data-day="${dayKey}" data-index="${dishes.length}"><i class="fas fa-times"></i></button>
                              </div>`;
                     html += `</div></div>`;
