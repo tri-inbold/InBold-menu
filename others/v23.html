@@ -1031,7 +1031,10 @@
                 menuSaved: 'Đã lưu thực đơn', unknown: 'Chưa rõ', today: 'Hôm nay',
                 oneDishPerLine: 'Tên món tiếng việt | Tên món tiếng anh', 
                 skip: 'Nhường', skipped: 'Đã nhường', eaten: 'Đã ăn', skipSuccess: 'Đã nhường suất ăn', eatenSuccess: 'Đã xác nhận ăn', 
-                skippedList: 'Danh sách đã nhường',
+                skippedList: 'Danh sách đã nhường', addPersonnel: 'Thêm nhân viên', editPersonnel: 'Chỉnh sửa nhân viên', deletePersonnel: 'Xóa nhân viên',
+                deleteConfirm: 'Bạn có chắc chắn muốn xóa?', personnelAdded: 'Đã thêm nhân viên', personnelUpdated: 'Đã cập nhật nhân viên',
+                personnelDeleted: 'Đã xóa nhân viên', emailExists: 'Email này đã tồn tại', invalidEmail: 'Email không hợp lệ', fillAllFields: 'Vui lòng điền đầy đủ thông tin',
+                enterDepartment: 'Nhập tên phòng ban mới', cancel: 'Hủy',
             },
             en: {
                 welcome: 'Welcome!', pleaseLogin: 'Please login', login: 'Login',
@@ -1064,7 +1067,12 @@
                 menuSaved: 'Menu saved', unknown: 'Unknown', today: 'Today',
                 oneDishPerLine: 'Name of dish in Vietnamese | Name of dish in English', 
                 skip: 'Give', skipped: 'Given', eaten: 'Eaten', skipSuccess: 'Given', eatenSuccess: 'Confirmed eaten',
-                skippedList: 'Given meals list',
+                skippedList: 'Given meals list', addPersonnel: 'Add personnel', editPersonnel: 'Edit personnel',
+                deletePersonnel: 'Delete personnel', deleteConfirm: 'Are you sure you want to delete?',
+                personnelAdded: 'Personnel added', personnelUpdated: 'Personnel updated',
+                personnelDeleted: 'Personnel deleted', emailExists: 'Email already exists',
+                invalidEmail: 'Invalid email', fillAllFields: 'Please fill all fields',
+                enterDepartment: 'Enter new department name', cancel: 'Cancel',
             }
         };
         
@@ -1251,12 +1259,10 @@
             const lastClear = localStorage.getItem(lastClearKey);
             const now = new Date();
             
-            // Kiểm tra xem đã qua thứ 2 chưa
             if (lastClear) {
                 const lastClearDate = new Date(lastClear);
                 const daysSinceLastClear = Math.floor((now - lastClearDate) / (1000 * 60 * 60 * 24));
                 
-                // Nếu đã qua thứ 2 (hoặc >= 7 ngày)
                 const isMonday = now.getDay() === 1;
                 const needsClear = (isMonday && daysSinceLastClear >= 1) || daysSinceLastClear >= 7;
                 
@@ -1266,7 +1272,6 @@
                     console.log('🗑️ Weekly cache cleared');
                 }
             } else {
-                // Lần đầu tiên, lưu timestamp
                 localStorage.setItem(lastClearKey, now.toISOString());
             }
         }
@@ -1719,6 +1724,19 @@
                 if (type === 'radio' && checked) state.userShiftSelection = value;
             } else if (name === 'guest-shift') {
                 if (type === 'radio' && checked) state.guestShiftSelection = value;
+            } else if (id === 'personnel-depart-select' && value === '__other__') {
+                const newDepart = prompt('Nhập tên phòng ban mới:');
+                if (newDepart && newDepart.trim()) {
+                    const option = document.createElement('option');
+                    option.value = newDepart.trim();
+                    option.textContent = newDepart.trim();
+                    option.selected = true;
+                    
+                    const otherOption = e.target.querySelector('option[value="__other__"]');
+                    e.target.insertBefore(option, otherOption);
+                } else {
+                    e.target.value = ''; 
+                }
             }
         });
 
@@ -1859,7 +1877,6 @@
                     state.cachedData.delete(`${weekString}/${dayKey}`);
                     showToast(__('eatenSuccess'));
                     
-                    // Re-render menu tab
                     const dayData = await getDocument(weekString, dayKey, true);
                     if (dayData) updateStaffListView(dayData);
                 } catch (err) {
@@ -1886,11 +1903,9 @@
                     const weekStr = dataset.week;
                     const weekKey = 'nextWeek';
                     
-                    // Lấy menu hiện tại
                     const currentMenu = await getDocument(weekStr, "menu", true) || {};
                     const menuToSave = { ...currentMenu };
                     
-                    // Chỉ thêm món mới
                     for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
                         const container = el(`menu-dishes-${weekKey}-${day}`);
                         if (container) {
@@ -1899,7 +1914,6 @@
                                 .map(textarea => textarea.value.trim())
                                 .filter(Boolean);
                             
-                            // Merge với món cũ
                             const existingDishes = currentMenu[day] || [];
                             menuToSave[day] = [...existingDishes, ...newDishes];
                         }
@@ -2042,7 +2056,159 @@
                     await renderAdmin();
                 } catch { showToast(__('error'), 'error'); } finally { hideLoader(); }
             }
+           
+            else if (id === 'add-personnel-btn') {
+                el('personnel-modal-title').textContent = 'Thêm nhân viên';
+                el('personnel-original-email-key').value = '';
+                el('personnel-name-input').value = '';
+                el('personnel-email-input').value = '';
+                el('personnel-depart-select').innerHTML = '';
+                
+                const allStaff = await getDocument("staff_list", "staffs", true);
+                const departments = allStaff ? [...new Set(Object.values(allStaff).map(p => p.depart).filter(Boolean))].sort() : [];
+                departments.forEach(dept => {
+                    const option = document.createElement('option');
+                    option.value = dept;
+                    option.textContent = dept;
+                    el('personnel-depart-select').appendChild(option);
+                });
+                
+                const otherOption = document.createElement('option');
+                otherOption.value = '__other__';
+                otherOption.textContent = 'Khác (nhập mới)';
+                el('personnel-depart-select').appendChild(otherOption);
+                
+                el('personnel-modal').classList.remove('hidden');
+            }
             
+            else if (classList.contains('edit-personnel-btn')) {
+                const userKey = dataset.key;
+                const allStaff = await getDocument("staff_list", "staffs", true);
+                const userData = allStaff[userKey];
+                
+                if (!userData) {
+                    showToast('Không tìm thấy nhân viên', 'error');
+                    return;
+                }
+                
+                el('personnel-modal-title').textContent = 'Chỉnh sửa nhân viên';
+                el('personnel-original-email-key').value = userKey;
+                el('personnel-name-input').value = userData.name || '';
+                el('personnel-email-input').value = userData.email || '';
+                el('personnel-depart-select').innerHTML = '';
+                
+                const departments = [...new Set(Object.values(allStaff).map(p => p.depart).filter(Boolean))].sort();
+                departments.forEach(dept => {
+                    const option = document.createElement('option');
+                    option.value = dept;
+                    option.textContent = dept;
+                    option.selected = dept === userData.depart;
+                    el('personnel-depart-select').appendChild(option);
+                });
+                
+                const otherOption = document.createElement('option');
+                otherOption.value = '__other__';
+                otherOption.textContent = 'Khác (nhập mới)';
+                el('personnel-depart-select').appendChild(otherOption);
+                
+                el('personnel-modal').classList.remove('hidden');
+            }
+            
+            else if (classList.contains('delete-personnel-btn')) {
+                state.deleteTarget = { key: dataset.key, name: dataset.name };
+                el('delete-personnel-text').textContent = `Bạn có chắc chắn muốn xóa nhân viên "${dataset.name}"? Hành động này không thể hoàn tác.`;
+                el('delete-personnel-modal').classList.remove('hidden');
+            }
+            
+            else if (id === 'save-personnel-btn') {
+                showLoader();
+                try {
+                    const name = el('personnel-name-input').value.trim();
+                    const email = el('personnel-email-input').value.trim();
+                    let depart = el('personnel-depart-select').value;
+                    const originalEmailKey = el('personnel-original-email-key').value;
+                    
+                    if (!name || !email) {
+                        showToast('Vui lòng điền đầy đủ thông tin', 'error');
+                        hideLoader();
+                        return;
+                    }
+                    
+                    if (!email.includes('@')) {
+                        showToast('Email không hợp lệ', 'error');
+                        hideLoader();
+                        return;
+                    }
+                    
+                    if (depart === '__other__') {
+                        depart = prompt('Nhập tên phòng ban mới:');
+                        if (!depart || !depart.trim()) {
+                            showToast('Tên phòng ban không được để trống', 'error');
+                            hideLoader();
+                            return;
+                        }
+                        depart = depart.trim();
+                    }
+                    
+                    const newEmailKey = emailToKey(email);
+                    const allStaff = await getDocument("staff_list", "staffs", true);
+                    
+                    if (!originalEmailKey || originalEmailKey !== newEmailKey) {
+                        if (allStaff && allStaff[newEmailKey]) {
+                            showToast('Email này đã tồn tại', 'error');
+                            hideLoader();
+                            return;
+                        }
+                    }
+                    
+                    const personnelData = {
+                        name: name,
+                        email: email,
+                        depart: depart,
+                        lan: 'vi'
+                    };
+                    
+                    if (originalEmailKey && originalEmailKey !== newEmailKey) {
+                        await updateDoc(doc(db, "staff_list", "staffs"), {
+                            [originalEmailKey]: deleteField(),
+                            [newEmailKey]: personnelData
+                        });
+                    } else {
+                        await updateDoc(doc(db, "staff_list", "staffs"), {
+                            [newEmailKey]: personnelData
+                        });
+                    }
+                    
+                    showToast(originalEmailKey ? 'Đã cập nhật nhân viên' : 'Đã thêm nhân viên');
+                    el('personnel-modal').classList.add('hidden');
+                    state.cachedData.delete('staff_list/staffs');
+                    await renderAdminPersonnel();
+                } catch (err) {
+                    console.error(err);
+                    showToast(__('error'), 'error');
+                } finally {
+                    hideLoader();
+                }
+            }
+            
+            else if (id === 'confirm-delete-personnel-btn') {
+                showLoader();
+                try {
+                    await updateDoc(doc(db, "staff_list", "staffs"), {
+                        [state.deleteTarget.key]: deleteField()
+                    });
+                    
+                    showToast(`Đã xóa nhân viên ${state.deleteTarget.name}`);
+                    el('delete-personnel-modal').classList.add('hidden');
+                    state.cachedData.delete('staff_list/staffs');
+                    await renderAdminPersonnel();
+                } catch (err) {
+                    console.error(err);
+                    showToast(__('error'), 'error');
+                } finally {
+                    hideLoader();
+                }
+            }
             else if(dataset.modal){
                  el(dataset.modal).classList.toggle('hidden');
             }
