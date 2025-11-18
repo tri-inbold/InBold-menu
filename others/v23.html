@@ -1640,14 +1640,38 @@
                     stats[shift][dish].ordered++;
                     if (order.status === 'eaten') stats[shift][dish].eaten++; else stats[shift][dish].notEaten++;
                 });
-                const createTable = (data, name) => {
+                const createTable = (data, shiftName) => {
                     if (Object.keys(data).length === 0) return '';
                     const totals = Object.values(data).reduce((acc, curr) => ({ordered: acc.ordered + curr.ordered, eaten: acc.eaten + curr.eaten, notEaten: acc.notEaten + curr.notEaten}), {ordered: 0, eaten: 0, notEaten: 0});
-                    return `<h4 class="mt-2" style="color:var(--primary);">${name}</h4><div class="table-wrapper"><table><thead><tr><th>${__('dish')}</th><th>${headers.ordered}</th><th>${headers.eaten}</th><th>${headers.notEaten}</th></tr></thead><tbody>
-                        ${Object.entries(data).map(([dish, d]) => `<tr><td>${dish}</td><td>${d.ordered}</td><td>${d.eaten}</td><td>${d.notEaten}</td></tr>`).join('')}
-                        <tr style="font-weight:600;background:rgba(102,126,234,0.1)"><td>${__('total')}</td><td>${totals.ordered}</td><td>${totals.eaten}</td><td>${totals.notEaten}</td></tr></tbody></table></div>`;
+                    return `<div class="table-wrapper"><table><thead><tr><th>${shiftName}</th><th style="text-align:center;width:80px;">${headers.ordered}</th><th style="text-align:center;width:80px;">${headers.eaten}</th><th style="text-align:center;width:80px;">${headers.notEaten}</th></tr></thead><tbody>
+                        ${Object.entries(data).map(([dish, d]) => `<tr><td>${dish}</td><td style="text-align:center;">${d.ordered}</td><td style="text-align:center;">${d.eaten}</td><td style="text-align:center;">${d.notEaten}</td></tr>`).join('')}
+                        <tr style="font-weight:600;background:rgba(102,126,234,0.1)"><td>${__('total')}</td><td style="text-align:center;">${totals.ordered}</td><td style="text-align:center;">${totals.eaten}</td><td style="text-align:center;">${totals.notEaten}</td></tr></tbody></table></div>`;
                 };
-                statsContent.innerHTML = createTable(stats.M, __('morning')) + createTable(stats.E, __('evening'));
+                
+                const morningTable = createTable(stats.M, __('morning'));
+                const eveningTable = createTable(stats.E, __('evening'));
+                
+                const dayTotals = {
+                    ordered: (stats.M.total?.ordered || 0) + (stats.E.total?.ordered || 0),
+                    eaten: (stats.M.total?.eaten || 0) + (stats.E.total?.eaten || 0),
+                    notEaten: (stats.M.total?.notEaten || 0) + (stats.E.total?.notEaten || 0)
+                };
+                
+                Object.values(stats.M).forEach(d => {
+                    dayTotals.ordered += d.ordered;
+                    dayTotals.eaten += d.eaten;
+                    dayTotals.notEaten += d.notEaten;
+                });
+                Object.values(stats.E).forEach(d => {
+                    dayTotals.ordered += d.ordered;
+                    dayTotals.eaten += d.eaten;
+                    dayTotals.notEaten += d.notEaten;
+                });
+                
+                const dayTotalTable = dayTotals.ordered > 0 ? `<div class="table-wrapper" style="margin-top:1rem;"><table><thead><tr><th>Tổng cả ngày</th><th style="text-align:center;width:80px;">${headers.ordered}</th><th style="text-align:center;width:80px;">${headers.eaten}</th><th style="text-align:center;width:80px;">${headers.notEaten}</th></tr></thead><tbody>
+                    <tr style="font-weight:600;background:rgba(102,126,234,0.1)"><td>${__('total')}</td><td style="text-align:center;">${dayTotals.ordered}</td><td style="text-align:center;">${dayTotals.eaten}</td><td style="text-align:center;">${dayTotals.notEaten}</td></tr></tbody></table></div>` : '';
+                
+                statsContent.innerHTML = morningTable + eveningTable + dayTotalTable;
             } else {
                 const isMonth = state.statsViewMode === 'month', date = new Date(state.statsViewDate);
                 const first = isMonth ? new Date(date.getFullYear(), date.getMonth(), 1) : new Date(date.setDate(date.getDate() - (date.getDay() || 7) + 1));
