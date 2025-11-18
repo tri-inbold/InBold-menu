@@ -1145,10 +1145,19 @@
             const firstName = getFirstName(state.staffProfile.name);
             const userEmailKey = emailToKey(state.currentUser.email);
             
-            const isReopenMode = localStorage.getItem('reopenMode') === 'true';
-            const reopenForUser = localStorage.getItem('reopenForUser');
+            let isReopenMode = false;
+            try {
+                const currentWeekString = getWeekString(new Date());
+                const todayData = await getDocument(currentWeekString, dayKey, true);
+                
+                if (todayData && todayData[userEmailKey] && todayData[userEmailKey].status === 'reopen') {
+                    isReopenMode = true;
+                }
+            } catch (err) {
+                console.error('Check reopen status error:', err);
+            }
             
-            if (isReopenMode && reopenForUser === userEmailKey) {
+            if (isReopenMode) {
                 const heroHtml = `<div class="card hero-card">
                     <div class="hero-content">
                         <div class="hero-greeting">${__('hi')} ${firstName}</div>
@@ -1169,7 +1178,7 @@
             } else {
                 const dayData = await getDocument(getWeekString(new Date()), dayKey, false);
                 const userOrder = dayData?.[userEmailKey];
-                if (userOrder) {
+                if (userOrder && userOrder.status !== 'reopen') {
                     const currentStatus = userOrder.status || 'not';
                     const isSkipped = currentStatus === 'skip';
                     const isEaten = currentStatus === 'eaten';
@@ -1406,9 +1415,9 @@
             const container = el('staff-list-container');
             const hour = new Date().getHours();
             const staffOrders = Object.entries(dayData)
-                .filter(([key, o]) => o.name && o.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                .filter(([key, o]) => o.name && o.status !== 'reopen' && o.name.toLowerCase().includes(searchTerm.toLowerCase())) 
                 .map(([key, o]) => ({ ...o, key }));
-            
+
             el('menu-filter-btn').innerHTML = state.menuFilterMode === 'auto' ? `<i class="fas ${hour < 15 ? 'fa-sun' : 'fa-moon'}"></i>` : `<i class="fas fa-users"></i>`;
             
             const createStaffItem = (order, showMarkEaten = false) => {
@@ -2186,14 +2195,27 @@
                 try {
                     const weekString = getWeekString(new Date());
                     const targetKey = state.reopenTarget.key;
+                    const today = new Date();
+                    const dayOfWeek = today.getDay();
                     
-                    for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
-                        await updateDoc(doc(db, weekString, day), { [targetKey]: deleteField() });
+                    const dayOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+                    const dayMapping = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri' };
+                    
+                    for (let d = dayOfWeek; d <= 5; d++) {
+                        if (d >= 1 && d <= 5) {
+                            const dayKey = dayMapping[d];
+                            await updateDoc(doc(db, weekString, dayKey), { 
+                                [targetKey]: {
+                                    status: 'reopen',
+                                    name: state.reopenTarget.name,
+                                    email: '',
+                                    food: '',
+                                    shift: '',
+                                    depart: ''
+                                }
+                            });
+                        }
                     }
-                    
-                    localStorage.setItem('reopenMode', 'true');
-                    localStorage.setItem('reopenForUser', targetKey);
-                    localStorage.setItem('reopenDate', new Date().toISOString());
                     
                     showToast(__('reopenSuccess'));
                     el('reopen-order-modal').classList.add('hidden');
@@ -2209,19 +2231,23 @@
                     } else {
                         await renderAdmin();
                     }
-                } catch { showToast(__('error'), 'error'); } finally { hideLoader(); }
+                } catch (err) { 
+                    console.error('Reopen error:', err);
+                    showToast(__('error'), 'error'); 
+                } finally { hideLoader(); }
             } else if (id === 'submit-reopen-order-btn') {
                 showLoader();
                 try {
                     const currentWeekString = getWeekString(new Date());
+                    const userEmailKey = emailToKey(state.currentUser.email);
                     
                     for (const dayKey in state.orderSelection) {
                         const payload = { 
-                            [emailToKey(state.currentUser.email)]: { 
+                            [userEmailKey]: { 
                                 name: state.staffProfile.name, 
                                 email: state.currentUser.email, 
                                 food: state.orderSelection[dayKey], 
-                                status: 'not', 
+                                status: 'not',
                                 shift: state.userShiftSelection, 
                                 depart: state.staffProfile.depart 
                             }
@@ -2229,17 +2255,16 @@
                         await setDoc(doc(db, currentWeekString, dayKey), payload, { merge: true });
                     }
                     
-                    localStorage.removeItem('reopenMode');
-                    localStorage.removeItem('reopenForUser');
-                    localStorage.removeItem('reopenDate');
-                    
                     showToast(__('orderSuccess')); 
                     state.orderSelection = {};
                     state.currentOrderDay = 'mon';
                     state.cachedData.clear();
                     await render();
                     await checkOrderNotification();
-                } catch { showToast(__('orderFailed'), 'error'); } finally { hideLoader(); }
+                } catch (err) { 
+                    console.error('Submit reopen order error:', err);
+                    showToast(__('orderFailed'), 'error'); 
+                } finally { hideLoader(); }
             } else if (id === 'add-personnel-btn') {
                 el('personnel-modal-title').textContent = 'Thêm nhân viên';
                 el('personnel-original-email-key').value = '';
@@ -2432,6 +2457,8 @@
             }
         }
 
+        // có 4 status: not: chưa ăn, eaten: đã ăn, skip: nhường cho người khác, reopen: mở lại order (theo ngày) cho người quên đặt món tuần đó, skip và reopen không được count vào thống kê
+        
         main();
     </script>
 </body>
