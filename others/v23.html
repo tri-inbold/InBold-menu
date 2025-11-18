@@ -1947,22 +1947,26 @@
                 showLoader();
                 try {
                     const today = new Date();
-                    const isReopenMode = localStorage.getItem('reopenMode') === 'true';
+                    const dayOfWeek = today.getDay();
+                    const hour = today.getHours();
                     
-                    const targetWeek = isReopenMode ? getWeekString(today) : (
-                        (today.getDay() === 5 && today.getHours() >= 15) || today.getDay() === 6 || today.getDay() === 0
-                            ? getWeekString(new Date(today.getTime() + 7 * 86400000)) 
-                            : getWeekString(today)
-                    );
+                    const canOrderNextWeek = (dayOfWeek === 5 && hour >= 15) || dayOfWeek === 6 || dayOfWeek === 0;
+                    const targetWeek = canOrderNextWeek 
+                        ? getWeekString(new Date(today.getTime() + 7 * 86400000))
+                        : getWeekString(today);
                     
                     for (const dayKey in state.orderSelection) {
-                        const payload = { [emailToKey(state.currentUser.email)]: { name: state.staffProfile.name, email: state.currentUser.email, food: state.orderSelection[dayKey], status: 'not', shift: state.userShiftSelection, depart: state.staffProfile.depart }};
+                        const payload = { 
+                            [emailToKey(state.currentUser.email)]: { 
+                                name: state.staffProfile.name, 
+                                email: state.currentUser.email, 
+                                food: state.orderSelection[dayKey], 
+                                status: 'not', 
+                                shift: state.userShiftSelection, 
+                                depart: state.staffProfile.depart 
+                            }
+                        };
                         await setDoc(doc(db, targetWeek, dayKey), payload, { merge: true });
-                    }
-                    
-                    if (isReopenMode) {
-                        localStorage.removeItem('reopenMode');
-                        localStorage.removeItem('reopenDate');
                     }
                     
                     showToast(__('orderSuccess')); 
