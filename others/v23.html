@@ -499,7 +499,7 @@
         .profile-menu-icon.red { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
         
         .profile-menu-text { flex: 1; text-align: left; }
-        .profile-menu-label { font-size: 14px; font-weight: 500; }
+        .profile-menu-label { font-size: 14px; font-weight: 500; color: var(--primary); }
         .profile-menu-value { font-size: 12px; color: var(--text-muted); }
         
         .btn {
@@ -1430,7 +1430,7 @@
                 .filter(([key, o]) => o.name && o.status !== 'reopen' && o.name.toLowerCase().includes(searchTerm.toLowerCase())) 
                 .map(([key, o]) => ({ ...o, key }));
 
-            el('menu-filter-btn').innerHTML = state.menuFilterMode === 'auto' ? `<i class="fas ${hour < 15 ? 'fa-sun' : 'fa-moon'}"></i>` : `<i class="fas fa-clock"></i>`;
+            el('menu-filter-btn').innerHTML = state.menuFilterMode === 'auto' ? `<i class="fas ${hour < 15 ? 'fa-sun' : 'fa-moon'}"></i>` : `<i class="fas fa-user-group"></i>`;
             
             const createStaffItem = (order, showMarkEaten = false) => {
                 const statusClass = order.status === 'eaten' ? 'eaten' : (order.status === 'skip' ? 'skipped' : '');
@@ -1540,7 +1540,7 @@
                 <button class="tab-btn ${state.adminSubTab === 'support' ? 'active' : ''}" data-subtab="support"><i class="fas fa-headset"></i><span class="tab-label">${__('support')}</span></button>
                 <button class="tab-btn ${state.adminSubTab === 'stats' ? 'active' : ''}" data-subtab="stats"><i class="fas fa-chart-pie"></i><span class="tab-label">${__('stats')}</span></button>
                 <button class="tab-btn ${state.adminSubTab === 'menu' ? 'active' : ''}" data-subtab="menu"><i class="fas fa-utensils"></i><span class="tab-label">${__('menu')}</span></button>
-                <button class="tab-btn ${state.adminSubTab === 'personnel' ? 'active' : ''}" data-subtab="personnel"><i class="fas fa-clock"></i><span class="tab-label">${__('personnel')}</span></button>
+                <button class="tab-btn ${state.adminSubTab === 'personnel' ? 'active' : ''}" data-subtab="personnel"><i class="fas fa-user-group"></i><span class="tab-label">${__('personnel')}</span></button>
             </div><div id="admin-content"></div></div>`;
             await renderAdminSubTab();
         }
