@@ -1235,13 +1235,30 @@
             const currentWeekOrders = await getDocument(currentWeekString, 'mon', true);
             const hasOrderedCurrentWeek = currentWeekOrders && currentWeekOrders[userEmailKey];
             
+            let hasAnyCurrentWeekOrders = false;
             if (isCurrentWeekPeriod) {
-                if (hasOrderedCurrentWeek) {
+                for (const dayKey of dayKeys) {
+                    const dayData = await getDocument(currentWeekString, dayKey, true);
+                    if (dayData && dayData[userEmailKey] && dayData[userEmailKey].status !== 'reopen') {
+                        hasAnyCurrentWeekOrders = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (isCurrentWeekPeriod) {
+                if (hasOrderedCurrentWeek || hasAnyCurrentWeekOrders) {
                     let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${currentWeekString.split('_')[1]}</h2></div><ul class="staff-list">`;
                     for (const key of dayKeys) {
                         const dayData = await getDocument(currentWeekString, key, true);
-                        const dish = dayData?.[userEmailKey]?.food;
-                        summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish">${parseDish(dish) || __('rest')}</div></div></li>`;
+                        const userOrder = dayData?.[userEmailKey];
+                        
+                        if (userOrder && userOrder.status !== 'reopen') {
+                            const dish = userOrder.food;
+                            summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish">${parseDish(dish)}</div></div></li>`;
+                        } else if (!userOrder || userOrder.status === 'reopen') {
+                            summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish text-muted">${__('notOrdered')}</div></div></li>`;
+                        }
                     }
                     container.innerHTML = summaryHTML + `</ul></div>`;
                     return;
@@ -1337,6 +1354,10 @@
                 return;
             }
             
+            if (!dayKeys.includes(state.currentOrderDay)) {
+                state.currentOrderDay = dayKeys[0];
+            }
+            
             const allSelected = dayKeys.every(day => state.orderSelection[day]);
             if (allSelected) {
                 let summaryHTML = `<div class="card">
@@ -1384,10 +1405,6 @@
             </div>`;
             
             container.innerHTML = `<div class="card">${warningHTML}<div class="card-header"><h2 class="card-title">${__('orderForWeek')} ${currentWeekString.split('_')[1]}</h2></div>${shiftToggleHTML}${tabsHTML}${daysContentHTML}</div>`;
-            
-            if (!dayKeys.includes(state.currentOrderDay)) {
-                state.currentOrderDay = dayKeys[0];
-            }
         }
         
         async function renderMenu() {
@@ -1848,17 +1865,30 @@
             
             const today = new Date();
             const dayOfWeek = today.getDay();
+            const hour = today.getHours();
             const userEmailKey = emailToKey(state.currentUser.email);
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
             
-            const checkWeekString = isWeekend 
-                ? getWeekString(new Date(today.getTime() + 7 * 86400000))
-                : getWeekString(today);
+            const isCurrentWeekPeriod = (dayOfWeek >= 1 && dayOfWeek <= 4) || (dayOfWeek === 5 && hour < 15);
+            const checkWeekString = isCurrentWeekPeriod 
+                ? getWeekString(today)
+                : getWeekString(new Date(today.getTime() + 7 * 86400000));
             
-            const checkOrders = await getDocument(checkWeekString, 'mon');
-            const hasOrdered = checkOrders && checkOrders[userEmailKey];
+            let hasAnyOrders = false;
+            const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
             
-            todayTab.classList.toggle('needs-attention', !hasOrdered);
+            for (const dayKey of dayKeys) {
+                const dayData = await getDocument(checkWeekString, dayKey, true);
+                if (dayData && dayData[userEmailKey]) {
+                    const userOrder = dayData[userEmailKey];
+                    if (userOrder.status && userOrder.status !== 'reopen') {
+                        hasAnyOrders = true;
+                        break;
+                    }
+                }
+            }
+            
+            todayTab.classList.toggle('needs-attention', !hasAnyOrders);
         }
 
         function autoResizeTextarea(element) {
@@ -1961,16 +1991,52 @@
                 } catch { showToast(__('error'), 'error'); } finally { hideLoader(); }
             } else if (classList.contains('order-day-tab-btn')) {
                 state.currentOrderDay = dataset.dayKey;
-                await renderOrderSection(el('order-section-container'));
+                
+                const userEmailKey = emailToKey(state.currentUser.email);
+                const currentWeekString = getWeekString(new Date());
+                const todayData = await getDocument(currentWeekString, getDayKey(), true);
+                const isReopenMode = todayData && todayData[userEmailKey] && todayData[userEmailKey].status === 'reopen';
+                
+                if (isReopenMode) {
+                    await renderReopenOrderSection(el('order-section-container'));
+                } else {
+                    await renderOrderSection(el('order-section-container'));
+                }
             } else if (classList.contains('order-dish-item') && !classList.contains('guest-dish-item')) {
                 const { dayKey, dish } = dataset;
-                const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri'];
                 state.orderSelection[dayKey] = dish;
-                const currentIndex = dayOrder.indexOf(dayKey);
-                if (currentIndex < dayOrder.length - 1) {
-                    state.currentOrderDay = dayOrder[currentIndex + 1];
+                
+                const userEmailKey = emailToKey(state.currentUser.email);
+                const currentWeekString = getWeekString(new Date());
+                const todayData = await getDocument(currentWeekString, getDayKey(), true);
+                const isReopenMode = todayData && todayData[userEmailKey] && todayData[userEmailKey].status === 'reopen';
+                
+                if (isReopenMode) {
+                    const today = new Date();
+                    const dayOfWeek = today.getDay();
+                    const dayOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+                    const availableDays = [];
+                    
+                    for (let d = dayOfWeek; d <= 5; d++) {
+                        if (d >= 1 && d <= 5) {
+                            availableDays.push(dayOrder[d]);
+                        }
+                    }
+                    
+                    const currentIndex = availableDays.indexOf(dayKey);
+                    if (currentIndex < availableDays.length - 1) {
+                        state.currentOrderDay = availableDays[currentIndex + 1];
+                    }
+                    
+                    await renderReopenOrderSection(el('order-section-container'));
+                } else {
+                    const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri'];
+                    const currentIndex = dayOrder.indexOf(dayKey);
+                    if (currentIndex < dayOrder.length - 1) {
+                        state.currentOrderDay = dayOrder[currentIndex + 1];
+                    }
+                    await renderOrderSection(el('order-section-container'));
                 }
-                await renderOrderSection(el('order-section-container'));
             } else if (id === 'submit-order-btn') {
                 showLoader();
                 try {
@@ -2268,6 +2334,18 @@
                 try {
                     const currentWeekString = getWeekString(new Date());
                     const userEmailKey = emailToKey(state.currentUser.email);
+                    const today = new Date();
+                    const dayOfWeek = today.getDay();
+                    
+                    const dayOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+                    const dayMapping = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri' };
+                    const allRemainingDays = [];
+                    
+                    for (let d = dayOfWeek; d <= 5; d++) {
+                        if (d >= 1 && d <= 5) {
+                            allRemainingDays.push(dayMapping[d]);
+                        }
+                    }
                     
                     for (const dayKey in state.orderSelection) {
                         const payload = { 
@@ -2281,6 +2359,17 @@
                             }
                         };
                         await setDoc(doc(db, currentWeekString, dayKey), payload, { merge: true });
+                    }
+                    
+                    for (const dayKey of allRemainingDays) {
+                        if (!state.orderSelection[dayKey]) {
+                            const dayData = await getDocument(currentWeekString, dayKey, true);
+                            if (dayData && dayData[userEmailKey] && dayData[userEmailKey].status === 'reopen') {
+                                await updateDoc(doc(db, currentWeekString, dayKey), {
+                                    [userEmailKey]: deleteField()
+                                });
+                            }
+                        }
                     }
                     
                     showToast(__('orderSuccess')); 
