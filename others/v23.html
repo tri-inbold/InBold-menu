@@ -2304,6 +2304,18 @@
                 try {
                     const currentWeekString = getWeekString(new Date());
                     const userEmailKey = emailToKey(state.currentUser.email);
+                    const today = new Date();
+                    const dayOfWeek = today.getDay();
+                    
+                    const dayOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+                    const dayMapping = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri' };
+                    const allRemainingDays = [];
+                    
+                    for (let d = dayOfWeek; d <= 5; d++) {
+                        if (d >= 1 && d <= 5) {
+                            allRemainingDays.push(dayMapping[d]);
+                        }
+                    }
                     
                     for (const dayKey in state.orderSelection) {
                         const payload = { 
@@ -2317,6 +2329,19 @@
                             }
                         };
                         await setDoc(doc(db, currentWeekString, dayKey), payload, { merge: true });
+                    }
+                    
+                    for (const dayKey of allRemainingDays) {
+                        if (!state.orderSelection[dayKey]) {
+                            // Check if this day has reopen status
+                            const dayData = await getDocument(currentWeekString, dayKey, true);
+                            if (dayData && dayData[userEmailKey] && dayData[userEmailKey].status === 'reopen') {
+                                // Remove the reopen entry completely
+                                await updateDoc(doc(db, currentWeekString, dayKey), {
+                                    [userEmailKey]: deleteField()
+                                });
+                            }
+                        }
                     }
                     
                     showToast(__('orderSuccess')); 
