@@ -826,63 +826,77 @@
         }
         
         async function syncUserProfile() {
-                const userEmailKey = emailToKey(state.currentUser.email);
-                const CACHE_KEY = `cache_profile_${userEmailKey}`;
-                
-                const cachedData = localStorage.getItem(CACHE_KEY);
-                let usedCache = false;
-    
-                if (cachedData) {
-                    try {
-                        const parsed = JSON.parse(cachedData);
-                        state.staffProfile = parsed.profile;
-                        state.isAdmin = parsed.isAdmin;
-                        
-                        updateUIForUser(state.currentUser);
-                        await render(); 
-                        usedCache = true;
-                        hideLoader();
-                    } catch (e) {
-                        console.warn("Cache lỗi, bỏ qua");
-                    }
-                }
-    
+            const userEmailKey = emailToKey(state.currentUser.email);
+            const CACHE_KEY = `cache_profile_${userEmailKey}`;
+            
+            const cachedData = localStorage.getItem(CACHE_KEY);
+            let usedCache = false;
+            let cachedProfile = null;
+
+            if (cachedData) {
                 try {
-                    const staffData = await getDocument("staff_list", "staffs");
+                    const parsed = JSON.parse(cachedData);
+                    state.staffProfile = parsed.profile;
+                    state.isAdmin = parsed.isAdmin;
+                    cachedProfile = parsed.profile;
                     
-                    if (!staffData || !staffData[userEmailKey]) {
-                        await signOut(auth);
-                        throw new Error("Tài khoản không có trong danh sách.");
-                    }
-    
-                    const latestProfile = staffData[userEmailKey];
-                    let latestIsAdmin = false;
-                    try {
-                        const adminData = await getDocument("admin_list", "admins");
-                        latestIsAdmin = adminData && adminData[userEmailKey] === true;
-                    } catch { latestIsAdmin = false; }
-    
-                    const isDifferent = !usedCache || 
-                                        JSON.stringify(state.staffProfile) !== JSON.stringify(latestProfile) ||
-                                        state.isAdmin !== latestIsAdmin;
-    
-                    if (isDifferent) {
-                        state.staffProfile = latestProfile;
-                        state.isAdmin = latestIsAdmin;
-                        
-                        localStorage.setItem(CACHE_KEY, JSON.stringify({
-                            profile: state.staffProfile,
-                            isAdmin: state.isAdmin,
-                            timestamp: Date.now()
-                        }));
-    
-                        updateUIForUser(state.currentUser);
-                        await render();
-                    }
-                } catch (e) {
-                    if (!usedCache) throw e;
-                }
+                    updateUIForUser(state.currentUser);
+                    await render(); 
+                    usedCache = true;
+                    hideLoader();
+                } catch (e) { console.warn("Cache lỗi"); }
             }
+
+            try {
+                const staffData = await getDocument("staff_list", "staffs");
+                if (!staffData || !staffData[userEmailKey]) {
+                    await signOut(auth); throw new Error("Tài khoản không có trong danh sách.");
+                }
+
+                const latestProfile = staffData[userEmailKey];
+                let latestIsAdmin = false;
+                try {
+                    const adminData = await getDocument("admin_list", "admins");
+                    latestIsAdmin = adminData && adminData[userEmailKey] === true;
+                } catch { latestIsAdmin = false; }
+
+                let needUpdate = !usedCache;
+
+                if (usedCache) {
+                    const p1 = cachedProfile || {};
+                    const p2 = latestProfile || {};
+                    
+                    // So sánh từng trường quan trọng ảnh hưởng đến giao diện
+                    if (p1.name !== p2.name || 
+                        p1.depart !== p2.depart || 
+                        p1.lan !== p2.lan || 
+                        state.isAdmin !== latestIsAdmin) {
+                        needUpdate = true;
+                    }
+                }
+
+                if (needUpdate) {
+                    console.log("Dữ liệu mới khác cache, cập nhật giao diện...");
+                    state.staffProfile = latestProfile;
+                    state.isAdmin = latestIsAdmin;
+                    
+                    localStorage.setItem(CACHE_KEY, JSON.stringify({
+                        profile: state.staffProfile,
+                        isAdmin: state.isAdmin,
+                        timestamp: Date.now()
+                    }));
+
+                    updateUIForUser(state.currentUser);
+                    await render();
+                } else {
+                    console.log("Dữ liệu khớp cache, bỏ qua render lại.");
+                    
+                    state.staffProfile = latestProfile;
+                }
+            } catch (e) {
+                if (!usedCache) throw e;
+            }
+        }
 
         function updateUIForUser(user) {
             const tabBar = el('tab-bar');
