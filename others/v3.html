@@ -1044,7 +1044,6 @@
                 } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); }
             } 
             else if (id === 'export-stats-btn') {
-                showLoader();
                 try {
                     await loadXLSXLibrary();
                     const wb = XLSX.utils.book_new(); const tables = el('stats-content').querySelectorAll('table');
@@ -1058,7 +1057,6 @@
                 } catch { showToast(__('error'), 'error'); }
             } 
             else if (id === 'export-personnel-btn') {
-                showLoader();
                 try {
                     await loadXLSXLibrary();
                     const allStaff = await getDocument("staff_list", "staffs");
