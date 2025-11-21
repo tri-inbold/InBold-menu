@@ -534,7 +534,7 @@
             const menu = nextWeekDoc ? nextWeekDoc.menu : null;
             if (!menu) { container.innerHTML = `<div class="card text-center"><p class="text-muted">${__('noMenu')}</p></div>`; return; }
         
-            const shiftToggleHTML = `<div class="form-group"><label class="form-label">${__('shift')}</label><div class="shift-toggle"><input type="radio" id="user-shift-m" name="user-shift" value="morning" ${state.userShiftSelection === 'morning' ? 'checked' : ''}><label for="user-shift-m">${__('morning')}</label><input type="radio" id="user-shift-e" name="user-shift" value="evening" ${state.userShiftSelection === 'evening' ? 'checked' : ''}><label for="user-shift-e">${__('evening')}</label></div></div>`;
+            const shiftToggleHTML = `<div class="form-group"><div class="shift-toggle"><input type="radio" id="user-shift-m" name="user-shift" value="morning" ${state.userShiftSelection === 'morning' ? 'checked' : ''}><label for="user-shift-m">${__('morning')}</label><input type="radio" id="user-shift-e" name="user-shift" value="evening" ${state.userShiftSelection === 'evening' ? 'checked' : ''}><label for="user-shift-e">${__('evening')}</label></div></div>`;
             
             let tabsHTML = `<div class="tabs">`;
             for (const dayKey of dayKeys) { tabsHTML += `<button class="tab-btn order-day-tab-btn ${state.currentOrderDay === dayKey ? 'active' : ''}" data-day-key="${dayKey}">${dayNames[dayKey]}</button>`; }
