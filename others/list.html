@@ -44,14 +44,12 @@
         .tab-btn:hover { background: var(--card-hover); color: var(--text); }
         .tab-btn.active { background: var(--gradient-1); border-color: transparent; color: white; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); }
         
-        /* Search & Filter */
         .search-bar { display: flex; gap: 8px; margin-bottom: 1rem; }
         .search-wrapper { position: relative; flex: 1; }
         .search-input { width: 100%; padding: 12px 12px 12px 40px; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: inherit; }
         .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
         .icon-btn { width: 42px; height: 42px; border-radius: 8px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; }
         
-        /* List Styles */
         .department-group { margin-bottom: 1.5rem; }
         .department-header { color: var(--primary-light); padding: 0.5rem 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid rgba(102, 126, 234, 0.2); margin-bottom: 0.5rem; }
         
@@ -67,24 +65,21 @@
         .status-eaten { color: var(--success); }
         .status-skip { color: var(--warning); }
         
-        /* Stats Table */
         .table-wrapper { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 1rem; }
         table { width: 100%; border-collapse: collapse; }
         thead { background: rgba(102, 126, 234, 0.1); }
         th, td { padding: 12px 15px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border); }
         th { font-weight: 600; color: var(--primary-light); text-transform: uppercase; font-size: 12px; }
         tr:last-child td { border-bottom: none; }
-        .stats-date-controls { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
+        .stats-date-controls { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 1.5rem; }
         .date-display { font-size: 16px; font-weight: 600; min-width: 150px; text-align: center; }
         
-        /* Utils */
         .hidden { display: none !important; }
         .text-center { text-align: center; }
         .text-muted { color: var(--text-muted); }
         #loader { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #0f172a; display: flex; align-items: center; justify-content: center; z-index: 9999; }
         .static-logo { width: 150px; height: auto; }
         
-        /* Badges */
         .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; margin-left: 6px; }
         .badge-morning { background: rgba(66, 153, 225, 0.2); color: #63b3ed; }
         .badge-evening { background: rgba(128, 90, 213, 0.2); color: #b794f4; }
@@ -110,7 +105,7 @@
 
         <div class="tabs">
             <button class="tab-btn active" data-tab="list">
-                <i class="fas fa-list-ul"></i> Danh sách hôm nay
+                <i class="fas fa-list-ul"></i> Món hôm nay
             </button>
             <button class="tab-btn" data-tab="stats">
                 <i class="fas fa-chart-pie"></i> Thống kê ngày
@@ -120,7 +115,7 @@
         <main id="main-content"></main>
     </div>
 
-<script type="module">
+    <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js";
 
@@ -136,7 +131,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // --- SỬA LỖI Ở ĐÂY: Đổi statsDate thành statsViewDate ---
         const state = {
             currentTab: 'list',
             statsViewDate: new Date(), 
@@ -147,7 +141,6 @@
         const showLoader = () => el('loader').classList.remove('hidden');
         const hideLoader = () => el('loader').classList.add('hidden');
 
-        // --- Helpers ---
         const getWeekString = (date) => {
             const d = new Date(date);
             d.setHours(0, 0, 0, 0);
@@ -159,7 +152,6 @@
 
         const getDayKey = (date = new Date()) => ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][date.getDay()];
         
-        // Helper để format ngày cho input date (YYYY-MM-DD) theo giờ địa phương
         const toLocalISOString = (date) => {
             const offset = date.getTimezoneOffset() * 60000;
             const localISOTime = (new Date(date - offset)).toISOString().slice(0, 10);
@@ -203,8 +195,6 @@
                 return null;
             }
         }
-
-        // --- Core Functions ---
 
         async function render() {
             showLoader();
@@ -361,7 +351,6 @@
         }
 
         async function renderStats(container) {
-            // Sử dụng toLocalISOString để tránh lỗi lệch múi giờ
             const dateStr = toLocalISOString(state.statsViewDate);
             const dayKey = getDayKey(state.statsViewDate);
             const weekStr = getWeekString(state.statsViewDate);
@@ -370,6 +359,7 @@
                 <div class="card">
                     <div class="stats-date-controls">
                         <button class="icon-btn" id="prev-day"><i class="fas fa-chevron-left"></i></button>
+                        <button class="icon-btn" id="today-btn" title="Hôm nay" style="background:var(--primary); color:white;"><i class="fas fa-calendar-day"></i></button>
                         <div style="position:relative;">
                             <div class="date-display">${state.statsViewDate.toLocaleDateString('vi-VN')}</div>
                             <input type="date" id="date-picker" value="${dateStr}" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;">
@@ -382,7 +372,6 @@
             container.innerHTML = controlsHtml;
 
             el('date-picker').addEventListener('change', (e) => {
-                // Tạo Date object từ chuỗi YYYY-MM-DD mà không bị lệch giờ
                 const parts = e.target.value.split('-');
                 state.statsViewDate = new Date(parts[0], parts[1] - 1, parts[2]);
                 renderStats(container);
@@ -393,6 +382,10 @@
             });
             el('next-day').addEventListener('click', () => {
                 state.statsViewDate.setDate(state.statsViewDate.getDate() + 1);
+                renderStats(container);
+            });
+            el('today-btn').addEventListener('click', () => {
+                state.statsViewDate = new Date();
                 renderStats(container);
             });
 
@@ -422,16 +415,11 @@
                 const shiftKey = (rawShift.includes('e') || rawShift === 'evening') ? 'evening' : 'morning';
 
                 if (!stats[shiftKey][dish]) {
-                    stats[shiftKey][dish] = { ordered: 0, eaten: 0, notEaten: 0 };
+                    stats[shiftKey][dish] = { ordered: 0 };
                 }
 
                 hasData = true;
                 stats[shiftKey][dish].ordered++;
-                if (status === 'eaten') {
-                    stats[shiftKey][dish].eaten++;
-                } else {
-                    stats[shiftKey][dish].notEaten++;
-                }
             });
 
             if (!hasData) {
@@ -441,25 +429,19 @@
 
             const createTable = (data, title, badgeClass) => {
                 if (Object.keys(data).length === 0) return '';
-                const totals = Object.values(data).reduce((acc, curr) => ({
-                    ordered: acc.ordered + curr.ordered, 
-                    eaten: acc.eaten + curr.eaten, 
-                    notEaten: acc.notEaten + curr.notEaten
-                }), {ordered: 0, eaten: 0, notEaten: 0});
+                const totalOrdered = Object.values(data).reduce((sum, curr) => sum + curr.ordered, 0);
 
                 return `
                     <div style="margin-bottom: 1.5rem;">
                         <h4 style="margin-bottom:10px; display:flex; align-items:center;">
-                            ${title} <span class="badge ${badgeClass}">${totals.ordered} suất</span>
+                            ${title} <span class="badge ${badgeClass}">${totalOrdered} suất</span>
                         </h4>
                         <div class="table-wrapper">
                             <table>
                                 <thead>
                                     <tr>
                                         <th>Món ăn</th>
-                                        <th class="text-center" title="Tổng đặt"><i class="fas fa-list-ul"></i></th>
-                                        <th class="text-center" title="Đã ăn"><i class="fas fa-check"></i></th>
-                                        <th class="text-center" title="Chưa ăn"><i class="fas fa-xmark"></i></th>
+                                        <th class="text-center" style="width: 80px;" title="Tổng đặt"><i class="fas fa-list-ul"></i></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -467,15 +449,11 @@
                                         <tr>
                                             <td>${dish}</td>
                                             <td class="text-center"><b>${d.ordered}</b></td>
-                                            <td class="text-center" style="color:var(--success)">${d.eaten}</td>
-                                            <td class="text-center" style="color:var(--text-muted)">${d.notEaten}</td>
                                         </tr>
                                     `).join('')}
                                     <tr style="background:rgba(102,126,234,0.1); font-weight:700;">
                                         <td>TỔNG CỘNG</td>
-                                        <td class="text-center">${totals.ordered}</td>
-                                        <td class="text-center">${totals.eaten}</td>
-                                        <td class="text-center">${totals.notEaten}</td>
+                                        <td class="text-center">${totalOrdered}</td>
                                     </tr>
                                 </tbody>
                             </table>
