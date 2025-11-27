@@ -65,7 +65,6 @@
         .tab-btn.active .tab-label { max-width: 100px; margin-left: 8px; }
         .tab-btn:hover { background: var(--card-hover); color: var(--text); }
         .tab-btn.active { background: var(--primary); border-color: var(--primary); color: white; }
-        /* Requirement 1: Active/Selected styling for tabs */
         .tab-btn.has-order::after { content: ''; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; background: var(--success); border-radius: 50%; }
         
         .action-buttons-hero { display: flex; gap: 12px; margin-top: 1rem; justify-content: center; }
@@ -81,7 +80,6 @@
         .order-dish-list { display: grid; gap: 0.5rem; }
         .order-dish-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: rgba(102, 126, 234, 0.05); border-radius: var(--radius-sm); border: 1px solid transparent; cursor: pointer; transition: all 0.2s; }
         .order-dish-item:hover { border-color: var(--primary); background: rgba(102, 126, 234, 0.12); }
-        /* Requirement 1: Selected dish highlight */
         .order-dish-item.selected { border-color: var(--success); background: rgba(72, 187, 120, 0.15); box-shadow: 0 0 0 1px var(--success); }
         .order-dish-name { flex: 1; font-size: 14px; font-weight: 500; }
         
@@ -240,7 +238,8 @@
                     <div>
                         <div class="form-group">
                             <label class="form-label">Nhường cho người cụ thể</label>
-                            <input type="text" id="skip-receiver-input" class="form-input" placeholder="Nhập tên người nhận...">
+                            <input type="text" id="skip-receiver-input" class="form-input" placeholder="Nhập tên người nhận..." list="staff-suggestions">
+                            <datalist id="staff-suggestions"></datalist>
                         </div>
                         <button id="skip-specific-btn" class="btn btn-secondary btn-block">Nhường cho người này</button>
                     </div>
@@ -738,7 +737,10 @@
                 
                 let extraInfo = '';
                 if (status === 'giveup') {
-                    extraInfo = `<div style="font-size:11px;color:var(--warning);"> <i class="fas fa-arrow-right"></i> ${receiver || 'Mọi người'}</div>`;
+                    // Chỉ hiện tên người nhận nếu không phải là "Everyone" hoặc "Mọi người"
+                    if (receiver && receiver !== 'Everyone' && receiver !== 'Mọi người') {
+                        extraInfo = `<div style="font-size:11px;color:var(--warning);"> <i class="fas fa-arrow-right"></i> ${receiver}</div>`;
+                    }
                 }
 
                 return `<li class="staff-item ${statusClass}"><div class="staff-details"><div class="staff-name">${order.name}</div><div class="staff-dish">${parseDish(order.rawDish)}</div>${extraInfo}</div>${actionBtn}</li>`;
@@ -1105,12 +1107,6 @@
             else if (classList.contains('order-dish-item') && !classList.contains('guest-dish-item')) {
                 const { dayKey, dish } = dataset;
                 state.orderSelection[dayKey] = dish;
-                const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri'];
-                // Keep on same day or move to next not forced
-                // const currentIndex = dayOrder.indexOf(dayKey);
-                // if (currentIndex < dayOrder.length - 1) state.currentOrderDay = dayOrder[currentIndex + 1];
-                
-                // Re-render to show selection state
                 const weekDoc = await getDocument('order_list', getWeekString(new Date()));
                 if (weekDoc && weekDoc[emailToKey(state.currentUser.email)]?.order === 'reopen') await renderReopenOrderSection(el('order-section-container'));
                 else await renderOrderSection(el('order-section-container'));
@@ -1130,10 +1126,7 @@
                     for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
                          if(state.orderSelection[day]) {
                              const dishName = state.orderSelection[day];
-                             // Kiểm tra nếu là món "Không đặt cơm"
                              const isNoOrder = dishName.toLowerCase().includes('không đặt cơm') || dishName.toLowerCase().includes('no order');
-                             
-                             // Nếu là Không đặt cơm -> dùng [ignore], ngược lại dùng not:
                              const prefix = isNoOrder ? '[ignore] ' : 'not: ';
                              payload[userKey][day] = `${prefix}${dishName}`;
                          }
@@ -1146,6 +1139,20 @@
             else if (dataset.action === 'skip-modal') {
                 state.skipTarget = { day: dataset.day, dish: dataset.dish };
                 el('skip-option-modal').classList.remove('hidden');
+                
+                // Tải danh sách nhân viên vào datalist để gợi ý
+                const datalist = el('staff-suggestions');
+                if (datalist.children.length === 0) {
+                    const allStaff = await getDocument("staff_list", "staffs");
+                    if (allStaff) {
+                        const names = Object.values(allStaff).map(s => s.name).filter(n => n !== state.staffProfile.name).sort();
+                        names.forEach(name => {
+                            const opt = document.createElement('option');
+                            opt.value = name;
+                            datalist.appendChild(opt);
+                        });
+                    }
+                }
             }
             else if (id === 'skip-everyone-btn') {
                 await processSkip('Everyone');
@@ -1257,7 +1264,6 @@
                     for (const day in state.guestOrderSelection) {
                         const dishName = state.guestOrderSelection[day];
                         const isNoOrder = dishName.toLowerCase().includes('không đặt cơm');
-                        // Sử dụng [ignore] thay vì placeholder:
                         const prefix = isNoOrder ? '[ignore] ' : 'not: ';
                         payload[guestKey][day] = `${prefix}${dishName}`;
                     }
