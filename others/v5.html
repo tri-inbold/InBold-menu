@@ -886,7 +886,7 @@
                         if (key === 'menu' || typeof val !== 'object' || val.order === 'reopen' || !val[dayKey]) return;
                         
                         const { status } = parseDishValue(val[dayKey]);
-                        if (status === 'placeholder') return;
+                        if (status === 'ignore' || status === 'placeholder') return;
                         
                         const depart = val.depart || __('unknown');
                         if (!departStats[depart]) departStats[depart] = { ordered: 0, eaten: 0, notEaten: 0 };
@@ -1140,7 +1140,6 @@
                 state.skipTarget = { day: dataset.day, dish: dataset.dish };
                 el('skip-option-modal').classList.remove('hidden');
                 
-                // Tải danh sách nhân viên vào datalist để gợi ý
                 const datalist = el('staff-suggestions');
                 if (datalist.children.length === 0) {
                     const allStaff = await getDocument("staff_list", "staffs");
