@@ -120,7 +120,7 @@
         <main id="main-content"></main>
     </div>
 
-    <script type="module">
+<script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js";
 
@@ -136,10 +136,11 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
+        // --- SỬA LỖI Ở ĐÂY: Đổi statsDate thành statsViewDate ---
         const state = {
             currentTab: 'list',
-            statsDate: new Date(),
-            filterMode: 'auto' // auto (theo giờ), all (tất cả)
+            statsViewDate: new Date(), 
+            filterMode: 'auto'
         };
 
         const el = (id) => document.getElementById(id);
@@ -158,6 +159,13 @@
 
         const getDayKey = (date = new Date()) => ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][date.getDay()];
         
+        // Helper để format ngày cho input date (YYYY-MM-DD) theo giờ địa phương
+        const toLocalISOString = (date) => {
+            const offset = date.getTimezoneOffset() * 60000;
+            const localISOTime = (new Date(date - offset)).toISOString().slice(0, 10);
+            return localISOTime;
+        };
+
         const parseDishValue = (rawString) => {
             if (!rawString) return { status: 'not', dish: '' };
             if (rawString.startsWith('[ignore]')) return { status: 'ignore', dish: rawString.substring(8).trim() };
@@ -182,7 +190,7 @@
             const { dish } = parseDishValue(rawString);
             if (!dish) return '';
             const parts = dish.replace('[ignore]', '').trim().split('|');
-            return parts[0].trim(); // Mặc định hiển thị tiếng Việt
+            return parts[0].trim();
         };
 
         async function getDocument(collection, documentId) {
@@ -201,7 +209,7 @@
         async function render() {
             showLoader();
             const mainContent = el('main-content');
-            mainContent.innerHTML = ''; // Clear previous content
+            mainContent.innerHTML = ''; 
 
             if (state.currentTab === 'list') {
                 await renderList(mainContent);
@@ -222,10 +230,10 @@
                         <i class="fas fa-search search-icon"></i>
                         <input type="text" id="search-input" class="search-input" placeholder="Tìm kiếm tên nhân viên...">
                     </div>
-                    <button id="toggle-filter-btn" class="icon-btn" title="Chuyển chế độ xem (Sáng/Chiều/Tất cả)">
+                    <button id="toggle-filter-btn" class="icon-btn" title="Chuyển chế độ xem">
                         <i class="fas ${state.filterMode === 'all' ? 'fa-list' : (today.getHours() < 14 ? 'fa-sun' : 'fa-moon')}"></i>
                     </button>
-                    <button id="reload-btn" class="icon-btn" title="Làm mới dữ liệu">
+                    <button id="reload-btn" class="icon-btn" title="Làm mới">
                         <i class="fas fa-sync-alt"></i>
                     </button>
                 </div>
@@ -240,12 +248,11 @@
                 return;
             }
 
-            // Bind events
             el('search-input').addEventListener('input', (e) => updateListView(weekData, dayKey, e.target.value));
             el('reload-btn').addEventListener('click', () => render());
             el('toggle-filter-btn').addEventListener('click', () => {
                 state.filterMode = state.filterMode === 'auto' ? 'all' : 'auto';
-                renderList(container); // Re-render header icon
+                renderList(container); 
             });
 
             updateListView(weekData, dayKey, '');
@@ -265,11 +272,9 @@
                 })
                 .map(([key, val]) => ({ ...val, key, rawDish: val[dayKey] }));
 
-            // Helper to generate a shift section
             const generateSection = (list, title) => {
                 if (list.length === 0) return '';
                 
-                // Group by Department
                 const byDept = {};
                 list.forEach(o => {
                     const dept = o.depart || 'Chưa rõ';
@@ -287,7 +292,6 @@
                     sorted.forEach(order => {
                         const { status, receiver } = parseDishValue(order.rawDish);
                         
-                        // Ignore [ignore] items
                         if (status === 'ignore' || status === 'placeholder') return;
 
                         let statusClass = '';
@@ -340,7 +344,6 @@
                 contentHtml += generateSection(morningShift, '<i class="fas fa-sun"></i> Ca Sáng');
                 contentHtml += generateSection(eveningShift, '<i class="fas fa-moon"></i> Ca Chiều');
             } else {
-                // Auto mode
                 if (hour < 14) {
                     contentHtml += generateSection(morningShift, '<i class="fas fa-sun"></i> Ca Sáng');
                     if (eveningShift.length > 0) contentHtml += `<div class="text-center text-muted" style="margin-top:20px"><small>Ca chiều sẽ hiển thị tự động sau 14:00</small></div>`;
@@ -358,7 +361,8 @@
         }
 
         async function renderStats(container) {
-            const dateStr = state.statsViewDate.toISOString().split('T')[0];
+            // Sử dụng toLocalISOString để tránh lỗi lệch múi giờ
+            const dateStr = toLocalISOString(state.statsViewDate);
             const dayKey = getDayKey(state.statsViewDate);
             const weekStr = getWeekString(state.statsViewDate);
 
@@ -377,9 +381,10 @@
             `;
             container.innerHTML = controlsHtml;
 
-            // Bind Events
             el('date-picker').addEventListener('change', (e) => {
-                state.statsViewDate = new Date(e.target.value);
+                // Tạo Date object từ chuỗi YYYY-MM-DD mà không bị lệch giờ
+                const parts = e.target.value.split('-');
+                state.statsViewDate = new Date(parts[0], parts[1] - 1, parts[2]);
                 renderStats(container);
             });
             el('prev-day').addEventListener('click', () => {
@@ -391,7 +396,6 @@
                 renderStats(container);
             });
 
-            // Fetch and Process Data
             const weekDoc = await getDocument('order_list', weekStr);
             const statsContainer = el('stats-table-container');
 
@@ -409,7 +413,6 @@
 
                 const { status } = parseDishValue(val[dayKey]);
                 
-                // IMPORTANT: Ignore "No Order"
                 if (status === 'ignore' || status === 'placeholder') return;
 
                 const dish = parseDish(val[dayKey]);
@@ -486,8 +489,6 @@
                 createTable(stats.evening, 'Ca Chiều', 'badge-evening');
         }
 
-        // --- Init ---
-        // Tab switching logic
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const target = e.currentTarget;
@@ -500,7 +501,6 @@
             });
         });
 
-        // Start
         render();
 
     </script>
