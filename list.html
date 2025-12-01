@@ -33,14 +33,10 @@
         body { font-family: 'Montserrat', sans-serif; background: var(--dark-bg); color: var(--text); line-height: 1.5; font-size: 14px; }
         #app { max-width: 900px; margin: 0 auto; min-height: 100vh; padding: 1.5rem; display: flex; flex-direction: column; }
         
-        .header { text-align: center; margin-bottom: 2rem; }
-        .app-title { font-size: 24px; font-weight: 700; color: white; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px; }
-        .app-subtitle { color: var(--text-muted); font-size: 13px; }
-
         .card { background: var(--card-bg); border-radius: var(--radius-md); padding: 1.5rem; margin-bottom: 1rem; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
         
         .tabs { display: flex; gap: 8px; margin-bottom: 1.5rem; justify-content: center; }
-        .tab-btn { padding: 10px 24px; border-radius: 50px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; transition: all 0.2s ease; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+        .tab-btn { padding: 14px 32px; border-radius: 50px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; transition: all 0.2s ease; font-weight: 600; font-size: 16px; }
         .tab-btn:hover { background: var(--card-hover); color: var(--text); }
         .tab-btn.active { background: var(--gradient-1); border-color: transparent; color: white; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); }
         
@@ -72,7 +68,8 @@
         th { font-weight: 600; color: var(--primary-light); text-transform: uppercase; font-size: 12px; }
         tr:last-child td { border-bottom: none; }
         .stats-date-controls { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 1.5rem; }
-        .date-display { font-size: 16px; font-weight: 600; min-width: 150px; text-align: center; }
+        .date-display { font-size: 16px; font-weight: 600; min-width: 150px; text-align: center; position: relative; }
+        .date-display::before { content: '*'; position: absolute; left: -12px; top: 0; }
         
         .hidden { display: none !important; }
         .text-center { text-align: center; }
@@ -98,18 +95,9 @@
     </div>
 
     <div id="app">
-        <header class="header">
-            <div class="app-title"><i class="fas fa-utensils"></i> Inbold Menu</div>
-            <div class="app-subtitle">Bảng theo dõi đặt món công khai</div>
-        </header>
-
         <div class="tabs">
-            <button class="tab-btn active" data-tab="list">
-                <i class="fas fa-list-ul"></i> Món hôm nay
-            </button>
-            <button class="tab-btn" data-tab="stats">
-                <i class="fas fa-chart-pie"></i> Thống kê ngày
-            </button>
+            <button class="tab-btn active" data-tab="list">Hôm nay</button>
+            <button class="tab-btn" data-tab="stats">Danh sách đặt</button>
         </div>
 
         <main id="main-content"></main>
@@ -265,24 +253,33 @@
             const generateSection = (list, title) => {
                 if (list.length === 0) return '';
                 
-                const byDept = {};
+                const giveupList = [];
+                const notEatenList = [];
+                const eatenList = [];
+                
                 list.forEach(o => {
-                    const dept = o.depart || 'Chưa rõ';
-                    if (!byDept[dept]) byDept[dept] = [];
-                    byDept[dept].push(o);
+                    const { status } = parseDishValue(o.rawDish);
+                    if (status === 'ignore' || status === 'placeholder') return;
+                    
+                    if (status === 'giveup') {
+                        giveupList.push(o);
+                    } else if (status === 'eaten') {
+                        eatenList.push(o);
+                    } else {
+                        notEatenList.push(o);
+                    }
                 });
 
                 let html = `<div style="margin-bottom: 2rem;">
                     <h3 style="color:white; border-bottom: 2px solid var(--primary); padding-bottom:5px; margin-bottom:15px;">${title} (${list.length})</h3>`;
                 
-                Object.keys(byDept).sort().forEach(dept => {
-                    const sorted = byDept[dept].sort((a,b) => a.name.localeCompare(b.name));
-                    html += `<div class="department-group"><div class="department-header">${dept}</div><ul class="staff-list">`;
+                const renderGroup = (groupList, groupTitle) => {
+                    if (groupList.length === 0) return '';
+                    const sorted = groupList.sort((a,b) => a.name.localeCompare(b.name));
+                    html += `<div class="department-group"><div class="department-header">${groupTitle}</div><ul class="staff-list">`;
                     
                     sorted.forEach(order => {
                         const { status, receiver } = parseDishValue(order.rawDish);
-                        
-                        if (status === 'ignore' || status === 'placeholder') return;
 
                         let statusClass = '';
                         let icon = '';
@@ -297,7 +294,7 @@
                             if (receiver && receiver !== 'Everyone' && receiver !== 'Mọi người') {
                                 extra = `<div style="font-size:11px;color:var(--warning); margin-top:2px;"> <i class="fas fa-arrow-right"></i> ${receiver}</div>`;
                             } else {
-                                extra = `<div style="font-size:11px;color:var(--warning); margin-top:2px;"> <i class="fas fa-users"></i> Đã nhường</div>`;
+                                extra = `<div style="font-size:11px;color:var(--warning); margin-top:2px;"> <i class="fas fa-users"></i> Đã nhượng</div>`;
                             }
                         }
 
@@ -313,7 +310,12 @@
                         `;
                     });
                     html += `</ul></div>`;
-                });
+                };
+
+                renderGroup(giveupList, 'Nhượng');
+                renderGroup(notEatenList, 'Chưa ăn');
+                renderGroup(eatenList, 'Đã ăn');
+                
                 html += `</div>`;
                 return html;
             };
@@ -356,7 +358,7 @@
             const weekStr = getWeekString(state.statsViewDate);
 
             const controlsHtml = `
-                <div class="card">
+                <div style="margin-bottom: 1.5rem;">
                     <div class="stats-date-controls">
                         <button class="icon-btn" id="prev-day"><i class="fas fa-chevron-left"></i></button>
                         <button class="icon-btn" id="today-btn" title="Hôm nay" style="background:var(--primary); color:white;"><i class="fas fa-calendar-day"></i></button>
@@ -366,8 +368,8 @@
                         </div>
                         <button class="icon-btn" id="next-day"><i class="fas fa-chevron-right"></i></button>
                     </div>
-                    <div id="stats-table-container"></div>
                 </div>
+                <div id="stats-table-container"></div>
             `;
             container.innerHTML = controlsHtml;
 
