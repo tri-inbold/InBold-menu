@@ -68,8 +68,7 @@
         th { font-weight: 600; color: var(--primary-light); text-transform: uppercase; font-size: 12px; }
         tr:last-child td { border-bottom: none; }
         .stats-date-controls { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 1.5rem; }
-        .date-display { font-size: 16px; font-weight: 600; min-width: 150px; text-align: center; position: relative; }
-        .date-display::before { content: '*'; position: absolute; left: -12px; top: 0; }
+        .date-display { font-size: 16px; font-weight: 600; min-width: 150px; text-align: center; }
         
         .hidden { display: none !important; }
         .text-center { text-align: center; }
@@ -356,14 +355,18 @@
             const dateStr = toLocalISOString(state.statsViewDate);
             const dayKey = getDayKey(state.statsViewDate);
             const weekStr = getWeekString(state.statsViewDate);
+            
+            const dayNames = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
+            const dayName = dayNames[state.statsViewDate.getDay()];
 
             const controlsHtml = `
                 <div style="margin-bottom: 1.5rem;">
                     <div class="stats-date-controls">
                         <button class="icon-btn" id="prev-day"><i class="fas fa-chevron-left"></i></button>
                         <button class="icon-btn" id="today-btn" title="Hôm nay" style="background:var(--primary); color:white;"><i class="fas fa-calendar-day"></i></button>
-                        <div style="position:relative;">
-                            <div class="date-display">${state.statsViewDate.toLocaleDateString('vi-VN')}</div>
+                        <div style="position:relative; display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:20px; color:var(--primary);">*</span>
+                            <div class="date-display">${dayName}, ${state.statsViewDate.toLocaleDateString('vi-VN')}</div>
                             <input type="date" id="date-picker" value="${dateStr}" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;">
                         </div>
                         <button class="icon-btn" id="next-day"><i class="fas fa-chevron-right"></i></button>
