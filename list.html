@@ -364,8 +364,7 @@
                     <div class="stats-date-controls">
                         <button class="icon-btn" id="prev-day"><i class="fas fa-chevron-left"></i></button>
                         <button class="icon-btn" id="today-btn" title="Hôm nay" style="background:var(--primary); color:white;"><i class="fas fa-calendar-day"></i></button>
-                        <div style="position:relative; display:flex; align-items:center; gap:8px;">
-                            <span style="font-size:20px; color:var(--primary);">*</span>
+                        <div style="position:relative;">
                             <div class="date-display">${dayName}, ${state.statsViewDate.toLocaleDateString('vi-VN')}</div>
                             <input type="date" id="date-picker" value="${dateStr}" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;">
                         </div>
