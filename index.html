@@ -993,21 +993,31 @@
                     
                     let sheetName = workbook.SheetNames.find(n => n.toLowerCase() === 'menu') || workbook.SheetNames[0];
                     const sheet = workbook.Sheets[sheetName];
+                    
                     const rows = XLSX.utils.sheet_to_json(sheet, {header: 1});
-
                     if (!rows || rows.length === 0) throw new Error("File trống");
 
+                    let colMap = { mon: -1, tue: -1, wed: -1, thu: -1, fri: -1 };
+                    let dataStartRow = -1;
 
-                    let colMap = { mon: 2, tue: 3, wed: 4, thu: 5, fri: 6 };
-                    
-                    let dataStartRow = 0;
                     for(let i=0; i < Math.min(rows.length, 10); i++) {
-                        const rowStr = rows[i].map(c => String(c || '').toLowerCase());
-                        if (rowStr.includes('stt') || rowStr.includes('no.')) {
+                        const row = rows[i].map(c => String(c || '').toLowerCase().trim());
+                        
+                        if (row.includes('mon') || row.includes('thứ 2')) {
                             dataStartRow = i + 1;
-                            break;
+                            
+                            colMap.mon = row.findIndex(c => c === 'mon' || c === 'thứ 2');
+                            colMap.tue = row.findIndex(c => c === 'tue' || c === 'thứ 3');
+                            colMap.wed = row.findIndex(c => c === 'wed' || c === 'thứ 4');
+                            colMap.thu = row.findIndex(c => c === 'thu' || c === 'thứ 5');
+                            colMap.fri = row.findIndex(c => c === 'fri' || c === 'thứ 6');
+                            
+                            break; 
                         }
                     }
+
+                    if (dataStartRow === -1) throw new Error("Không tìm thấy dòng tiêu đề (Mon, Tue... hoặc Thứ 2, Thứ 3...)");
+                    if (colMap.mon === -1) throw new Error("Không xác định được các cột thứ ngày.");
 
                     const parsedMenu = { mon: [], tue: [], wed: [], thu: [], fri: [] };
 
@@ -1016,12 +1026,15 @@
                         if (!row || row.length === 0) continue;
 
                         for (const dayKey of ['mon', 'tue', 'wed', 'thu', 'fri']) {
-                            const cellValue = row[colMap[dayKey]]; 
-                            if (cellValue) {
-                                const cleanVal = String(cellValue).trim();
-                                const isIgnored = !cleanVal || cleanVal.toLowerCase().includes('không đặt cơm') || cleanVal.toLowerCase().includes('no order');
-                                if (!isIgnored) {
-                                    parsedMenu[dayKey].push(cleanVal);
+                            const colIndex = colMap[dayKey];
+                            if (colIndex > -1) {
+                                const cellValue = row[colIndex]; 
+                                if (cellValue) {
+                                    const cleanVal = String(cellValue).trim();
+                                    const isIgnored = !cleanVal || cleanVal.toLowerCase().includes('không đặt cơm') || cleanVal.toLowerCase().includes('no order');
+                                    if (!isIgnored) {
+                                        parsedMenu[dayKey].push(cleanVal);
+                                    }
                                 }
                             }
                         }
@@ -1045,7 +1058,7 @@
                     }
 
                     document.querySelectorAll('.menu-dish-textarea').forEach(autoResizeTextarea);
-                    showToast('Đã nhập dữ liệu menu (Cột C-G). Hãy bấm Lưu.');
+                    showToast('Đã nhập dữ liệu menu thành công.');
 
                 } catch (err) {
                     console.error(err);
