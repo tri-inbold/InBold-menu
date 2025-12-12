@@ -820,7 +820,7 @@
                 for (const [dayKey, dayName] of Object.entries({ mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') })) {
                     const dishes = menuData[dayKey] || [];
                     html += `<div class="form-group"><label class="form-label">${dayName}</label><ul class="staff-list">`;
-                    if (dishes.length > 0) dishes.forEach(dish => html += `<li class="staff-item"><div class="staff-details"><div class="staff-dish">${parseDish(dish)}</div></div></li>`);
+                    if (dishes.length > 0) dishes.forEach(dish => html += `<li class="staff-item"><div class="staff-details"><div class="staff-dish">${dish}</div></div></li>`);
                     else html += `<li class="staff-item"><div class="staff-details"><div class="staff-dish text-muted">${__('noDishYet')}</div></div></li>`;
                     html += `</ul></div>`;
                 }
@@ -841,7 +841,7 @@
                     html += `<div id="menu-dishes-${weekKey}-${dayKey}" style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.5rem;">`;
                     
                     dishes.forEach((dish, index) => {
-                         html += `<div style="display:flex;gap:0.5rem;align-items:center;"><textarea class="form-textarea menu-dish-textarea" ... >${dish}</textarea>...</div>`;
+                         html += `<div style="display:flex;gap:0.5rem;align-items:center;"><textarea class="form-textarea menu-dish-textarea" ... >${parseDish(dish)}</textarea>...</div>`;
                     });
 
                     const newIndex = dishes.length;
