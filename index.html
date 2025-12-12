@@ -828,12 +828,26 @@
             };
         
             const renderEditableMenuSection = (weekKey, menuData, title) => {
-                let html = `<h3 style="color:var(--primary);margin:1.5rem 0 1rem;font-size:18px;">${title}</h3>`;
+                let html = `<div style="display:flex;align-items:center;gap:10px;margin:1.5rem 0 1rem;"><h3 style="color:var(--primary);font-size:18px;margin:0;">${title}</h3>`;
+                
+                if (weekKey === 'nextWeek') {
+                    html += `<button onclick="document.getElementById('menu-file-input').click()" class="icon-btn" title="Import Excel/CSV (Cột C-G)" style="width:32px;height:32px;"><i class="fas fa-file-import"></i></button><input type="file" id="menu-file-input" class="hidden" accept=".xlsx, .xls, .csv">`;
+                }
+                html += `</div>`;
+
                 for (const [dayKey, dayName] of Object.entries({ mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') })) {
                     const dishes = menuData[dayKey] || [];
                     html += `<div class="form-group"><label class="form-label">${dayName}</label>`;
-                    if (dishes.length > 0) { html += `<ul class="staff-list">`; dishes.forEach(dish => html += `<li class="staff-item"><div class="staff-details"><div class="staff-dish">${parseDish(dish)}</div></div></li>`); html += `</ul>`; }
-                    html += `<div id="menu-dishes-${weekKey}-${dayKey}" style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.5rem;"><div style="display:flex;gap:0.5rem;align-items:center;"><textarea class="form-textarea menu-dish-textarea" data-week="${weekKey}" data-day="${dayKey}" data-index="${dishes.length}" placeholder="${__('oneDishPerLine')}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;"></textarea><button class="icon-btn remove-menu-dish-btn hidden" data-week="${weekKey}" data-day="${dayKey}" data-index="${dishes.length}"><i class="fas fa-times"></i></button></div></div></div>`;
+                    html += `<div id="menu-dishes-${weekKey}-${dayKey}" style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.5rem;">`;
+                    
+                    dishes.forEach((dish, index) => {
+                         html += `<div style="display:flex;gap:0.5rem;align-items:center;"><textarea class="form-textarea menu-dish-textarea" data-week="${weekKey}" data-day="${dayKey}" data-index="${index}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;">${dish}</textarea><button class="icon-btn remove-menu-dish-btn" data-week="${weekKey}" data-day="${dayKey}" data-index="${index}"><i class="fas fa-times"></i></button></div>`;
+                    });
+
+                    const newIndex = dishes.length;
+                    html += `<div style="display:flex;gap:0.5rem;align-items:center;"><textarea class="form-textarea menu-dish-textarea" data-week="${weekKey}" data-day="${dayKey}" data-index="${newIndex}" placeholder="${__('oneDishPerLine')}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;"></textarea><button class="icon-btn remove-menu-dish-btn hidden" data-week="${weekKey}" data-day="${dayKey}" data-index="${newIndex}"><i class="fas fa-times"></i></button></div>`;
+                    
+                    html += `</div></div>`;
                 }
                 return html;
             };
@@ -966,6 +980,98 @@
                     const option = document.createElement('option'); option.value = newDepart.trim(); option.textContent = newDepart.trim(); option.selected = true;
                     e.target.insertBefore(option, e.target.querySelector('option[value="__other__"]'));
                 } else { e.target.value = ''; }
+            }
+            else if (id === 'menu-file-input') {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                showLoader();
+                try {
+                    await loadXLSXLibrary();
+                    const data = await file.arrayBuffer();
+                    const workbook = XLSX.read(data);
+                    
+                    // Ưu tiên sheet tên "Menu", nếu không lấy sheet đầu tiên
+                    let sheetName = workbook.SheetNames.find(n => n.toLowerCase() === 'menu') || workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[sheetName];
+                    
+                    // Convert sheet to array of arrays (Header: 1 means row 1 is index 0)
+                    const rows = XLSX.utils.sheet_to_json(sheet, {header: 1});
+
+                    if (!rows || rows.length === 0) throw new Error("File trống");
+
+                    // Xác định index các cột dựa trên Header hoặc mặc định theo yêu cầu (Cột C -> G tương ứng index 2 -> 6)
+                    let colMap = { mon: 2, tue: 3, wed: 4, thu: 5, fri: 6 };
+                    let dataStartRow = 0;
+
+                    // Thử tìm header row để map chính xác hơn (trong trường hợp file cấu trúc khác)
+                    for(let i=0; i < Math.min(rows.length, 10); i++) {
+                        const rowStr = rows[i].map(c => String(c || '').toLowerCase());
+                        if (rowStr.some(c => c.includes('mon') || c.includes('thứ 2'))) {
+                            dataStartRow = i + 1; // Dữ liệu bắt đầu sau header
+                            rowStr.forEach((cell, idx) => {
+                                if (cell.includes('mon') || cell.includes('thứ 2')) colMap.mon = idx;
+                                else if (cell.includes('tue') || cell.includes('thứ 3')) colMap.tue = idx;
+                                else if (cell.includes('wed') || cell.includes('thứ 4')) colMap.wed = idx;
+                                else if (cell.includes('thu') || cell.includes('thứ 5')) colMap.thu = idx;
+                                else if (cell.includes('fri') || cell.includes('thứ 6')) colMap.fri = idx;
+                            });
+                            break;
+                        }
+                    }
+
+                    // Object chứa dữ liệu món ăn đã parse
+                    const parsedMenu = { mon: [], tue: [], wed: [], thu: [], fri: [] };
+
+                    // Duyệt qua các dòng dữ liệu
+                    for (let i = dataStartRow; i < rows.length; i++) {
+                        const row = rows[i];
+                        if (!row || row.length === 0) continue;
+
+                        for (const dayKey of ['mon', 'tue', 'wed', 'thu', 'fri']) {
+                            const cellValue = row[colMap[dayKey]];
+                            if (cellValue) {
+                                const cleanVal = String(cellValue).trim();
+                                // Bỏ qua nếu là dòng "Không đặt cơm" hoặc rỗng
+                                const isIgnored = !cleanVal || cleanVal.toLowerCase().includes('không đặt cơm') || cleanVal.toLowerCase().includes('no order');
+                                if (!isIgnored) {
+                                    parsedMenu[dayKey].push(cleanVal);
+                                }
+                            }
+                        }
+                    }
+
+                    // Cập nhật lên giao diện (DOM)
+                    for (const dayKey of ['mon', 'tue', 'wed', 'thu', 'fri']) {
+                        const container = el(`menu-dishes-nextWeek-${dayKey}`);
+                        if (container) {
+                            container.innerHTML = ''; // Xóa cũ
+                            const dishes = parsedMenu[dayKey];
+                            
+                            // Tạo các input chứa món ăn
+                            dishes.forEach((dish, idx) => {
+                                const rowHTML = `<div style="display:flex;gap:0.5rem;align-items:center;"><textarea class="form-textarea menu-dish-textarea" data-week="nextWeek" data-day="${dayKey}" data-index="${idx}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;">${dish}</textarea><button class="icon-btn remove-menu-dish-btn" data-week="nextWeek" data-day="${dayKey}" data-index="${idx}"><i class="fas fa-times"></i></button></div>`;
+                                container.insertAdjacentHTML('beforeend', rowHTML);
+                            });
+
+                            // Thêm input rỗng cuối cùng
+                            const emptyIdx = dishes.length;
+                            const emptyRowHTML = `<div style="display:flex;gap:0.5rem;align-items:center;"><textarea class="form-textarea menu-dish-textarea" data-week="nextWeek" data-day="${dayKey}" data-index="${emptyIdx}" placeholder="${__('oneDishPerLine')}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;"></textarea><button class="icon-btn remove-menu-dish-btn hidden" data-week="nextWeek" data-day="${dayKey}" data-index="${emptyIdx}"><i class="fas fa-times"></i></button></div>`;
+                            container.insertAdjacentHTML('beforeend', emptyRowHTML);
+                        }
+                    }
+
+                    // Resize lại các textarea
+                    document.querySelectorAll('.menu-dish-textarea').forEach(autoResizeTextarea);
+                    showToast('Đã nhập dữ liệu menu. Hãy kiểm tra và bấm Lưu.');
+
+                } catch (err) {
+                    console.error(err);
+                    showToast('Lỗi đọc file: ' + err.message, 'error');
+                } finally {
+                    hideLoader();
+                    e.target.value = ''; // Reset input để chọn lại file cũ được
+                }
             }
         });
 
