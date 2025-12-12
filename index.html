@@ -993,25 +993,18 @@
                     
                     let sheetName = workbook.SheetNames.find(n => n.toLowerCase() === 'menu') || workbook.SheetNames[0];
                     const sheet = workbook.Sheets[sheetName];
-                    
                     const rows = XLSX.utils.sheet_to_json(sheet, {header: 1});
 
                     if (!rows || rows.length === 0) throw new Error("File trống");
 
-                    let colMap = { mon: 2, tue: 3, wed: 4, thu: 5, fri: 6 };
-                    let dataStartRow = 0;
 
+                    let colMap = { mon: 2, tue: 3, wed: 4, thu: 5, fri: 6 };
+                    
+                    let dataStartRow = 0;
                     for(let i=0; i < Math.min(rows.length, 10); i++) {
                         const rowStr = rows[i].map(c => String(c || '').toLowerCase());
-                        if (rowStr.some(c => c.includes('mon') || c.includes('thứ 2'))) {
+                        if (rowStr.includes('stt') || rowStr.includes('no.')) {
                             dataStartRow = i + 1;
-                            rowStr.forEach((cell, idx) => {
-                                if (cell.includes('mon') || cell.includes('thứ 2')) colMap.mon = idx;
-                                else if (cell.includes('tue') || cell.includes('thứ 3')) colMap.tue = idx;
-                                else if (cell.includes('wed') || cell.includes('thứ 4')) colMap.wed = idx;
-                                else if (cell.includes('thu') || cell.includes('thứ 5')) colMap.thu = idx;
-                                else if (cell.includes('fri') || cell.includes('thứ 6')) colMap.fri = idx;
-                            });
                             break;
                         }
                     }
@@ -1023,7 +1016,7 @@
                         if (!row || row.length === 0) continue;
 
                         for (const dayKey of ['mon', 'tue', 'wed', 'thu', 'fri']) {
-                            const cellValue = row[colMap[dayKey]];
+                            const cellValue = row[colMap[dayKey]]; 
                             if (cellValue) {
                                 const cleanVal = String(cellValue).trim();
                                 const isIgnored = !cleanVal || cleanVal.toLowerCase().includes('không đặt cơm') || cleanVal.toLowerCase().includes('no order');
@@ -1037,7 +1030,7 @@
                     for (const dayKey of ['mon', 'tue', 'wed', 'thu', 'fri']) {
                         const container = el(`menu-dishes-nextWeek-${dayKey}`);
                         if (container) {
-                            container.innerHTML = '';
+                            container.innerHTML = ''; 
                             const dishes = parsedMenu[dayKey];
                             
                             dishes.forEach((dish, idx) => {
@@ -1052,7 +1045,7 @@
                     }
 
                     document.querySelectorAll('.menu-dish-textarea').forEach(autoResizeTextarea);
-                    showToast('Đã nhập dữ liệu menu. Hãy kiểm tra và bấm Lưu.');
+                    showToast('Đã nhập dữ liệu menu (Cột C-G). Hãy bấm Lưu.');
 
                 } catch (err) {
                     console.error(err);
