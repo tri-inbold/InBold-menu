@@ -60,7 +60,8 @@
         
         .tabs { display: flex; gap: 6px; margin-bottom: 1rem; overflow-x: auto; padding-bottom: 4px; }
         .tabs::-webkit-scrollbar { height: 3px; }
-        .tab-btn { padding: 8px 16px; border-radius: var(--radius-sm); background: var(--card-bg); border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; transition: all 0.2s ease; white-space: nowrap; font-weight: 500; font-size: 13px; display: inline-flex; align-items: center; }
+        .tab-btn { padding: 8px 16px; border-radius: var(--radius-sm); background: var(--card-bg); border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; transition: all 0.2s ease; white-space: nowrap; font-weight: 500; font-size: 13px; display: inline-flex; align-items: center; position: relative;}
+        .tab-btn.has-order::after { content: ''; position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; background: var(--success); border-radius: 50%; box-shadow: 0 0 0 1px var(--card-bg); }
         .tab-btn .tab-label { max-width: 0; overflow: hidden; transition: max-width 0.3s ease, margin-left 0.3s ease; }
         .tab-btn.active .tab-label { max-width: 100px; margin-left: 8px; }
         .tab-btn:hover { background: var(--card-hover); color: var(--text); }
@@ -258,6 +259,7 @@
         const SUPPORT_EMAIL = 'truc.tran@inbold.com'; // email người hỗ trợ
 
         const state = {
+            isEditingMenu: false,
             currentUser: null, staffProfile: null, isAdmin: false,
             currentTab: 'today', adminSubTab: 'stats', authReady: false,
             menuFilterMode: 'auto', orderSelection: {},
@@ -814,45 +816,59 @@
             const [thisWeekDoc, nextWeekDoc] = await Promise.all([getDocument('order_list', thisWeek), getDocument('order_list', nextWeek)]);
             const thisWeekMenu = thisWeekDoc ? thisWeekDoc.menu : {};
             const nextWeekMenu = nextWeekDoc ? nextWeekDoc.menu : {};
+
+            // Kiểm tra xem tuần sau đã có dữ liệu menu chưa
+            const hasNextWeekData = nextWeekMenu && Object.values(nextWeekMenu).some(d => d && d.length > 0);
         
-            const renderReadOnlyMenuSection = (menuData, title) => {
+            // Hàm render chế độ Xem (Read-only)
+            const renderReadOnlyMenuSection = (menuData, title, isNextWeek = false) => {
                 let html = `<h3 style="color:var(--primary);margin:1.5rem 0 1rem;font-size:18px;">${title}</h3>`;
                 for (const [dayKey, dayName] of Object.entries({ mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') })) {
                     const dishes = menuData[dayKey] || [];
                     html += `<div class="form-group"><label class="form-label">${dayName}</label><ul class="staff-list">`;
-                    if (dishes.length > 0) dishes.forEach(dish => html += `<li class="staff-item"><div class="staff-details"><div class="staff-dish">${dish}</div></div></li>`);
+                    if (dishes.length > 0) dishes.forEach(dish => html += `<li class="staff-item"><div class="staff-details"><div class="staff-dish">${parseDish(dish)}</div></div></li>`);
                     else html += `<li class="staff-item"><div class="staff-details"><div class="staff-dish text-muted">${__('noDishYet')}</div></div></li>`;
                     html += `</ul></div>`;
                 }
                 return html;
             };
         
+            // Hàm render chế độ Sửa (Editable)
             const renderEditableMenuSection = (weekKey, menuData, title) => {
-                let html = `<div style="display:flex;align-items:center;gap:10px;margin:1.5rem 0 1rem;"><h3 style="color:var(--primary);font-size:18px;margin:0;">${title}</h3>`;
-                
-                if (weekKey === 'nextWeek') {
-                    html += `<button onclick="document.getElementById('menu-file-input').click()" class="icon-btn" title="Import Excel/CSV (Cột C-G)" style="width:32px;height:32px;"><i class="fas fa-file-import"></i></button><input type="file" id="menu-file-input" class="hidden" accept=".xlsx, .xls, .csv">`;
-                }
-                html += `</div>`;
-
+                let html = `<h3 style="color:var(--primary);margin:1.5rem 0 1rem;font-size:18px;">${title}</h3>`;
                 for (const [dayKey, dayName] of Object.entries({ mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') })) {
                     const dishes = menuData[dayKey] || [];
                     html += `<div class="form-group"><label class="form-label">${dayName}</label>`;
-                    html += `<div id="menu-dishes-${weekKey}-${dayKey}" style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.5rem;">`;
-                    
-                    dishes.forEach((dish, index) => {
-                         html += `<div style="display:flex;gap:0.5rem;align-items:center;"><textarea class="form-textarea menu-dish-textarea" ... >${parseDish(dish)}</textarea>...</div>`;
-                    });
-
-                    const newIndex = dishes.length;
-                    html += `<div style="display:flex;gap:0.5rem;align-items:center;"><textarea class="form-textarea menu-dish-textarea" data-week="${weekKey}" data-day="${dayKey}" data-index="${newIndex}" placeholder="${__('oneDishPerLine')}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;"></textarea><button class="icon-btn remove-menu-dish-btn hidden" data-week="${weekKey}" data-day="${dayKey}" data-index="${newIndex}"><i class="fas fa-times"></i></button></div>`;
-                    
-                    html += `</div></div>`;
+                    if (dishes.length > 0) { html += `<ul class="staff-list">`; dishes.forEach(dish => html += `<li class="staff-item"><div class="staff-details"><div class="staff-dish">${parseDish(dish)}</div></div></li>`); html += `</ul>`; }
+                    html += `<div id="menu-dishes-${weekKey}-${dayKey}" style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.5rem;"><div style="display:flex;gap:0.5rem;align-items:center;"><textarea class="form-textarea menu-dish-textarea" data-week="${weekKey}" data-day="${dayKey}" data-index="${dishes.length}" placeholder="${__('oneDishPerLine')}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;"></textarea><button class="icon-btn remove-menu-dish-btn hidden" data-week="${weekKey}" data-day="${dayKey}" data-index="${dishes.length}"><i class="fas fa-times"></i></button></div></div></div>`;
                 }
                 return html;
             };
             
-            el('admin-content').innerHTML = `<div class="mt-3">${renderReadOnlyMenuSection(thisWeekMenu, `${__('menuThisWeek')} (${thisWeek.split('_')[1]})`)}${renderEditableMenuSection('nextWeek', nextWeekMenu, `${__('menuNextWeek')} (${nextWeek.split('_')[1]})`)}<button id="save-menu-nextWeek" class="btn btn-primary btn-block" style="margin-top:1rem;" data-week="${nextWeek}"><i class="fas fa-save"></i> ${__('save')} ${__('menuNextWeek')}</button></div>`;
+            let contentHTML = `<div class="mt-3">`;
+            
+            // 1. Menu tuần này (Luôn là Read-only)
+            contentHTML += renderReadOnlyMenuSection(thisWeekMenu, `${__('menuThisWeek')} (${thisWeek.split('_')[1]})`);
+
+            // 2. Menu tuần sau
+            // Nếu đã có data VÀ chưa bấm nút Chỉnh sửa -> Hiện Read-only
+            if (hasNextWeekData && !state.isEditingMenu) {
+                contentHTML += renderReadOnlyMenuSection(nextWeekMenu, `${__('menuNextWeek')} (${nextWeek.split('_')[1]})`, true);
+                // Hiện nút "Chỉnh sửa" thay vì nút Lưu
+                contentHTML += `<div class="mt-3 text-center"><p class="text-muted mb-2"><i class="fas fa-check-circle" style="color:var(--success)"></i> Menu đã được lưu.</p><button id="edit-menu-btn" class="btn btn-secondary"><i class="fas fa-pen"></i> Chỉnh sửa lại</button></div>`;
+            } else {
+                // Nếu chưa có data HOẶC đang bấm sửa -> Hiện Editable và nút Lưu
+                contentHTML += renderEditableMenuSection('nextWeek', nextWeekMenu, `${__('menuNextWeek')} (${nextWeek.split('_')[1]})`);
+                contentHTML += `<button id="save-menu-nextWeek" class="btn btn-primary btn-block" style="margin-top:1rem;" data-week="${nextWeek}"><i class="fas fa-save"></i> ${__('save')} ${__('menuNextWeek')}</button>`;
+                
+                // Nếu đang ở chế độ sửa, thêm nút Hủy để quay lại
+                if (state.isEditingMenu) {
+                     contentHTML += `<button id="cancel-edit-menu-btn" class="btn btn-secondary btn-block mt-2">${__('cancel')}</button>`;
+                }
+            }
+
+            contentHTML += `</div>`;
+            el('admin-content').innerHTML = contentHTML;
             document.querySelectorAll('.menu-dish-textarea').forEach(autoResizeTextarea);
         }
 
@@ -1313,6 +1329,46 @@
                 showLoader(); try { await updateDoc(doc(db, "staff_list", "staffs"), { [state.deleteTarget.key]: deleteField() }); showToast('Đã xóa'); el('delete-personnel-modal').classList.add('hidden'); await renderAdminPersonnel(); } catch { showToast(__('error'), 'error'); } finally { hideLoader(); }
             }
             else if(dataset.modal) el(dataset.modal).classList.toggle('hidden');
+
+            else if (id === 'edit-menu-btn') {
+                state.isEditingMenu = true;
+                await renderAdminMenu();
+            }
+            else if (id === 'cancel-edit-menu-btn') {
+                state.isEditingMenu = false;
+                await renderAdminMenu();
+            }
+            else if (id === 'save-menu-nextWeek') {
+                showLoader();
+                try {
+                    const weekStr = dataset.week;
+                    const weekKey = 'nextWeek';
+                    const weekDoc = await getDocument('order_list', weekStr) || {};
+                    const menuToSave = { ...(weekDoc.menu || {}) };
+                    
+                    let hasData = false;
+                    for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
+                        const container = el(`menu-dishes-${weekKey}-${day}`);
+                        if (container) {
+                            const newDishes = Array.from(container.querySelectorAll('.menu-dish-textarea')).map(t => t.value.trim()).filter(Boolean);
+                            const existingDishes = menuToSave[day] || [];
+                            const finalDishes = [...existingDishes, ...newDishes];
+                            
+                            if (finalDishes.length > 0) {
+                                hasData = true;
+                                if (!finalDishes.some(d => d.includes('Không đặt cơm'))) finalDishes.push('Không đặt cơm | No order');
+                            }
+                            menuToSave[day] = finalDishes;
+                        }
+                    }
+                    
+                    await setDoc(doc(db, 'order_list', weekStr), { menu: menuToSave }, { merge: true });
+                    showToast(__('menuSaved'));
+                    
+                    state.isEditingMenu = false; 
+                    await renderAdminMenu();
+                } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); }
+            }
         });
 
         async function main() {
