@@ -841,7 +841,7 @@
                     html += `<div id="menu-dishes-${weekKey}-${dayKey}" style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.5rem;">`;
                     
                     dishes.forEach((dish, index) => {
-                         html += `<div style="display:flex;gap:0.5rem;align-items:center;"><textarea class="form-textarea menu-dish-textarea" data-week="${weekKey}" data-day="${dayKey}" data-index="${index}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;">${dish}</textarea><button class="icon-btn remove-menu-dish-btn" data-week="${weekKey}" data-day="${dayKey}" data-index="${index}"><i class="fas fa-times"></i></button></div>`;
+                         html += `<div style="display:flex;gap:0.5rem;align-items:center;"><textarea class="form-textarea menu-dish-textarea" ... >${dish}</textarea>...</div>`;
                     });
 
                     const newIndex = dishes.length;
@@ -991,24 +991,20 @@
                     const data = await file.arrayBuffer();
                     const workbook = XLSX.read(data);
                     
-                    // Ưu tiên sheet tên "Menu", nếu không lấy sheet đầu tiên
                     let sheetName = workbook.SheetNames.find(n => n.toLowerCase() === 'menu') || workbook.SheetNames[0];
                     const sheet = workbook.Sheets[sheetName];
                     
-                    // Convert sheet to array of arrays (Header: 1 means row 1 is index 0)
                     const rows = XLSX.utils.sheet_to_json(sheet, {header: 1});
 
                     if (!rows || rows.length === 0) throw new Error("File trống");
 
-                    // Xác định index các cột dựa trên Header hoặc mặc định theo yêu cầu (Cột C -> G tương ứng index 2 -> 6)
                     let colMap = { mon: 2, tue: 3, wed: 4, thu: 5, fri: 6 };
                     let dataStartRow = 0;
 
-                    // Thử tìm header row để map chính xác hơn (trong trường hợp file cấu trúc khác)
                     for(let i=0; i < Math.min(rows.length, 10); i++) {
                         const rowStr = rows[i].map(c => String(c || '').toLowerCase());
                         if (rowStr.some(c => c.includes('mon') || c.includes('thứ 2'))) {
-                            dataStartRow = i + 1; // Dữ liệu bắt đầu sau header
+                            dataStartRow = i + 1;
                             rowStr.forEach((cell, idx) => {
                                 if (cell.includes('mon') || cell.includes('thứ 2')) colMap.mon = idx;
                                 else if (cell.includes('tue') || cell.includes('thứ 3')) colMap.tue = idx;
@@ -1020,10 +1016,8 @@
                         }
                     }
 
-                    // Object chứa dữ liệu món ăn đã parse
                     const parsedMenu = { mon: [], tue: [], wed: [], thu: [], fri: [] };
 
-                    // Duyệt qua các dòng dữ liệu
                     for (let i = dataStartRow; i < rows.length; i++) {
                         const row = rows[i];
                         if (!row || row.length === 0) continue;
@@ -1032,7 +1026,6 @@
                             const cellValue = row[colMap[dayKey]];
                             if (cellValue) {
                                 const cleanVal = String(cellValue).trim();
-                                // Bỏ qua nếu là dòng "Không đặt cơm" hoặc rỗng
                                 const isIgnored = !cleanVal || cleanVal.toLowerCase().includes('không đặt cơm') || cleanVal.toLowerCase().includes('no order');
                                 if (!isIgnored) {
                                     parsedMenu[dayKey].push(cleanVal);
@@ -1041,27 +1034,23 @@
                         }
                     }
 
-                    // Cập nhật lên giao diện (DOM)
                     for (const dayKey of ['mon', 'tue', 'wed', 'thu', 'fri']) {
                         const container = el(`menu-dishes-nextWeek-${dayKey}`);
                         if (container) {
-                            container.innerHTML = ''; // Xóa cũ
+                            container.innerHTML = '';
                             const dishes = parsedMenu[dayKey];
                             
-                            // Tạo các input chứa món ăn
                             dishes.forEach((dish, idx) => {
                                 const rowHTML = `<div style="display:flex;gap:0.5rem;align-items:center;"><textarea class="form-textarea menu-dish-textarea" data-week="nextWeek" data-day="${dayKey}" data-index="${idx}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;">${dish}</textarea><button class="icon-btn remove-menu-dish-btn" data-week="nextWeek" data-day="${dayKey}" data-index="${idx}"><i class="fas fa-times"></i></button></div>`;
                                 container.insertAdjacentHTML('beforeend', rowHTML);
                             });
 
-                            // Thêm input rỗng cuối cùng
                             const emptyIdx = dishes.length;
                             const emptyRowHTML = `<div style="display:flex;gap:0.5rem;align-items:center;"><textarea class="form-textarea menu-dish-textarea" data-week="nextWeek" data-day="${dayKey}" data-index="${emptyIdx}" placeholder="${__('oneDishPerLine')}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;"></textarea><button class="icon-btn remove-menu-dish-btn hidden" data-week="nextWeek" data-day="${dayKey}" data-index="${emptyIdx}"><i class="fas fa-times"></i></button></div>`;
                             container.insertAdjacentHTML('beforeend', emptyRowHTML);
                         }
                     }
 
-                    // Resize lại các textarea
                     document.querySelectorAll('.menu-dish-textarea').forEach(autoResizeTextarea);
                     showToast('Đã nhập dữ liệu menu. Hãy kiểm tra và bấm Lưu.');
 
@@ -1070,7 +1059,7 @@
                     showToast('Lỗi đọc file: ' + err.message, 'error');
                 } finally {
                     hideLoader();
-                    e.target.value = ''; // Reset input để chọn lại file cũ được
+                    e.target.value = '';
                 }
             }
         });
@@ -1141,10 +1130,8 @@
                     for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
                          if(state.orderSelection[day]) {
                              const dishName = state.orderSelection[day];
-                             // Kiểm tra nếu là món "Không đặt cơm"
                              const isNoOrder = dishName.toLowerCase().includes('không đặt cơm') || dishName.toLowerCase().includes('no order');
                              
-                             // Nếu là Không đặt cơm -> dùng [ignore], ngược lại dùng not:
                              const prefix = isNoOrder ? '[ignore] ' : 'not: ';
                              payload[userKey][day] = `${prefix}${dishName}`;
                          }
@@ -1257,7 +1244,6 @@
                     for (const day in state.guestOrderSelection) {
                         const dishName = state.guestOrderSelection[day];
                         const isNoOrder = dishName.toLowerCase().includes('không đặt cơm');
-                        // Sử dụng [ignore] thay vì placeholder:
                         const prefix = isNoOrder ? '[ignore] ' : 'not: ';
                         payload[guestKey][day] = `${prefix}${dishName}`;
                     }
