@@ -385,6 +385,13 @@
                 return { status: 'ignore', dish: cleanDish };
             }
 
+            if (rawString.startsWith('giveup[')) {
+                const closeBracket = rawString.indexOf(']');
+                const receiver = rawString.substring(7, closeBracket);
+                const dish = rawString.substring(closeBracket + 2).trim();
+                return { status: 'giveup', receiver, dish };
+            }
+
             const prefixes = ['eaten:', 'giveup:', 'not:', 'placeholder:'];
             for (const prefix of prefixes) {
                 if (rawString.startsWith(prefix)) {
@@ -489,7 +496,7 @@
                             <div class="hero-greeting">${__('hi')} ${firstName}</div>
                             <div class="hero-title">${parseDish(rawDishString)}</div>
                             ${!isPlaceholder ? `<div class="action-buttons-hero">
-                                <button class="btn btn-skip ${isSkipped ? 'active' : ''}" data-action="skip" data-day="${dayKey}" ${isSkipped || isEaten ? 'disabled' : ''}>
+                                <button class="btn btn-skip ${isSkipped ? 'active' : ''}" data-action="skip-modal" data-dish="${dish}" data-day="${dayKey}" ${isSkipped || isEaten ? 'disabled' : ''}>
                                     <i class="fas fa-ban"></i> ${__('skip')}
                                 </button>
                                 <button class="btn btn-eaten ${isEaten ? 'active' : ''}" data-action="eaten" data-day="${dayKey}" ${isEaten ? 'disabled' : ''}>
@@ -635,6 +642,28 @@
             }
         }
 
+        async function processSkip(receiverName) {
+            el('skip-option-modal').classList.add('hidden');
+            showLoader();
+            try {
+                const weekString = getWeekString(new Date());
+                const { day, dish } = state.skipTarget;
+                const userKey = emailToKey(state.currentUser.email);
+                
+                const newStatus = `giveup[${receiverName}]`;
+                await updateDoc(doc(db, 'order_list', weekString), { [`${userKey}.${day}`]: `${newStatus}: ${dish}` });
+                
+                showToast(__('skipSuccess')); 
+                el('skip-receiver-input').value = '';
+                await render();
+            } catch (err) { 
+                console.error(err); 
+                showToast(__('error'), 'error'); 
+            } finally { 
+                hideLoader(); 
+            }
+        }
+        
         function updateStaffListView(weekDoc, searchTerm = '') {
             const container = el('staff-list-container');
             const hour = new Date().getHours();
@@ -647,11 +676,22 @@
             el('menu-filter-btn').innerHTML = state.menuFilterMode === 'auto' ? `<i class="fas ${hour < 15 ? 'fa-sun' : 'fa-moon'}"></i>` : `<i class="fas fa-user-group"></i>`;
             
             const createStaffItem = (order, showMarkEaten = false) => {
-                const { status } = parseDishValue(order.rawDish);
+                const { status, receiver } = parseDishValue(order.rawDish);
+                
                 const statusClass = status === 'eaten' ? 'eaten' : (status === 'giveup' ? 'skipped' : '');
                 const isPlaceholder = status === 'ignore' || status === 'placeholder';
-                const actionBtn = (showMarkEaten && !isPlaceholder) ? `<div class="staff-item-actions"><button class="btn-mark-eaten mark-eaten-btn" data-key="${order.key}" data-day="${dayKey}"><i class="fas fa-check"></i> ${__('eaten')}</button></div>` : '';
-                return `<li class="staff-item ${statusClass}"><div class="staff-details"><div class="staff-name">${order.name}</div><div class="staff-dish">${parseDish(order.rawDish)}</div></div>${actionBtn}</li>`;
+                
+                const canMarkEaten = (showMarkEaten || (state.isAdmin && status !== 'eaten')) && !isPlaceholder && status !== 'giveup';
+                const actionBtn = canMarkEaten ? `<div class="staff-item-actions"><button class="btn-mark-eaten mark-eaten-btn" data-key="${order.key}" data-day="${dayKey}"><i class="fas fa-check"></i> ${__('eaten')}</button></div>` : '';
+                
+                let extraInfo = '';
+                if (status === 'giveup') {
+                    if (receiver && receiver !== 'Everyone' && receiver !== 'Mọi người') {
+                        extraInfo = `<div style="font-size:11px;color:var(--warning);margin-top:2px;"> <i class="fas fa-arrow-right"></i> ${receiver}</div>`;
+                    }
+                }
+
+                return `<li class="staff-item ${statusClass}"><div class="staff-details"><div class="staff-name">${order.name}</div><div class="staff-dish">${parseDish(order.rawDish)}</div>${extraInfo}</div>${actionBtn}</li>`;
             };
             
             const createDepartmentHTML = (list) => {
@@ -1160,19 +1200,46 @@
                     showToast(__('orderSuccess')); state.orderSelection = {}; state.currentOrderDay = 'mon'; await render(); await checkOrderNotification();
                 } catch (e) { console.error(e); showToast(__('orderFailed'), 'error'); } finally { hideLoader(); }
             }
-            else if (dataset.action === 'skip' || dataset.action === 'eaten') {
+            else if (dataset.action === 'skip-modal') {
+                state.skipTarget = { day: dataset.day, dish: dataset.dish };
+                el('skip-option-modal').classList.remove('hidden');
+                
+                const datalist = el('staff-suggestions');
+                if (datalist.children.length === 0) {
+                    const allStaff = await getDocument("staff_list", "staffs");
+                    if (allStaff) {
+                        const names = Object.values(allStaff).map(s => s.name).filter(n => n !== state.staffProfile.name).sort();
+                        names.forEach(name => {
+                            const opt = document.createElement('option');
+                            opt.value = name;
+                            datalist.appendChild(opt);
+                        });
+                    }
+                }
+            }
+            
+            else if (id === 'skip-everyone-btn') {
+                await processSkip('Everyone');
+            }
+            
+            else if (id === 'skip-specific-btn') {
+                const receiver = el('skip-receiver-input').value.trim();
+                if (!receiver) return showToast('Vui lòng nhập tên người nhận', 'error');
+                await processSkip(receiver);
+            }
+
+            else if (dataset.action === 'eaten') {
                 showLoader();
                 try {
                     const weekString = getWeekString(new Date());
-                    const { day, action } = dataset;
+                    const { day } = dataset;
                     const userKey = emailToKey(state.currentUser.email);
                     const weekDoc = await getDocument('order_list', weekString);
                     const currentDishString = weekDoc[userKey][day];
                     const { dish } = parseDishValue(currentDishString);
                     
-                    const newStatus = action === 'skip' ? 'giveup' : 'eaten';
-                    await updateDoc(doc(db, 'order_list', weekString), { [`${userKey}.${day}`]: `${newStatus}: ${dish}` });
-                    showToast(action === 'skip' ? __('skipSuccess') : __('eatenSuccess')); await render();
+                    await updateDoc(doc(db, 'order_list', weekString), { [`${userKey}.${day}`]: `eaten: ${dish}` });
+                    showToast(__('eatenSuccess')); await render();
                 } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); }
             }
             else if (classList.contains('mark-eaten-btn')) {
