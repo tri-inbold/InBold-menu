@@ -114,6 +114,10 @@
         
         .icon-btn { width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--card-bg); border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; }
         .icon-btn:hover { background: var(--card-hover); }
+
+        .toggle-icon { transition: transform 0.3s ease; cursor: pointer; padding: 4px; }
+        .toggle-icon.rotate { transform: rotate(180deg); }
+        .gift-actions { margin-top: 0.5rem; display: flex; justify-content: flex-end; }
         
         .form-group { margin-bottom: 1rem; }
         .form-label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px; }
@@ -488,16 +492,26 @@
                 Object.entries(weekData).forEach(([key, val]) => {
                     if (key === 'menu' || key === userEmailKey) return;
                     const raw = val[dayKey];
+                    // Lưu cả KEY của người nhường để update db
                     if (raw && raw.startsWith(`giveup[${myName}]:`)) {
-                        gifters.push({ name: val.name, dish: parseDish(raw) });
+                        gifters.push({ key: key, name: val.name, dish: parseDish(raw) });
                     }
                 });
 
                 if (gifters.length > 0) {
                     giftHTML = gifters.map(g => 
                         `<div class="gift-alert">
-                            <h3><i class="fas fa-gift"></i> Bạn được nhường suất ăn!</h3>
-                            <div><strong>${g.name}</strong> đã nhường cho bạn món: ${g.dish}</div>
+                            <div style="display:flex; justify-content:space-between; align-items:start;">
+                                <div>
+                                    <h3><i class="fas fa-gift"></i> Bạn được nhường suất ăn!</h3>
+                                    <div style="font-size:13px"><strong>${g.name}</strong>: ${g.dish}</div>
+                                </div>
+                            </div>
+                            <div class="gift-actions">
+                                <button class="btn btn-mark-eaten" style="background:var(--success); padding:6px 12px; font-size:12px;" data-action="eat-gift" data-giver-key="${g.key}" data-day="${dayKey}" data-dish="${g.dish}">
+                                    <i class="fas fa-utensils"></i> Xác nhận ăn món này
+                                </button>
+                            </div>
                         </div>`
                     ).join('');
                 }
@@ -565,7 +579,7 @@
             
             if (isCurrentWeekPeriod) {
                 if (hasOrderedCurrentWeek) {
-                    let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${currentWeekString.split('_')[1]}</h2></div><ul class="staff-list">`;
+                    let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${currentWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon" data-target="summary-list-current"></i></div><ul id="summary-list-current" class="staff-list">`;
                     for (const key of dayKeys) {
                         const rawDish = userDataCurrent[key];
                         if (rawDish) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish">${parseDish(rawDish)}</div></div></li>`;
@@ -583,7 +597,7 @@
             const hasOrderedNextWeek = userDataNext && userDataNext.order === 'ordered';
         
             if (hasOrderedNextWeek) {
-                let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${nextWeekString.split('_')[1]}</h2></div><ul class="staff-list">`;
+                let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${nextWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon" data-target="summary-list-next"></i></div><ul id="summary-list-next" class="staff-list">`;
                 for (const key of dayKeys) {
                     const rawDish = userDataNext[key];
                     summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish">${parseDish(rawDish) || __('rest')}</div></div></li>`;
@@ -594,7 +608,7 @@
         
             const allSelected = dayKeys.every(day => state.orderSelection[day]);
             if (allSelected) {
-                let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${nextWeekString.split('_')[1]}</h2></div><ul class="staff-list">`;
+                let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${nextWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon" data-target="summary-list-confirm"></i></div><ul id="summary-list-confirm" class="staff-list">`;
                 for (const dayKey of dayKeys) { summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(state.orderSelection[dayKey])}</div></div></li>`; }
                 summaryHTML += `</ul><button id="submit-order-btn" class="btn btn-primary btn-block mt-3"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;
                 container.innerHTML = summaryHTML; return;
@@ -606,15 +620,26 @@
             const shiftToggleHTML = `<div class="form-group"><div class="shift-toggle"><input type="radio" id="user-shift-m" name="user-shift" value="morning" ${state.userShiftSelection === 'morning' ? 'checked' : ''}><label for="user-shift-m">${__('morning')}</label><input type="radio" id="user-shift-e" name="user-shift" value="evening" ${state.userShiftSelection === 'evening' ? 'checked' : ''}><label for="user-shift-e">${__('evening')}</label></div></div>`;
             
             let tabsHTML = `<div class="tabs">`;
-            for (const dayKey of dayKeys) { tabsHTML += `<button class="tab-btn order-day-tab-btn ${state.currentOrderDay === dayKey ? 'active' : ''}" data-day-key="${dayKey}">${dayNames[dayKey]}</button>`; }
+            for (const dayKey of dayKeys) { 
+                const hasOrder = state.orderSelection[dayKey];
+                tabsHTML += `<button class="tab-btn order-day-tab-btn ${state.currentOrderDay === dayKey ? 'active' : ''} ${hasOrder ? 'has-order' : ''}" data-day-key="${dayKey}">${dayNames[dayKey]}</button>`; 
+            }
             tabsHTML += `</div>`;
             
             let daysContentHTML = '';
             for (const dayKey of dayKeys) {
                 const dishes = menu[dayKey] || [];
                 daysContentHTML += `<div id="order-day-${dayKey}" class="${state.currentOrderDay === dayKey ? '' : 'hidden'}">`;
-                if (Array.isArray(dishes) && dishes.length > 0) { daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item" data-dish="${dish}" data-day-key="${dayKey}"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`; } 
-                else { daysContentHTML += `<p class="text-center text-muted p-3">${__('noDishes')}</p><div class="order-dish-list"><div class="order-dish-item" data-dish="Nghỉ" data-day-key="${dayKey}"><div class="order-dish-name">${__('rest')}</div></div></div>`; }
+                const selectedDish = state.orderSelection[dayKey];
+                if (Array.isArray(dishes) && dishes.length > 0) { 
+                    daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => {
+                        const isSelected = dish === selectedDish;
+                        return `<div class="order-dish-item ${isSelected ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}"><div class="order-dish-name">${parseDish(dish)}</div></div>`;
+                    }).join('')}</div>`; 
+                } 
+                else { 
+                    daysContentHTML += `<p class="text-center text-muted p-3">${__('noDishes')}</p><div class="order-dish-list"><div class="order-dish-item" data-dish="Nghỉ" data-day-key="${dayKey}"><div class="order-dish-name">${__('rest')}</div></div></div>`; 
+                }
                 daysContentHTML += `</div>`;
             }
             container.innerHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderForWeek')} ${nextWeekString.split('_')[1]}</h2></div>${shiftToggleHTML}${tabsHTML}${daysContentHTML}</div>`;
@@ -1247,17 +1272,40 @@
                     }
                 }
             }
-            
+            else if (dataset.action === 'eat-gift') {
+                showLoader();
+                try {
+                    const weekString = getWeekString(new Date());
+                    const { giverKey, day, dish } = dataset;
+                    
+
+                    await updateDoc(doc(db, 'order_list', weekString), { [`${giverKey}.${day}`]: `eaten: ${dish}` });
+                    
+                    showToast('Đã xác nhận ăn món được nhường!'); 
+                    await render();
+                } catch (err) { 
+                    console.error(err); 
+                    showToast(__('error'), 'error'); 
+                } finally { 
+                    hideLoader(); 
+                }
+            }
+            else if (classList.contains('toggle-icon')) {
+                const targetId = dataset.target;
+                const listEl = el(targetId);
+                if (listEl) {
+                    listEl.classList.toggle('hidden');
+                    target.classList.toggle('rotate');
+                }
+            }
             else if (id === 'skip-everyone-btn') {
                 await processSkip('Everyone');
             }
-            
             else if (id === 'skip-specific-btn') {
                 const receiver = el('skip-receiver-input').value.trim();
                 if (!receiver) return showToast('Vui lòng nhập tên người nhận', 'error');
                 await processSkip(receiver);
             }
-
             else if (dataset.action === 'eaten') {
                 showLoader();
                 try {
