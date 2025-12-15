@@ -485,36 +485,65 @@
             const weekData = await getDocument('order_list', currentWeekString);
             const userData = weekData ? weekData[userEmailKey] : null;
 
+            // --- CẬP NHẬT LOGIC HIỂN THỊ QUÀ TẶNG ---
             let giftHTML = '';
             if (weekData) {
                 const myName = state.staffProfile.name;
                 const gifters = [];
+                
                 Object.entries(weekData).forEach(([key, val]) => {
-                    if (key === 'menu' || key === userEmailKey) return;
+                    if (key === 'menu' || key === userEmailKey) return; 
+                    
                     const raw = val[dayKey];
-                    if (raw && raw.startsWith(`giveup[${myName}]:`)) {
-                        gifters.push({ key: key, name: val.name, dish: parseDish(raw) });
+                    if (!raw) return;
+
+                    const { status, receiver, dish } = parseDishValue(raw);
+
+                    // Chỉ xử lý nếu trạng thái là 'giveup'
+                    if (status === 'giveup') {
+                        // Logic hiển thị:
+                        // 1. Nhường cho chính mình (receiver === myName)
+                        // 2. Hoặc nhường cho tất cả (receiver === 'Everyone'/'Mọi người')
+                        const isForMe = receiver === myName;
+                        const isForEveryone = receiver === 'Everyone' || receiver === 'Mọi người';
+
+                        if (isForMe || isForEveryone) {
+                            gifters.push({ 
+                                key: key, 
+                                name: val.name, 
+                                dish: parseDish(raw),
+                                rawDish: dish, 
+                                type: isForMe ? 'private' : 'public'
+                            });
+                        }
                     }
                 });
 
                 if (gifters.length > 0) {
-                    giftHTML = gifters.map(g => 
-                        `<div class="gift-alert">
+                    giftHTML = gifters.map(g => {
+                        const icon = g.type === 'private' ? '<i class="fas fa-user-check"></i>' : '<i class="fas fa-users"></i>';
+                        const label = g.type === 'private' ? 'nhường riêng cho bạn' : 'nhường cho mọi người';
+                        
+                        return `<div class="gift-alert">
                             <div style="display:flex; justify-content:space-between; align-items:start;">
                                 <div>
                                     <h3><i class="fas fa-gift"></i> Bạn được nhường suất ăn!</h3>
-                                    <div style="font-size:13px"><strong>${g.name}</strong>: ${g.dish}</div>
+                                    <div style="font-size:13px; margin-bottom:4px;">
+                                        <strong>${g.name}</strong> ${label}: <br/>
+                                        <span style="color:var(--primary); font-weight:600;">${g.dish}</span>
+                                    </div>
                                 </div>
                             </div>
                             <div class="gift-actions">
-                                <button class="btn btn-mark-eaten" style="background:var(--success); padding:6px 12px; font-size:12px;" data-action="eat-gift" data-giver-key="${g.key}" data-day="${dayKey}" data-dish="${g.dish}">
+                                <button class="btn btn-mark-eaten" style="background:var(--success); padding:6px 12px; font-size:12px;" data-action="eat-gift" data-giver-key="${g.key}" data-day="${dayKey}" data-dish="${g.rawDish}">
                                     <i class="fas fa-utensils"></i> Xác nhận ăn phần này
                                 </button>
                             </div>
-                        </div>`
-                    ).join('');
+                        </div>`;
+                    }).join('');
                 }
             }
+            // ------------------------------------------
             
             let isReopenMode = false;
             if (userData && userData.order === 'reopen') { isReopenMode = true; }
@@ -741,18 +770,26 @@
                 const { status, receiver } = parseDishValue(order.rawDish);
                 const statusClass = status === 'eaten' ? 'eaten' : (status === 'giveup' ? 'skipped' : '');
                 const isPlaceholder = status === 'ignore' || status === 'placeholder';
-                const actionBtn = (showMarkEaten && !isPlaceholder) ? `<div class="staff-item-actions"><button class="btn-mark-eaten mark-eaten-btn" data-key="${order.key}" data-day="${dayKey}"><i class="fas fa-check"></i> ${__('eaten')}</button></div>` : '';
+                
+                // CẬP NHẬT: Tuyệt đối không hiện nút ăn nếu status là 'giveup' (để tránh conflict với nút nhận quà)
+                const canMarkEaten = (showMarkEaten || (state.isAdmin && status !== 'eaten')) 
+                                     && !isPlaceholder 
+                                     && status !== 'giveup'; // Điều kiện quan trọng
+
+                const actionBtn = canMarkEaten ? `<div class="staff-item-actions"><button class="btn-mark-eaten mark-eaten-btn" data-key="${order.key}" data-day="${dayKey}"><i class="fas fa-check"></i> ${__('eaten')}</button></div>` : '';
                 
                 let extraInfo = '';
                 if (status === 'giveup') {
                     if (receiver && receiver !== 'Everyone' && receiver !== 'Mọi người') {
                         extraInfo = `<div style="font-size:11px;color:var(--warning);margin-top:2px;"> <i class="fas fa-arrow-right"></i> ${receiver}</div>`;
+                    } else {
+                        extraInfo = `<div style="font-size:11px;color:var(--warning);margin-top:2px;"> <i class="fas fa-users"></i> Mọi người</div>`;
                     }
                 }
 
                 return `<li class="staff-item ${statusClass}"><div class="staff-details"><div class="staff-name">${order.name}</div><div class="staff-dish">${parseDish(order.rawDish)}</div>${extraInfo}</div>${actionBtn}</li>`;
             };
-                        
+            
             const createDepartmentHTML = (list) => {
                 const byDepartment = {};
                 list.forEach(order => { const depart = order.depart || __('unknown'); if (!byDepartment[depart]) byDepartment[depart] = []; byDepartment[depart].push(order); });
@@ -790,7 +827,6 @@
             }
             container.innerHTML = html || `<p class="text-center text-muted p-3">${__('notFound')}</p>`;
         }
-
         async function renderProfile() {
             const { currentUser: user, staffProfile: profile } = state;
             el('main-content').innerHTML = `<div class="card"><div class="profile-section"><img src="${user.photoURL}" alt="avatar" class="profile-avatar"><div class="profile-name">${profile.name}</div><div class="profile-depart">${profile.depart || __('notUpdated')}</div><div class="profile-language-toggle"><button class="btn btn-secondary lang-toggle-btn ${profile.lan === 'vi' ? 'active' : ''}" data-lang="vi">${__('vietnamese')}</button><button class="btn btn-secondary lang-toggle-btn ${profile.lan === 'en' ? 'active' : ''}" data-lang="en">${__('english')}</button></div><div class="profile-menu"><a href="mailto:${SUPPORT_EMAIL}" style="text-decoration:none; color:inherit;" class="profile-menu-item"><i class="fas fa-headset" style="color:var(--primary);"></i><span class="profile-menu-label">${__('support')}</span></a></div><div class="text-center" style="margin-top: 4rem;"><button id="logout-menu-item" class="btn btn-secondary btn-small"><i class="fas fa-sign-out-alt"></i>${__('logout')}</button></div></div></div>`;
