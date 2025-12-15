@@ -115,9 +115,9 @@
         .icon-btn { width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--card-bg); border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; }
         .icon-btn:hover { background: var(--card-hover); }
 
-        .toggle-icon { transition: transform 0.3s ease; cursor: pointer; padding: 4px; }
+        .gift-actions { margin-top: 0.5rem; display: flex; justify-content: flex-start; } 
+        .toggle-icon { transition: transform 0.3s ease; cursor: pointer; padding: 8px; margin-left: auto; }
         .toggle-icon.rotate { transform: rotate(180deg); }
-        .gift-actions { margin-top: 0.5rem; display: flex; justify-content: flex-end; }
         
         .form-group { margin-bottom: 1rem; }
         .form-label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px; }
@@ -492,7 +492,6 @@
                 Object.entries(weekData).forEach(([key, val]) => {
                     if (key === 'menu' || key === userEmailKey) return;
                     const raw = val[dayKey];
-                    // Lưu cả KEY của người nhường để update db
                     if (raw && raw.startsWith(`giveup[${myName}]:`)) {
                         gifters.push({ key: key, name: val.name, dish: parseDish(raw) });
                     }
@@ -509,7 +508,7 @@
                             </div>
                             <div class="gift-actions">
                                 <button class="btn btn-mark-eaten" style="background:var(--success); padding:6px 12px; font-size:12px;" data-action="eat-gift" data-giver-key="${g.key}" data-day="${dayKey}" data-dish="${g.dish}">
-                                    <i class="fas fa-utensils"></i> Xác nhận ăn món này
+                                    <i class="fas fa-utensils"></i> Xác nhận ăn phần này
                                 </button>
                             </div>
                         </div>`
@@ -569,80 +568,85 @@
             const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
         
             const isCurrentWeekPeriod = (dayOfWeek >= 1 && dayOfWeek <= 3) || (dayOfWeek === 4 && hour < 15);
-
             const currentWeekString = getWeekString(today);
             const nextWeekString = getWeekString(new Date(today.getTime() + 7 * 86400000));
             
-            const currentWeekDoc = await getDocument('order_list', currentWeekString);
+            const [currentWeekDoc, nextWeekDoc] = await Promise.all([
+                getDocument('order_list', currentWeekString),
+                getDocument('order_list', nextWeekString)
+            ]);
+
             const userDataCurrent = currentWeekDoc ? currentWeekDoc[userEmailKey] : null;
             const hasOrderedCurrentWeek = userDataCurrent && userDataCurrent.order === 'ordered';
             
-            if (isCurrentWeekPeriod) {
-                if (hasOrderedCurrentWeek) {
-                    let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${currentWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon" data-target="summary-list-current"></i></div><ul id="summary-list-current" class="staff-list">`;
-                    for (const key of dayKeys) {
-                        const rawDish = userDataCurrent[key];
-                        if (rawDish) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish">${parseDish(rawDish)}</div></div></li>`;
-                        else summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish text-muted">${__('notOrdered')}</div></div></li>`;
-                    }
-                    container.innerHTML = summaryHTML + `</ul></div>`;
-                    return;
-                }
-                container.innerHTML = `<div class="card text-center" style="padding: 2rem;"><i class="fas fa-calendar-xmark" style="font-size: 48px; color: var(--text-muted); margin-bottom: 1rem;"></i><h3 style="color: var(--text); margin-bottom: 0.5rem;">Chưa đặt món tuần này</h3><p class="text-muted" style="margin-bottom: 1.5rem;">Liên hệ bộ phận hỗ trợ để được mở lại đặt món.</p><a href="mailto:${SUPPORT_EMAIL}" class="btn btn-primary" style="text-decoration: none;"><i class="fas fa-headset"></i> ${__('support')}</a></div>`;
-                return;
-            }
-            
-            const nextWeekDoc = await getDocument('order_list', nextWeekString);
-            const userDataNext = nextWeekDoc ? nextWeekDoc[userEmailKey] : null;
-            const hasOrderedNextWeek = userDataNext && userDataNext.order === 'ordered';
-        
-            if (hasOrderedNextWeek) {
-                let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${nextWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon" data-target="summary-list-next"></i></div><ul id="summary-list-next" class="staff-list">`;
+            let htmlContent = '';
+
+            if (hasOrderedCurrentWeek) {
+                let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${currentWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon" data-target="summary-list-current"></i></div><ul id="summary-list-current" class="staff-list">`;
                 for (const key of dayKeys) {
-                    const rawDish = userDataNext[key];
-                    summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish">${parseDish(rawDish) || __('rest')}</div></div></li>`;
+                    const rawDish = userDataCurrent[key];
+                    if (rawDish) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish">${parseDish(rawDish)}</div></div></li>`;
+                    else summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish text-muted">${__('notOrdered')}</div></div></li>`;
                 }
-                container.innerHTML = summaryHTML + `</ul></div>`;
-                return;
+                htmlContent += summaryHTML + `</ul></div>`;
+            } else if (isCurrentWeekPeriod) {
+                htmlContent += `<div class="card text-center" style="padding: 2rem;"><i class="fas fa-calendar-xmark" style="font-size: 48px; color: var(--text-muted); margin-bottom: 1rem;"></i><h3 style="color: var(--text); margin-bottom: 0.5rem;">Chưa đặt món tuần này</h3><p class="text-muted" style="margin-bottom: 1.5rem;">Liên hệ bộ phận hỗ trợ để được mở lại đặt món.</p><a href="mailto:${SUPPORT_EMAIL}" class="btn btn-primary" style="text-decoration: none;"><i class="fas fa-headset"></i> ${__('support')}</a></div>`;
             }
-        
-            const allSelected = dayKeys.every(day => state.orderSelection[day]);
-            if (allSelected) {
-                let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${nextWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon" data-target="summary-list-confirm"></i></div><ul id="summary-list-confirm" class="staff-list">`;
-                for (const dayKey of dayKeys) { summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(state.orderSelection[dayKey])}</div></div></li>`; }
-                summaryHTML += `</ul><button id="submit-order-btn" class="btn btn-primary btn-block mt-3"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;
-                container.innerHTML = summaryHTML; return;
-            }
-        
-            const menu = nextWeekDoc ? nextWeekDoc.menu : null;
-            if (!menu) { container.innerHTML = `<div class="card text-center"><p class="text-muted">${__('noMenu')}</p></div>`; return; }
-        
-            const shiftToggleHTML = `<div class="form-group"><div class="shift-toggle"><input type="radio" id="user-shift-m" name="user-shift" value="morning" ${state.userShiftSelection === 'morning' ? 'checked' : ''}><label for="user-shift-m">${__('morning')}</label><input type="radio" id="user-shift-e" name="user-shift" value="evening" ${state.userShiftSelection === 'evening' ? 'checked' : ''}><label for="user-shift-e">${__('evening')}</label></div></div>`;
-            
-            let tabsHTML = `<div class="tabs">`;
-            for (const dayKey of dayKeys) { 
-                const hasOrder = state.orderSelection[dayKey];
-                tabsHTML += `<button class="tab-btn order-day-tab-btn ${state.currentOrderDay === dayKey ? 'active' : ''} ${hasOrder ? 'has-order' : ''}" data-day-key="${dayKey}">${dayNames[dayKey]}</button>`; 
-            }
-            tabsHTML += `</div>`;
-            
-            let daysContentHTML = '';
-            for (const dayKey of dayKeys) {
-                const dishes = menu[dayKey] || [];
-                daysContentHTML += `<div id="order-day-${dayKey}" class="${state.currentOrderDay === dayKey ? '' : 'hidden'}">`;
-                const selectedDish = state.orderSelection[dayKey];
-                if (Array.isArray(dishes) && dishes.length > 0) { 
-                    daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => {
-                        const isSelected = dish === selectedDish;
-                        return `<div class="order-dish-item ${isSelected ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}"><div class="order-dish-name">${parseDish(dish)}</div></div>`;
-                    }).join('')}</div>`; 
+
+            if (!isCurrentWeekPeriod) {
+                const userDataNext = nextWeekDoc ? nextWeekDoc[userEmailKey] : null;
+                const hasOrderedNextWeek = userDataNext && userDataNext.order === 'ordered';
+
+                if (hasOrderedNextWeek) {
+                    let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${nextWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon" data-target="summary-list-next"></i></div><ul id="summary-list-next" class="staff-list">`;
+                    for (const key of dayKeys) {
+                        const rawDish = userDataNext[key];
+                        summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish">${parseDish(rawDish) || __('rest')}</div></div></li>`;
+                    }
+                    htmlContent += summaryHTML + `</ul></div>`;
                 } 
-                else { 
-                    daysContentHTML += `<p class="text-center text-muted p-3">${__('noDishes')}</p><div class="order-dish-list"><div class="order-dish-item" data-dish="Nghỉ" data-day-key="${dayKey}"><div class="order-dish-name">${__('rest')}</div></div></div>`; 
+                else {
+                    const allSelected = dayKeys.every(day => state.orderSelection[day]);
+                    if (allSelected) {
+                        let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${nextWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon" data-target="summary-list-confirm"></i></div><ul id="summary-list-confirm" class="staff-list">`;
+                        for (const dayKey of dayKeys) { summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(state.orderSelection[dayKey])}</div></div></li>`; }
+                        htmlContent += summaryHTML + `</ul><button id="submit-order-btn" class="btn btn-primary btn-block mt-3"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;
+                    } else {
+                        const menu = nextWeekDoc ? nextWeekDoc.menu : null;
+                        if (!menu) { 
+                            htmlContent += `<div class="card text-center"><p class="text-muted">${__('noMenu')}</p></div>`; 
+                        } else {
+                            const shiftToggleHTML = `<div class="form-group"><div class="shift-toggle"><input type="radio" id="user-shift-m" name="user-shift" value="morning" ${state.userShiftSelection === 'morning' ? 'checked' : ''}><label for="user-shift-m">${__('morning')}</label><input type="radio" id="user-shift-e" name="user-shift" value="evening" ${state.userShiftSelection === 'evening' ? 'checked' : ''}><label for="user-shift-e">${__('evening')}</label></div></div>`;
+                            
+                            let tabsHTML = `<div class="tabs">`;
+                            for (const dayKey of dayKeys) { 
+                                const hasOrder = state.orderSelection[dayKey];
+                                tabsHTML += `<button class="tab-btn order-day-tab-btn ${state.currentOrderDay === dayKey ? 'active' : ''} ${hasOrder ? 'has-order' : ''}" data-day-key="${dayKey}">${dayNames[dayKey]}</button>`; 
+                            }
+                            tabsHTML += `</div>`;
+                            
+                            let daysContentHTML = '';
+                            for (const dayKey of dayKeys) {
+                                const dishes = menu[dayKey] || [];
+                                daysContentHTML += `<div id="order-day-${dayKey}" class="${state.currentOrderDay === dayKey ? '' : 'hidden'}">`;
+                                const selectedDish = state.orderSelection[dayKey];
+                                if (Array.isArray(dishes) && dishes.length > 0) { 
+                                    daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => {
+                                        const isSelected = dish === selectedDish;
+                                        return `<div class="order-dish-item ${isSelected ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}"><div class="order-dish-name">${parseDish(dish)}</div></div>`;
+                                    }).join('')}</div>`; 
+                                } else { 
+                                    daysContentHTML += `<p class="text-center text-muted p-3">${__('noDishes')}</p><div class="order-dish-list"><div class="order-dish-item" data-dish="Nghỉ" data-day-key="${dayKey}"><div class="order-dish-name">${__('rest')}</div></div></div>`; 
+                                }
+                                daysContentHTML += `</div>`;
+                            }
+                            htmlContent += `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderForWeek')} ${nextWeekString.split('_')[1]}</h2></div>${shiftToggleHTML}${tabsHTML}${daysContentHTML}</div>`;
+                        }
+                    }
                 }
-                daysContentHTML += `</div>`;
             }
-            container.innerHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderForWeek')} ${nextWeekString.split('_')[1]}</h2></div>${shiftToggleHTML}${tabsHTML}${daysContentHTML}</div>`;
+
+            container.innerHTML = htmlContent;
         }
         
         async function renderReopenOrderSection(container) {
