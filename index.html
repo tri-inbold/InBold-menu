@@ -594,7 +594,7 @@
             let htmlContent = '';
 
             if (hasOrderedCurrentWeek) {
-                let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${currentWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon" data-target="summary-list-current"></i></div><ul id="summary-list-current" class="staff-list">`;
+                let summaryHTML = `<div class="card"><div class="card-header toggle-card-header" style="cursor:pointer;" data-target="summary-list-current"><h2 class="card-title">${__('orderedWeek')} ${currentWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon"></i></div><ul id="summary-list-current" class="staff-list">`;
                 for (const key of dayKeys) {
                     const rawDish = userDataCurrent[key];
                     if (rawDish) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish">${parseDish(rawDish)}</div></div></li>`;
@@ -610,7 +610,7 @@
                 const hasOrderedNextWeek = userDataNext && userDataNext.order === 'ordered';
 
                 if (hasOrderedNextWeek) {
-                    let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${nextWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon" data-target="summary-list-next"></i></div><ul id="summary-list-next" class="staff-list">`;
+                    let summaryHTML = `<div class="card"><div class="card-header toggle-card-header" style="cursor:pointer;" data-target="summary-list-next"><h2 class="card-title">${__('orderedWeek')} ${nextWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon"></i></div><ul id="summary-list-next" class="staff-list">`;
                     for (const key of dayKeys) {
                         const rawDish = userDataNext[key];
                         summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish">${parseDish(rawDish) || __('rest')}</div></div></li>`;
@@ -620,7 +620,7 @@
                 else {
                     const allSelected = dayKeys.every(day => state.orderSelection[day]);
                     if (allSelected) {
-                        let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${nextWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon" data-target="summary-list-confirm"></i></div><ul id="summary-list-confirm" class="staff-list">`;
+                        let summaryHTML = `<div class="card"><div class="card-header toggle-card-header" style="cursor:pointer;" data-target="summary-list-confirm"><h2 class="card-title">${__('orderedWeek')} ${nextWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon"></i></div><ul id="summary-list-confirm" class="staff-list">`;
                         for (const dayKey of dayKeys) { summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(state.orderSelection[dayKey])}</div></div></li>`; }
                         htmlContent += summaryHTML + `</ul><button id="submit-order-btn" class="btn btn-primary btn-block mt-3"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;
                     } else {
@@ -758,25 +758,36 @@
 
                 let statusClass = '';
                 if (status === 'eaten') statusClass = 'eaten';
-                else if (isPublicGiveup) statusClass = 'skipped'; // Chỉ public mới có màu cam
+                else if (isPublicGiveup) statusClass = 'skipped';
                 
                 let showEatBtn = false;
-                if (!isPlaceholder && status !== 'eaten') {
+                
+                if (status !== 'eaten' && !isPlaceholder) {
                     if (state.isAdmin) {
                         showEatBtn = true;
-                    } else if (isPublicGiveup) {
-                        showEatBtn = true;
+                    } else {
+                        if (isPublicGiveup) {
+                            showEatBtn = true;
+                        }
                     }
                 }
 
                 const actionBtn = showEatBtn ? `<div class="staff-item-actions"><button class="btn-mark-eaten mark-eaten-btn" data-key="${order.key}" data-day="${dayKey}"><i class="fas fa-check"></i> ${__('eaten')}</button></div>` : '';
                 
                 let extraInfo = '';
-                if (isPrivateGiveup) {
-                    extraInfo = `<div style="font-size:11px;color:var(--warning);margin-top:2px;"> <i class="fas fa-arrow-right"></i> ${receiver}</div>`;
+                if (status === 'giveup') {
+                    if (isPrivateGiveup) {
+                    } else {
+                        extraInfo = `<div style="font-size:11px;color:var(--warning);margin-top:2px;"> <i class="fas fa-users"></i> Mọi người</div>`;
+                    }
                 }
 
-                return `<li class="staff-item ${statusClass}"><div class="staff-details"><div class="staff-name">${order.name}</div><div class="staff-dish">${parseDish(order.rawDish)}</div>${extraInfo}</div>${actionBtn}</li>`;
+                let nameHtml = order.name;
+                if (isPrivateGiveup) {
+                    nameHtml = `${order.name} <span style="color:var(--warning); font-weight:normal; font-size: 11px; margin-left: 4px;"><i class="fas fa-long-arrow-alt-right"></i> ${receiver}</span>`;
+                }
+
+                return `<li class="staff-item ${statusClass}"><div class="staff-details"><div class="staff-name">${nameHtml}</div><div class="staff-dish">${parseDish(order.rawDish)}</div>${extraInfo}</div>${actionBtn}</li>`;
             };
             
             const createDepartmentHTML = (list) => {
@@ -825,6 +836,7 @@
             }
             container.innerHTML = html || `<p class="text-center text-muted p-3">${__('notFound')}</p>`;
         }
+        
         async function renderProfile() {
             const { currentUser: user, staffProfile: profile } = state;
             el('main-content').innerHTML = `<div class="card"><div class="profile-section"><img src="${user.photoURL}" alt="avatar" class="profile-avatar"><div class="profile-name">${profile.name}</div><div class="profile-depart">${profile.depart || __('notUpdated')}</div><div class="profile-language-toggle"><button class="btn btn-secondary lang-toggle-btn ${profile.lan === 'vi' ? 'active' : ''}" data-lang="vi">${__('vietnamese')}</button><button class="btn btn-secondary lang-toggle-btn ${profile.lan === 'en' ? 'active' : ''}" data-lang="en">${__('english')}</button></div><div class="profile-menu"><a href="mailto:${SUPPORT_EMAIL}" style="text-decoration:none; color:inherit;" class="profile-menu-item"><i class="fas fa-headset" style="color:var(--primary);"></i><span class="profile-menu-label">${__('support')}</span></a></div><div class="text-center" style="margin-top: 4rem;"><button id="logout-menu-item" class="btn btn-secondary btn-small"><i class="fas fa-sign-out-alt"></i>${__('logout')}</button></div></div></div>`;
@@ -1328,12 +1340,15 @@
                     hideLoader(); 
                 }
             }
-            else if (classList.contains('toggle-icon')) {
-                const targetId = dataset.target;
+            else if (target.closest('.toggle-card-header')) {
+                const header = target.closest('.toggle-card-header');
+                const targetId = header.dataset.target;
                 const listEl = el(targetId);
+                const icon = header.querySelector('.toggle-icon');
+                
                 if (listEl) {
                     listEl.classList.toggle('hidden');
-                    target.classList.toggle('rotate');
+                    if (icon) icon.classList.toggle('rotate');
                 }
             }
             else if (id === 'skip-everyone-btn') {
