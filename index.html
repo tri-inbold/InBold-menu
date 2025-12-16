@@ -485,7 +485,6 @@
             const weekData = await getDocument('order_list', currentWeekString);
             const userData = weekData ? weekData[userEmailKey] : null;
 
-            // --- CẬP NHẬT LOGIC HIỂN THỊ QUÀ TẶNG ---
             let giftHTML = '';
             if (weekData) {
                 const myName = state.staffProfile.name;
@@ -499,39 +498,25 @@
 
                     const { status, receiver, dish } = parseDishValue(raw);
 
-                    // Chỉ xử lý nếu trạng thái là 'giveup'
                     if (status === 'giveup') {
-                        // Logic hiển thị:
-                        // 1. Nhường cho chính mình (receiver === myName)
-                        // 2. Hoặc nhường cho tất cả (receiver === 'Everyone'/'Mọi người')
-                        const isForMe = receiver === myName;
-                        const isForEveryone = receiver === 'Everyone' || receiver === 'Mọi người';
-
-                        if (isForMe || isForEveryone) {
+                        if (receiver === myName) {
                             gifters.push({ 
                                 key: key, 
                                 name: val.name, 
                                 dish: parseDish(raw),
-                                rawDish: dish, 
-                                type: isForMe ? 'private' : 'public'
+                                rawDish: dish
                             });
                         }
                     }
                 });
 
                 if (gifters.length > 0) {
-                    giftHTML = gifters.map(g => {
-                        const icon = g.type === 'private' ? '<i class="fas fa-user-check"></i>' : '<i class="fas fa-users"></i>';
-                        const label = g.type === 'private' ? 'nhường riêng cho bạn' : 'nhường cho mọi người';
-                        
-                        return `<div class="gift-alert">
+                    giftHTML = gifters.map(g => 
+                        `<div class="gift-alert">
                             <div style="display:flex; justify-content:space-between; align-items:start;">
                                 <div>
                                     <h3><i class="fas fa-gift"></i> Bạn được nhường suất ăn!</h3>
-                                    <div style="font-size:13px; margin-bottom:4px;">
-                                        <strong>${g.name}</strong> ${label}: <br/>
-                                        <span style="color:var(--primary); font-weight:600;">${g.dish}</span>
-                                    </div>
+                                    <div style="font-size:13px"><strong>${g.name}</strong> nhường riêng cho bạn: ${g.dish}</div>
                                 </div>
                             </div>
                             <div class="gift-actions">
@@ -539,11 +524,10 @@
                                     <i class="fas fa-utensils"></i> Xác nhận ăn phần này
                                 </button>
                             </div>
-                        </div>`;
-                    }).join('');
+                        </div>`
+                    ).join('');
                 }
             }
-            // ------------------------------------------
             
             let isReopenMode = false;
             if (userData && userData.order === 'reopen') { isReopenMode = true; }
@@ -586,8 +570,7 @@
             }
             el('main-content').innerHTML = heroHtml + giftHTML + `<div id="order-section-container"></div>`;
             await renderOrderSection(el('order-section-container'));
-        }
-        
+        }        
         async function renderOrderSection(container) {
             const today = new Date();
             const dayOfWeek = today.getDay();
@@ -766,25 +749,31 @@
 
             el('menu-filter-btn').innerHTML = state.menuFilterMode === 'auto' ? `<i class="fas ${hour < 15 ? 'fa-sun' : 'fa-moon'}"></i>` : `<i class="fas fa-user-group"></i>`;
             
-            const createStaffItem = (order, showMarkEaten = false) => {
+            const createStaffItem = (order) => {
                 const { status, receiver } = parseDishValue(order.rawDish);
-                const statusClass = status === 'eaten' ? 'eaten' : (status === 'giveup' ? 'skipped' : '');
                 const isPlaceholder = status === 'ignore' || status === 'placeholder';
                 
-                // CẬP NHẬT: Tuyệt đối không hiện nút ăn nếu status là 'giveup' (để tránh conflict với nút nhận quà)
-                const canMarkEaten = (showMarkEaten || (state.isAdmin && status !== 'eaten')) 
-                                     && !isPlaceholder 
-                                     && status !== 'giveup'; // Điều kiện quan trọng
+                const isPublicGiveup = status === 'giveup' && (receiver === 'Everyone' || receiver === 'Mọi người');
+                const isPrivateGiveup = status === 'giveup' && !isPublicGiveup;
 
-                const actionBtn = canMarkEaten ? `<div class="staff-item-actions"><button class="btn-mark-eaten mark-eaten-btn" data-key="${order.key}" data-day="${dayKey}"><i class="fas fa-check"></i> ${__('eaten')}</button></div>` : '';
+                let statusClass = '';
+                if (status === 'eaten') statusClass = 'eaten';
+                else if (isPublicGiveup) statusClass = 'skipped'; // Chỉ public mới có màu cam
+                
+                let showEatBtn = false;
+                if (!isPlaceholder && status !== 'eaten') {
+                    if (state.isAdmin) {
+                        showEatBtn = true;
+                    } else if (isPublicGiveup) {
+                        showEatBtn = true;
+                    }
+                }
+
+                const actionBtn = showEatBtn ? `<div class="staff-item-actions"><button class="btn-mark-eaten mark-eaten-btn" data-key="${order.key}" data-day="${dayKey}"><i class="fas fa-check"></i> ${__('eaten')}</button></div>` : '';
                 
                 let extraInfo = '';
-                if (status === 'giveup') {
-                    if (receiver && receiver !== 'Everyone' && receiver !== 'Mọi người') {
-                        extraInfo = `<div style="font-size:11px;color:var(--warning);margin-top:2px;"> <i class="fas fa-arrow-right"></i> ${receiver}</div>`;
-                    } else {
-                        extraInfo = `<div style="font-size:11px;color:var(--warning);margin-top:2px;"> <i class="fas fa-users"></i> Mọi người</div>`;
-                    }
+                if (isPrivateGiveup) {
+                    extraInfo = `<div style="font-size:11px;color:var(--warning);margin-top:2px;"> <i class="fas fa-arrow-right"></i> ${receiver}</div>`;
                 }
 
                 return `<li class="staff-item ${statusClass}"><div class="staff-details"><div class="staff-name">${order.name}</div><div class="staff-dish">${parseDish(order.rawDish)}</div>${extraInfo}</div>${actionBtn}</li>`;
@@ -806,15 +795,24 @@
             const createSkippedSection = (list) => {
                 if (list.length === 0) return '';
                 const sorted = list.sort((a, b) => a.name.localeCompare(b.name));
-                return `<div class="skipped-section"><div class="skipped-section-header"><i class="fas fa-hand-holding-heart"></i><span>${__('skippedList')} (${list.length})</span></div><ul class="staff-list">${sorted.map(order => createStaffItem(order, true)).join('')}</ul></div>`;
+                return `<div class="skipped-section"><div class="skipped-section-header"><i class="fas fa-hand-holding-heart"></i><span>${__('skippedList')} (${list.length})</span></div><ul class="staff-list">${sorted.map(order => createStaffItem(order)).join('')}</ul></div>`;
             };
             
             const sang = staffOrders.filter(o => o.shift === 'morning' || o.shift === 'M');
             const chieu = staffOrders.filter(o => o.shift === 'evening' || o.shift === 'E');
             
             const createShiftHTML = (list) => {
-                const skipped = list.filter(o => parseDishValue(o.rawDish).status === 'giveup');
-                const others = list.filter(o => parseDishValue(o.rawDish).status !== 'giveup');
+                const skipped = list.filter(o => {
+                    const { status, receiver } = parseDishValue(o.rawDish);
+                    return status === 'giveup' && (receiver === 'Everyone' || receiver === 'Mọi người');
+                });
+
+                const others = list.filter(o => {
+                    const { status, receiver } = parseDishValue(o.rawDish);
+                    const isPublicGiveup = status === 'giveup' && (receiver === 'Everyone' || receiver === 'Mọi người');
+                    return !isPublicGiveup;
+                });
+
                 return createSkippedSection(skipped) + createDepartmentHTML(others);
             };
             
