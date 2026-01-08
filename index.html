@@ -1457,7 +1457,7 @@
         });
 
         document.body.addEventListener('click', async (e) => {
-            const target = e.target.closest('button, a, .profile-menu-item, .order-dish-item, .toggle-card-header');
+            const target = e.target.closest('button, a, .profile-menu-item, .order-dish-item, .toggle-card-header, .toggle-option');
             if (!target) return;
             const { id, classList, dataset } = target;
 
