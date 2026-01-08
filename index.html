@@ -1422,28 +1422,70 @@
                 showLoader();
                 try {
                     const today = new Date();
-                    const dayOfWeek = today.getDay();
-                    const hour = today.getHours();
-                    const canOrderNextWeek = (dayOfWeek === 4 && hour >= 15) || dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0;
-
-                    const targetWeek = canOrderNextWeek ? getWeekString(new Date(today.getTime() + 7 * 86400000)) : getWeekString(today);
-                    const userKey = emailToKey(state.currentUser.email);
-                    
-                    const payload = { [userKey]: { name: state.staffProfile.name, email: state.currentUser.email, depart: state.staffProfile.depart, shift: state.userShiftSelection, order: 'ordered' } };
-                    for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
-                         if(state.orderSelection[day]) {
-                             const dishName = state.orderSelection[day];
-                             const isNoOrder = dishName.toLowerCase().includes('không đặt cơm') || dishName.toLowerCase().includes('no order');
-                             
-                             const prefix = isNoOrder ? '[ignore] ' : 'not: ';
-                             payload[userKey][day] = `${prefix}${dishName}`;
-                         }
+                    const isReopen = id === 'submit-reopen-order-btn';
+            
+                    let targetWeek;
+                    if (isReopen) {
+                        targetWeek = getWeekString(today);
+                    } else {
+                        const dayOfWeek = today.getDay();
+                        const hour = today.getHours();
+            
+                        const canOrderNextWeek =
+                            (dayOfWeek === 4 && hour >= 15) || // Thứ 5 sau 15h
+                            dayOfWeek === 5 ||                // Thứ 6
+                            dayOfWeek === 6 ||                // Thứ 7
+                            dayOfWeek === 0;                  // Chủ nhật
+            
+                        targetWeek = canOrderNextWeek
+                            ? getWeekString(new Date(today.getTime() + 7 * 86400000))
+                            : getWeekString(today);
                     }
-                    
-                    await setDoc(doc(db, 'order_list', targetWeek), payload, { merge: true });
-                    showToast(__('orderSuccess')); state.orderSelection = {}; state.currentOrderDay = 'mon'; await render(); await checkOrderNotification();
-                } catch (e) { console.error(e); showToast(__('orderFailed'), 'error'); } finally { hideLoader(); }
+            
+                    const userKey = emailToKey(state.currentUser.email);
+            
+                    const payload = {
+                        [userKey]: {
+                            name: state.staffProfile.name,
+                            email: state.currentUser.email,
+                            depart: state.staffProfile.depart,
+                            shift: state.userShiftSelection,
+                            order: 'ordered'
+                        }
+                    };
+            
+                    for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
+                        if (state.orderSelection[day]) {
+                            const dishName = state.orderSelection[day];
+                            const isNoOrder =
+                                dishName.toLowerCase().includes('không đặt cơm') ||
+                                dishName.toLowerCase().includes('no order');
+            
+                            const prefix = isNoOrder ? '[ignore] ' : 'not: ';
+                            payload[userKey][day] = `${prefix}${dishName}`;
+                        }
+                    }
+            
+                    await setDoc(
+                        doc(db, 'order_list', targetWeek),
+                        payload,
+                        { merge: true }
+                    );
+            
+                    showToast(__('orderSuccess'));
+                    state.orderSelection = {};
+                    state.currentOrderDay = 'mon';
+                    await render();
+                    await checkOrderNotification();
+            
+                } catch (e) {
+                    console.error(e);
+                    showToast(__('orderFailed'), 'error');
+                } finally {
+                    hideLoader();
+                }
             }
+
             else if (dataset.action === 'skip-modal') {
                 state.skipTarget = { day: dataset.day, dish: dataset.dish };
                 el('skip-option-modal').classList.remove('hidden');
