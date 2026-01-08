@@ -911,7 +911,6 @@
                     <div class="profile-depart">${profile.depart || __('notUpdated')}</div>
                     
                     <div class="form-group text-center" style="margin-bottom: 1.5rem;">
-                        <label class="form-label" style="display:inline-block; margin-right:10px;">${__('vietnamese')}/${__('english')}</label>
                         <div class="profile-language-toggle">
                             <button class="btn btn-secondary lang-toggle-btn ${profile.lan === 'vi' ? 'active' : ''}" data-lang="vi">${__('vietnamese')}</button>
                             <button class="btn btn-secondary lang-toggle-btn ${profile.lan === 'en' ? 'active' : ''}" data-lang="en">${__('english')}</button>
@@ -919,7 +918,6 @@
                     </div>
 
                     <div class="form-group text-center" style="margin-bottom: 2rem;">
-                        <label class="form-label" style="display:inline-block; margin-right:10px;">Giao diện / Theme</label>
                         <div class="profile-language-toggle">
                             <button class="btn btn-secondary theme-toggle-btn ${currentTheme === 'dark' ? 'active' : ''}" data-theme="dark"><i class="fas fa-moon"></i> Dark</button>
                             <button class="btn btn-secondary theme-toggle-btn ${currentTheme === 'light' ? 'active' : ''}" data-theme="light"><i class="fas fa-sun"></i> Light</button>
@@ -1432,10 +1430,10 @@
                         const hour = today.getHours();
             
                         const canOrderNextWeek =
-                            (dayOfWeek === 4 && hour >= 15) || // Thứ 5 sau 15h
-                            dayOfWeek === 5 ||                // Thứ 6
-                            dayOfWeek === 6 ||                // Thứ 7
-                            dayOfWeek === 0;                  // Chủ nhật
+                            (dayOfWeek === 4 && hour >= 15) ||
+                            dayOfWeek === 5 ||
+                            dayOfWeek === 6 ||
+                            dayOfWeek === 0;
             
                         targetWeek = canOrderNextWeek
                             ? getWeekString(new Date(today.getTime() + 7 * 86400000))
