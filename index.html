@@ -1136,7 +1136,7 @@
                 statsContent.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>${__('department')}</th><th>${headers.ordered}</th><th>${headers.eaten}</th><th>${headers.notEaten}</th></tr></thead><tbody>${Object.entries(departStats).map(([dep, d]) => `<tr><td>${dep}</td><td>${d.ordered}</td><td>${d.eaten}</td><td>${d.notEaten}</td></tr>`).join('')}<tr style="font-weight:600;background:rgba(102,126,234,0.1)"><td>${__('total')}</td><td>${totals.ordered}</td><td>${totals.eaten}</td><td>${totals.notEaten}</td></tr></tbody></table></div>`;
             }
         }        
-        {async function renderAdminMenu() {
+        async function renderAdminMenu() {
             const today = new Date();
             const thisWeek = getWeekString(today);
             const nextWeek = getWeekString(new Date(today.getTime() + 7 * 86400000));
@@ -1341,87 +1341,98 @@
                 } else { e.target.value = ''; }
             }
             else if (id === 'menu-file-input') {
+                // ... (Giữ nguyên logic menu file input cũ của bạn ở đây) ...
                 const file = e.target.files[0];
                 if (!file) return;
-                
                 showLoader();
                 try {
                     await loadXLSXLibrary();
                     const data = await file.arrayBuffer();
                     const workbook = XLSX.read(data);
-                    
                     let sheetName = workbook.SheetNames.find(n => n.toLowerCase() === 'menu') || workbook.SheetNames[0];
                     const sheet = workbook.Sheets[sheetName];
-                    
                     const rows = XLSX.utils.sheet_to_json(sheet, {header: 1});
-                    if (!rows || rows.length === 0) throw new Error("File trống");
-
+                    // ... (logic xử lý menu cũ) ...
+                    // Đoạn này dài, bạn giữ nguyên code cũ của menu
+                    // Chỉ cần đảm bảo đóng ngoặc đúng cho else if này
+                    // Code rút gọn để bạn dễ nhìn vị trí chèn:
                     let colMap = { mon: -1, tue: -1, wed: -1, thu: -1, fri: -1 };
                     let dataStartRow = -1;
-
                     for(let i=0; i < Math.min(rows.length, 10); i++) {
-                        const row = rows[i].map(c => String(c || '').toLowerCase().trim());
-                        
-                        if (row.includes('mon') || row.includes('thứ 2')) {
-                            dataStartRow = i + 1;
-                            
-                            colMap.mon = row.findIndex(c => c === 'mon' || c === 'thứ 2');
-                            colMap.tue = row.findIndex(c => c === 'tue' || c === 'thứ 3');
-                            colMap.wed = row.findIndex(c => c === 'wed' || c === 'thứ 4');
-                            colMap.thu = row.findIndex(c => c === 'thu' || c === 'thứ 5');
-                            colMap.fri = row.findIndex(c => c === 'fri' || c === 'thứ 6');
-                            
-                            break; 
-                        }
+                         // ... logic tìm dòng tiêu đề ...
+                         const row = rows[i].map(c => String(c || '').toLowerCase().trim());
+                         if (row.includes('mon') || row.includes('thứ 2')) { dataStartRow = i + 1; /*...*/ break; }
                     }
-
-                    if (dataStartRow === -1) throw new Error("Không tìm thấy dòng tiêu đề (Mon, Tue... hoặc Thứ 2, Thứ 3...)");
-                    if (colMap.mon === -1) throw new Error("Không xác định được các cột thứ ngày.");
-
-                    const parsedMenu = { mon: [], tue: [], wed: [], thu: [], fri: [] };
-
-                    for (let i = dataStartRow; i < rows.length; i++) {
-                        const row = rows[i];
-                        if (!row || row.length === 0) continue;
-
-                        for (const dayKey of ['mon', 'tue', 'wed', 'thu', 'fri']) {
-                            const colIndex = colMap[dayKey];
-                            if (colIndex > -1) {
-                                const cellValue = row[colIndex]; 
-                                if (cellValue) {
-                                    const cleanVal = String(cellValue).trim();
-                                    const isIgnored = !cleanVal || cleanVal.toLowerCase().includes('không đặt cơm') || cleanVal.toLowerCase().includes('no order');
-                                    if (!isIgnored) {
-                                        parsedMenu[dayKey].push(cleanVal);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    for (const dayKey of ['mon', 'tue', 'wed', 'thu', 'fri']) {
+                    // ... xử lý import menu ...
+                     for (const dayKey of ['mon', 'tue', 'wed', 'thu', 'fri']) {
                         const container = el(`menu-dishes-nextWeek-${dayKey}`);
                         if (container) {
                             container.innerHTML = ''; 
-                            const dishes = parsedMenu[dayKey];
-                            
-                            dishes.forEach((dish, idx) => {
-                                const rowHTML = `<div style="display:flex;gap:0.5rem;align-items:center;"><textarea class="form-textarea menu-dish-textarea" data-week="nextWeek" data-day="${dayKey}" data-index="${idx}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;">${dish}</textarea><button class="icon-btn remove-menu-dish-btn" data-week="nextWeek" data-day="${dayKey}" data-index="${idx}"><i class="fas fa-times"></i></button></div>`;
-                                container.insertAdjacentHTML('beforeend', rowHTML);
-                            });
-
-                            const emptyIdx = dishes.length;
-                            const emptyRowHTML = `<div style="display:flex;gap:0.5rem;align-items:center;"><textarea class="form-textarea menu-dish-textarea" data-week="nextWeek" data-day="${dayKey}" data-index="${emptyIdx}" placeholder="${__('oneDishPerLine')}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;"></textarea><button class="icon-btn remove-menu-dish-btn hidden" data-week="nextWeek" data-day="${dayKey}" data-index="${emptyIdx}"><i class="fas fa-times"></i></button></div>`;
-                            container.insertAdjacentHTML('beforeend', emptyRowHTML);
+                            // ... logic render lại menu ...
                         }
                     }
-
                     document.querySelectorAll('.menu-dish-textarea').forEach(autoResizeTextarea);
                     showToast('Đã nhập dữ liệu menu thành công.');
+                } catch (err) { console.error(err); showToast('Lỗi đọc file: ' + err.message, 'error'); } finally { hideLoader(); e.target.value = ''; }
+            }
+
+            else if (id === 'personnel-import-input') {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                if (!confirm("CẢNH BÁO: Hành động này sẽ XÓA TOÀN BỘ dữ liệu nhân viên hiện tại và thay thế bằng danh sách trong file Excel.\n\nBạn có chắc chắn muốn tiếp tục không?")) {
+                    e.target.value = '';
+                    return;
+                }
+
+                showLoader();
+                try {
+                    await loadXLSXLibrary();
+                    const data = await file.arrayBuffer();
+                    const workbook = XLSX.read(data);
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(sheet);
+
+                    if (!rows || rows.length === 0) throw new Error("File trống hoặc sai định dạng");
+
+                    const newStaffData = {};
+                    let count = 0;
+                    
+                    rows.forEach(row => {
+                        const name = row['Tên'] || row['Name'] || row['name'] || Object.values(row)[0];
+                        const email = row['Email'] || row['email'] || Object.values(row)[1];
+                        const depart = row['Phòng ban'] || row['Department'] || row['department'] || Object.values(row)[2] || '';
+
+                        if (name && email && String(email).includes('@')) {
+                            const key = emailToKey(String(email).trim());
+                            newStaffData[key] = {
+                                name: String(name).trim(),
+                                email: String(email).trim(),
+                                depart: String(depart).trim(),
+                                lan: 'vi',
+                                theme: 'dark'
+                            };
+                            count++;
+                        }
+                    });
+
+                    if (count === 0) throw new Error("Không tìm thấy dữ liệu hợp lệ (Cần cột Tên, Email)");
+                    const currentDoc = await getDocument("staff_list", "staffs") || {};
+                    const guests = {};
+                    Object.keys(currentDoc).forEach(k => {
+                        if (k.startsWith('guest_')) guests[k] = currentDoc[k];
+                    });
+
+                    const finalData = { ...newStaffData, ...guests };
+                    
+                    await setDoc(doc(db, "staff_list", "staffs"), finalData);
+
+                    showToast(`Đã nhập thành công ${count} nhân viên.`, 'success');
+                    await renderAdminPersonnel();
 
                 } catch (err) {
                     console.error(err);
-                    showToast('Lỗi đọc file: ' + err.message, 'error');
+                    showToast('Lỗi nhập file: ' + err.message, 'error');
                 } finally {
                     hideLoader();
                     e.target.value = '';
@@ -1630,69 +1641,7 @@
                     
                     header.classList.toggle('collapsed', listEl.classList.contains('hidden'));
                 }
-            }
-            else if (id === 'personnel-import-input') {
-                const file = e.target.files[0];
-                if (!file) return;
-
-                if (!confirm("CẢNH BÁO: Hành động này sẽ XÓA TOÀN BỘ dữ liệu nhân viên hiện tại và thay thế bằng danh sách trong file Excel.\n\nBạn có chắc chắn muốn tiếp tục không?")) {
-                    e.target.value = '';
-                    return;
-                }
-
-                showLoader();
-                try {
-                    await loadXLSXLibrary();
-                    const data = await file.arrayBuffer();
-                    const workbook = XLSX.read(data);
-                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const rows = XLSX.utils.sheet_to_json(sheet);
-
-                    if (!rows || rows.length === 0) throw new Error("File trống hoặc sai định dạng");
-
-                    const newStaffData = {};
-                    let count = 0;
-                    
-                    rows.forEach(row => {
-                        const name = row['Tên'] || row['Name'] || row['name'] || Object.values(row)[0];
-                        const email = row['Email'] || row['email'] || Object.values(row)[1];
-                        const depart = row['Phòng ban'] || row['Department'] || row['department'] || Object.values(row)[2] || '';
-
-                        if (name && email && String(email).includes('@')) {
-                            const key = emailToKey(String(email).trim());
-                            newStaffData[key] = {
-                                name: String(name).trim(),
-                                email: String(email).trim(),
-                                depart: String(depart).trim(),
-                                lan: 'vi', // default
-                                theme: 'dark' // default
-                            };
-                            count++;
-                        }
-                    });
-
-                    if (count === 0) throw new Error("Không tìm thấy dữ liệu hợp lệ (Cần cột Tên, Email)");
-                    const currentDoc = await getDocument("staff_list", "staffs") || {};
-                    const guests = {};
-                    Object.keys(currentDoc).forEach(k => {
-                        if (k.startsWith('guest_')) guests[k] = currentDoc[k];
-                    });
-
-                    const finalData = { ...newStaffData, ...guests };
-                    
-                    await setDoc(doc(db, "staff_list", "staffs"), finalData);
-
-                    showToast(`Đã nhập thành công ${count} nhân viên.`, 'success');
-                    await renderAdminPersonnel();
-
-                } catch (err) {
-                    console.error(err);
-                    showToast('Lỗi nhập file: ' + err.message, 'error');
-                } finally {
-                    hideLoader();
-                    e.target.value = '';
-                }
-            }    
+            } 
             else if (id === 'skip-everyone-btn') {
                 await processSkip('Everyone');
             }
