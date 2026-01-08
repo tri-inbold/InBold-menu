@@ -62,6 +62,11 @@
         [data-theme="light"] .tab-btn.active,
         [data-theme="light"] .shift-toggle input[type="radio"]:checked + label { color: #ffffff !important; font-weight: 600; }
         [data-theme="light"] .hero-card { box-shadow: 0 10px 25px -5px rgba(249, 115, 22, 0.4); }
+        [data-theme="light"] .btn-skip { background-color: #f59e0b !important; color: #ffffff !important; border: 1px solid #d97706 !important; font-weight: 600; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3); }
+        [data-theme="light"] .btn-eaten,
+        [data-theme="light"] .btn-mark-eaten { background-color: #16a34a !important; color: #ffffff !important; border: 1px solid #15803d !important; font-weight: 600; box-shadow: 0 2px 4px rgba(22, 163, 74, 0.3); }
+        [data-theme="light"] .btn-skip:hover,
+        [data-theme="light"] .btn-eaten:hover { transform: translateY(-1px); opacity: 0.95; }
         [data-theme="light"] .form-input, 
         [data-theme="light"] .form-select, 
         [data-theme="light"] .form-textarea,
@@ -957,10 +962,74 @@
             el('admin-content').innerHTML = `<div class="mt-3"><div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;"><div class="shift-toggle" id="stats-mode-container"><input type="radio" id="stats-day" name="stats-mode" value="day" ${state.statsViewMode === 'day' ? 'checked' : ''}><label for="stats-day">${__('day')}</label><input type="radio" id="stats-week" name="stats-mode" value="week" ${state.statsViewMode === 'week' ? 'checked' : ''}><label for="stats-week">${__('week')}</label><input type="radio" id="stats-month" name="stats-mode" value="month" ${state.statsViewMode === 'month' ? 'checked' : ''}><label for="stats-month">${__('month')}</label></div><div style="display:flex;gap:8px;"><button id="stats-today-btn" class="icon-btn" title="${__('today')}"><i class="fas fa-calendar-day"></i></button><div style="position:relative;"><label for="stats-date-picker" class="icon-btn"><i class="fas fa-calendar-days"></i></label><input type="date" id="stats-date-picker" value="${dateStr}" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;"></div></div></div><div id="stats-content" class="mt-2"></div><button id="export-stats-btn" class="btn btn-primary btn-block mt-3"><i class="fas fa-file-excel"></i> ${__('downloadXLSX')}</button></div>`;
             await renderStatsContent();
         }
-        async function renderAdminSupport() {
+        async function renderAdminSupport(searchTerm = '') {
             const [allStaff, weekDoc] = await Promise.all([getDocument("staff_list", "staffs"), getDocument('order_list', getWeekString(new Date()))]);
-            const notOrderedList = allStaff ? Object.entries(allStaff).filter(([key]) => !key.startsWith('guest_') && (!weekDoc || !weekDoc[key] || weekDoc[key].order === 'reopen')).map(([key, profile]) => ({ key, profile })).sort((a, b) => a.profile.name.localeCompare(b.profile.name)) : [];
-            el('admin-content').innerHTML = `<div class="mt-3"><h3 style="color:var(--primary);margin-bottom:1rem;font-size:18px;">${__('notOrderedYet')}</h3>${notOrderedList.length > 0 ? `<div class="table-wrapper"><table><thead><tr><th>${__('name')}</th><th class="hide-mobile">${__('email')}</th><th class="hide-mobile">${__('department')}</th><th style="width:60px;">${__('actions')}</th></tr></thead><tbody>${notOrderedList.map(item => `<tr><td>${item.profile.name}</td><td class="hide-mobile">${item.profile.email}</td><td class="hide-mobile">${item.profile.depart || '-'}</td><td><button class="icon-btn reopen-order-btn" data-key="${item.key}" data-name="${item.profile.name}"><i class="fas fa-redo"></i></button></td></tr>`).join('')}</tbody></table></div>` : `<p class="text-center text-muted p-3">${__('everyoneOrdered')}</p>`}<h3 style="color:var(--primary);margin:2rem 0 1rem;font-size:18px;">${__('orderForGuest')}</h3><button id="add-guest-order-btn" class="btn btn-primary btn-block"><i class="fas fa-plus"></i> ${__('addGuest')}</button></div>`;
+            
+            let notOrderedList = allStaff ? Object.entries(allStaff)
+                .filter(([key]) => !key.startsWith('guest_') && (!weekDoc || !weekDoc[key] || weekDoc[key].order === 'reopen'))
+                .map(([key, profile]) => ({ key, profile }))
+                .sort((a, b) => a.profile.name.localeCompare(b.profile.name)) : [];
+
+            if (searchTerm) {
+                const lowerTerm = searchTerm.toLowerCase();
+                notOrderedList = notOrderedList.filter(item => 
+                    item.profile.name.toLowerCase().includes(lowerTerm) || 
+                    item.profile.email.toLowerCase().includes(lowerTerm)
+                );
+            }
+
+            el('admin-content').innerHTML = `
+            <div class="mt-3">
+                <h3 style="color:var(--primary);margin-bottom:1rem;font-size:18px;">${__('notOrderedYet')} (${notOrderedList.length})</h3>
+                
+                <!-- Thanh tìm kiếm mới -->
+                <div class="search-bar mb-2">
+                    <div class="search-wrapper">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" id="search-support" class="search-input" placeholder="${__('searchStaff')}" value="${searchTerm}">
+                    </div>
+                </div>
+
+                ${notOrderedList.length > 0 ? `
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>${__('name')}</th>
+                                <th class="hide-mobile">${__('email')}</th>
+                                <th class="hide-mobile">${__('department')}</th>
+                                <th style="width:60px;">${__('actions')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${notOrderedList.map(item => `
+                            <tr>
+                                <td>${item.profile.name}</td>
+                                <td class="hide-mobile">${item.profile.email}</td>
+                                <td class="hide-mobile">${item.profile.depart || '-'}</td>
+                                <td>
+                                    <button class="icon-btn reopen-order-btn" data-key="${item.key}" data-name="${item.profile.name}" title="${__('reopenOrderFor')}">
+                                        <i class="fas fa-redo"></i>
+                                    </button>
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>` : `<p class="text-center text-muted p-3">${searchTerm ? __('notFound') : __('everyoneOrdered')}</p>`}
+                
+                <h3 style="color:var(--primary);margin:2rem 0 1rem;font-size:18px;">${__('orderForGuest')}</h3>
+                <button id="add-guest-order-btn" class="btn btn-primary btn-block"><i class="fas fa-plus"></i> ${__('addGuest')}</button>
+            </div>`;
+
+            const searchInput = el('search-support');
+            if(searchInput) {
+                searchInput.focus();
+                const val = searchInput.value; 
+                searchInput.value = ''; 
+                searchInput.value = val;
+                
+                searchInput.addEventListener('input', (e) => renderAdminSupport(e.target.value));
+            }
         }
         async function renderStatsContent() {
             const statsContent = el('stats-content');
