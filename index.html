@@ -89,6 +89,8 @@
         [data-theme="light"] .search-icon { color: #94a3b8 !important; }
         [data-theme="light"] .modal-content { background: #ffffff !important; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
         [data-theme="light"] .close-btn { color: #64748b !important; }
+        [data-theme="light"] .toggle-option.active { background: #ffffff; }
+        [data-theme="light"] .toggle-group { background: #e2e8f0; }
         
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Montserrat', sans-serif; background: var(--dark-bg); color: var(--text); line-height: 1.5; font-size: 14px; }
@@ -100,7 +102,18 @@
         .card { background: var(--card-bg); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1rem; border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: all 0.2s ease; }
         @media (min-width: 769px) { .card { padding: 1.5rem; } }
         .card:hover { box-shadow: var(--shadow-md); }
-        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; transition: margin-bottom 0.3s ease; }
+        .card-header.collapsed { margin-bottom: 0 !important; border-bottom: none; }
+        
+        .btn-upload { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 500; }
+        .btn-upload:hover { background: var(--card-hover); border-color: var(--primary); }
+
+        .toggle-group-container { display: flex; flex-direction: column; gap: 1rem; max-width: 300px; margin: 0 auto 2rem; }
+        .toggle-group-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); text-align: center; margin-bottom: 0.5rem; }
+        .toggle-group { display: flex; padding: 4px; background: rgba(0,0,0,0.2); border-radius: 50px; border: 1px solid var(--border); position: relative; }
+        .toggle-option { flex: 1; padding: 8px 0; text-align: center; font-size: 13px; font-weight: 500; color: var(--text-muted); cursor: pointer; border-radius: 40px; transition: all 0.3s ease; position: relative; z-index: 1; }
+        .toggle-option.active { background: var(--card-bg); color: var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-weight: 600; }
+        .toggle-option:hover:not(.active) { color: var(--text); }
         .card-title { font-size: 16px; font-weight: 600; color: var(--text); }
         @media (min-width: 769px) { .card-title { font-size: 20px; } }
 
@@ -915,17 +928,19 @@
                     <div class="profile-name">${profile.name}</div>
                     <div class="profile-depart">${profile.depart || __('notUpdated')}</div>
                     
-                    <div class="form-group text-center" style="margin-bottom: 1.5rem;">
-                        <div class="profile-language-toggle">
-                            <button class="btn btn-secondary lang-toggle-btn ${profile.lan === 'vi' ? 'active' : ''}" data-lang="vi">${__('vietnamese')}</button>
-                            <button class="btn btn-secondary lang-toggle-btn ${profile.lan === 'en' ? 'active' : ''}" data-lang="en">${__('english')}</button>
+                    <div class="toggle-group-container" style="margin-top: 2rem;">
+                        <div>
+                            <div class="toggle-group">
+                                <div class="toggle-option lang-toggle-btn ${profile.lan === 'vi' ? 'active' : ''}" data-lang="vi">Tiếng Việt</div>
+                                <div class="toggle-option lang-toggle-btn ${profile.lan === 'en' ? 'active' : ''}" data-lang="en">English</div>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="form-group text-center" style="margin-bottom: 2rem;">
-                        <div class="profile-language-toggle">
-                            <button class="btn btn-secondary theme-toggle-btn ${currentTheme === 'dark' ? 'active' : ''}" data-theme="dark"><i class="fas fa-moon"></i> Dark</button>
-                            <button class="btn btn-secondary theme-toggle-btn ${currentTheme === 'light' ? 'active' : ''}" data-theme="light"><i class="fas fa-sun"></i> Light</button>
+                        <div>
+                            <div class="toggle-group">
+                                <div class="toggle-option theme-toggle-btn ${currentTheme === 'dark' ? 'active' : ''}" data-theme="dark"><i class="fas fa-moon"></i> Dark</div>
+                                <div class="toggle-option theme-toggle-btn ${currentTheme === 'light' ? 'active' : ''}" data-theme="light"><i class="fas fa-sun"></i> Light</div>
+                            </div>
                         </div>
                     </div>
 
@@ -936,7 +951,7 @@
                         </a>
                     </div>
                     
-                    <div class="text-center" style="margin-top: 4rem;">
+                    <div class="text-center" style="margin-top: 3rem;">
                         <button id="logout-menu-item" class="btn btn-secondary btn-small">
                             <i class="fas fa-sign-out-alt"></i>${__('logout')}
                         </button>
@@ -1121,7 +1136,7 @@
                 statsContent.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>${__('department')}</th><th>${headers.ordered}</th><th>${headers.eaten}</th><th>${headers.notEaten}</th></tr></thead><tbody>${Object.entries(departStats).map(([dep, d]) => `<tr><td>${dep}</td><td>${d.ordered}</td><td>${d.eaten}</td><td>${d.notEaten}</td></tr>`).join('')}<tr style="font-weight:600;background:rgba(102,126,234,0.1)"><td>${__('total')}</td><td>${totals.ordered}</td><td>${totals.eaten}</td><td>${totals.notEaten}</td></tr></tbody></table></div>`;
             }
         }        
-        async function renderAdminMenu() {
+        {async function renderAdminMenu() {
             const today = new Date();
             const thisWeek = getWeekString(today);
             const nextWeek = getWeekString(new Date(today.getTime() + 7 * 86400000));
@@ -1144,10 +1159,11 @@
             };
         
             const renderEditableMenuSection = (weekKey, menuData, title) => {
-                let html = `<div style="display:flex;align-items:center;gap:10px;margin:1.5rem 0 1rem;"><h3 style="color:var(--primary);font-size:18px;margin:0;">${title}</h3>`;
+                let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin:1.5rem 0 1rem;"><h3 style="color:var(--primary);font-size:18px;margin:0;">${title}</h3>`;
                 
                 if (weekKey === 'nextWeek') {
-                    html += `<button onclick="document.getElementById('menu-file-input').click()" class="icon-btn" title="Import Excel" style="width:32px;height:32px;"><i class="fas fa-file-import"></i></button><input type="file" id="menu-file-input" class="hidden" accept=".xlsx, .xls, .csv">`;
+                    // Cập nhật nút tải lên có chữ
+                    html += `<button onclick="document.getElementById('menu-file-input').click()" class="btn-upload"><i class="fas fa-file-excel" style="color:#16a34a"></i> Tải lên Excel</button><input type="file" id="menu-file-input" class="hidden" accept=".xlsx, .xls, .csv">`;
                 }
                 html += `</div>`;
 
@@ -1166,7 +1182,8 @@
 
             if (hasNextWeekData && !state.isEditingMenu) {
                 contentHTML += renderReadOnlyMenuSection(nextWeekMenu, `${__('menuNextWeek')} (${nextWeek.split('_')[1]})`, true);
-                contentHTML += `<div class="mt-3 text-center"><p class="text-muted mb-2"><i class="fas fa-check-circle" style="color:var(--success)"></i> ${__('menuSavedState')}</p><button id="edit-menu-btn" class="btn btn-secondary"><i class="fas fa-pen"></i> ${__('editAgain')}</button></div>`;
+                // Đã loại bỏ nút "Chỉnh sửa lại" ở đây theo yêu cầu
+                contentHTML += `<div class="mt-3 text-center"><p class="text-muted mb-2"><i class="fas fa-check-circle" style="color:var(--success)"></i> ${__('menuSavedState')}</p></div>`;
             } else {
                 contentHTML += renderEditableMenuSection('nextWeek', nextWeekMenu, `${__('menuNextWeek')} (${nextWeek.split('_')[1]})`);
                 contentHTML += `<button id="save-menu-nextWeek" class="btn btn-primary btn-block" style="margin-top:1rem;" data-week="${nextWeek}"><i class="fas fa-save"></i> ${__('save')} ${__('menuNextWeek')}</button>`;
@@ -1191,14 +1208,25 @@
             
             el('admin-content').innerHTML = `
             <div class="mt-3">
-                <div style="display:flex; gap:8px; margin-bottom:1rem; align-items:center;">
-                    <div class="search-wrapper">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; gap: 8px;">
+                     <!-- Search Bar -->
+                    <div class="search-wrapper" style="flex:1;">
                         <i class="fas fa-search search-icon"></i>
                         <input type="text" id="search-personnel" class="search-input" placeholder="${__('searchStaff')}" value="${searchTerm}">
                     </div>
-                    <button id="add-personnel-btn" class="icon-btn"><i class="fas fa-plus"></i></button>
-                    <button id="export-personnel-btn" class="icon-btn"><i class="fas fa-file-excel"></i></button>
+                    
+                    <button id="add-personnel-btn" class="icon-btn" title="Thêm thủ công"><i class="fas fa-plus"></i></button>
+                    <button id="export-personnel-btn" class="icon-btn" title="Xuất Excel"><i class="fas fa-file-excel"></i></button>
                 </div>
+
+                <!-- Nút Tải lên Excel Ghi đè -->
+                <div style="margin-bottom: 1rem;">
+                    <button onclick="document.getElementById('personnel-import-input').click()" class="btn btn-secondary btn-block" style="border: 1px dashed var(--border);">
+                        <i class="fas fa-file-upload" style="color:var(--warning)"></i> Tải lên Excel (Ghi đè DB)
+                    </button>
+                    <input type="file" id="personnel-import-input" class="hidden" accept=".xlsx, .xls, .csv">
+                </div>
+
                 <div class="table-wrapper">
                     <table>
                         <thead><tr><th>${__('personnel')}</th><th class="hide-mobile">${__('email')}</th><th class="hide-mobile">${__('department')}</th><th>${__('actions')}</th></tr></thead>
@@ -1210,9 +1238,11 @@
             </div>`;
             
             const searchInput = el('search-personnel');
-            searchInput.focus();
-            const val = searchInput.value; searchInput.value = ''; searchInput.value = val;
-            searchInput.addEventListener('input', (e) => renderAdminPersonnel(e.target.value));
+            if(searchInput) {
+                searchInput.focus();
+                const val = searchInput.value; searchInput.value = ''; searchInput.value = val;
+                searchInput.addEventListener('input', (e) => renderAdminPersonnel(e.target.value));
+            }
         }
         
         async function syncUserProfile() {
@@ -1597,8 +1627,72 @@
                 if (listEl) {
                     listEl.classList.toggle('hidden');
                     if (icon) icon.classList.toggle('rotate');
+                    
+                    header.classList.toggle('collapsed', listEl.classList.contains('hidden'));
                 }
             }
+            else if (id === 'personnel-import-input') {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                if (!confirm("CẢNH BÁO: Hành động này sẽ XÓA TOÀN BỘ dữ liệu nhân viên hiện tại và thay thế bằng danh sách trong file Excel.\n\nBạn có chắc chắn muốn tiếp tục không?")) {
+                    e.target.value = '';
+                    return;
+                }
+
+                showLoader();
+                try {
+                    await loadXLSXLibrary();
+                    const data = await file.arrayBuffer();
+                    const workbook = XLSX.read(data);
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(sheet);
+
+                    if (!rows || rows.length === 0) throw new Error("File trống hoặc sai định dạng");
+
+                    const newStaffData = {};
+                    let count = 0;
+                    
+                    rows.forEach(row => {
+                        const name = row['Tên'] || row['Name'] || row['name'] || Object.values(row)[0];
+                        const email = row['Email'] || row['email'] || Object.values(row)[1];
+                        const depart = row['Phòng ban'] || row['Department'] || row['department'] || Object.values(row)[2] || '';
+
+                        if (name && email && String(email).includes('@')) {
+                            const key = emailToKey(String(email).trim());
+                            newStaffData[key] = {
+                                name: String(name).trim(),
+                                email: String(email).trim(),
+                                depart: String(depart).trim(),
+                                lan: 'vi', // default
+                                theme: 'dark' // default
+                            };
+                            count++;
+                        }
+                    });
+
+                    if (count === 0) throw new Error("Không tìm thấy dữ liệu hợp lệ (Cần cột Tên, Email)");
+                    const currentDoc = await getDocument("staff_list", "staffs") || {};
+                    const guests = {};
+                    Object.keys(currentDoc).forEach(k => {
+                        if (k.startsWith('guest_')) guests[k] = currentDoc[k];
+                    });
+
+                    const finalData = { ...newStaffData, ...guests };
+                    
+                    await setDoc(doc(db, "staff_list", "staffs"), finalData);
+
+                    showToast(`Đã nhập thành công ${count} nhân viên.`, 'success');
+                    await renderAdminPersonnel();
+
+                } catch (err) {
+                    console.error(err);
+                    showToast('Lỗi nhập file: ' + err.message, 'error');
+                } finally {
+                    hideLoader();
+                    e.target.value = '';
+                }
+            }    
             else if (id === 'skip-everyone-btn') {
                 await processSkip('Everyone');
             }
