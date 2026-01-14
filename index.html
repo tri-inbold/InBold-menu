@@ -307,16 +307,25 @@
         <div id="delete-department-modal" class="modal hidden">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2 class="modal-title">Xóa phòng ban</h2>
+                    <h2 class="modal-title">Xóa & Chuyển phòng ban</h2>
                     <button class="close-btn" data-modal="delete-department-modal"><i class="fas fa-times"></i></button>
                 </div>
-                <p id="delete-department-text" class="text-muted mb-3"></p>
-                <div style="background: rgba(245, 101, 101, 0.1); color: var(--error); padding: 10px; border-radius: 8px; font-size: 12px; margin-bottom: 1rem;">
-                    <i class="fas fa-exclamation-triangle"></i> Cảnh báo: Nhân sự thuộc phòng ban này sẽ bị mất thông tin phòng ban (trống). Dữ liệu thống kê cũ không bị thay đổi.
+                
+                <p id="delete-department-text" class="text-muted mb-3" style="font-weight:600; color:var(--text) !important;"></p>
+                
+                <div class="form-group">
+                    <label class="form-label" style="color: var(--warning);">Chọn phòng ban mới cho nhân sự cũ:</label>
+                    <select id="transfer-department-select" class="form-select">
+                    </select>
                 </div>
+        
+                <div style="background: rgba(102, 126, 234, 0.1); color: var(--primary); padding: 10px; border-radius: 8px; font-size: 12px; margin-bottom: 1rem;">
+                    <i class="fas fa-info-circle"></i> Toàn bộ nhân viên và lịch sử đặt món tháng này của phòng ban bị xóa sẽ được chuyển sang phòng ban mới chọn ở trên.
+                </div>
+        
                 <div style="display: flex; gap: 12px;">
                     <button class="btn btn-secondary" data-modal="delete-department-modal" style="flex: 1;">Hủy</button>
-                    <button id="confirm-delete-department-btn" class="btn btn-primary" style="background: var(--error); border-color: var(--error); flex: 1;">Xóa</button>
+                    <button id="confirm-delete-department-btn" class="btn btn-primary" style="flex: 1;">Xác nhận chuyển & Xóa</button>
                 </div>
             </div>
         </div>
@@ -1012,20 +1021,18 @@
         }
 
         async function renderAdmin() {
-            el('main-content').innerHTML = `<div class="card"><div class="tabs"><button class="tab-btn ${state.adminSubTab === 'support' ? 'active' : ''}" data-subtab="support"><i class="fas fa-headset"></i><span class="tab-label">${__('support')}</span></button><button class="tab-btn ${state.adminSubTab === 'stats' ? 'active' : ''}" data-subtab="stats"><i class="fas fa-chart-pie"></i><span class="tab-label">${__('stats')}</span></button><button class="tab-btn ${state.adminSubTab === 'menu' ? 'active' : ''}" data-subtab="menu"><i class="fas fa-utensils"></i><span class="tab-label">${__('menu')}</span></button><button class="tab-btn ${state.adminSubTab === 'personnel' ? 'active' : ''}" data-subtab="personnel"><i class="fas fa-user-group"></i><span class="tab-label">${__('personnel')}</span></button></div><div id="admin-content"></div></div>`;
             el('main-content').innerHTML = `<div class="card">
                 <div class="tabs">
                     <button class="tab-btn ${state.adminSubTab === 'support' ? 'active' : ''}" data-subtab="support"><i class="fas fa-headset"></i><span class="tab-label">${__('support')}</span></button>
                     <button class="tab-btn ${state.adminSubTab === 'stats' ? 'active' : ''}" data-subtab="stats"><i class="fas fa-chart-pie"></i><span class="tab-label">${__('stats')}</span></button>
                     <button class="tab-btn ${state.adminSubTab === 'menu' ? 'active' : ''}" data-subtab="menu"><i class="fas fa-utensils"></i><span class="tab-label">${__('menu')}</span></button>
                     <button class="tab-btn ${state.adminSubTab === 'personnel' ? 'active' : ''}" data-subtab="personnel"><i class="fas fa-user-group"></i><span class="tab-label">${__('personnel')}</span></button>
-                    <!-- THÊM DÒNG NÀY -->
-                    <button class="tab-btn ${state.adminSubTab === 'departments' ? 'active' : ''}" data-subtab="departments"><i class="fas fa-building"></i><span class="tab-label">Phòng ban</span></button> 
                 </div>
                 <div id="admin-content"></div>
             </div>`;
             await renderAdminSubTab();
         }
+
 
         async function getDepartmentsList() {
             let deptDoc = await getDocument("admin_list", "departments");
@@ -1094,8 +1101,7 @@
                 case 'stats': await renderAdminStats(); break;
                 case 'support': await renderAdminSupport(); break;
                 case 'menu': await renderAdminMenu(); break;
-                case 'personnel': await renderAdminPersonnel(); break;
-                case 'departments': await renderAdminDepartments(); break;
+                case 'personnel': await renderAdminPersonnel(); break; 
             }
         }
         async function renderAdminStats() {
@@ -1545,15 +1551,15 @@
                 } catch (err) { console.error(err); showToast('Lỗi đọc file: ' + err.message, 'error'); } finally { hideLoader(); e.target.value = ''; }
             }
 
-            else if (id === 'personnel-import-input') {
+           else if (id === 'personnel-import-input') {
                 const file = e.target.files[0];
                 if (!file) return;
-
-                if (!confirm("CẢNH BÁO: Hành động này sẽ XÓA TOÀN BỘ dữ liệu nhân viên hiện tại và thay thế bằng danh sách trong file Excel.\n\nBạn có chắc chắn muốn tiếp tục không?")) {
+        
+                if (!confirm("CẢNH BÁO: Hành động này sẽ:\n1. XÓA TOÀN BỘ dữ liệu nhân viên hiện tại.\n2. CẬP NHẬT LẠI danh sách phòng ban theo file Excel.\n\nBạn có chắc chắn muốn tiếp tục không?")) {
                     e.target.value = '';
                     return;
                 }
-
+        
                 showLoader();
                 try {
                     await loadXLSXLibrary();
@@ -1561,44 +1567,56 @@
                     const workbook = XLSX.read(data);
                     const sheet = workbook.Sheets[workbook.SheetNames[0]];
                     const rows = XLSX.utils.sheet_to_json(sheet);
-
+        
                     if (!rows || rows.length === 0) throw new Error("File trống hoặc sai định dạng");
-
+        
                     const newStaffData = {};
+                    const newDepartmentsSet = new Set();
                     let count = 0;
                     
                     rows.forEach(row => {
                         const name = row['Tên'] || row['Name'] || row['name'] || Object.values(row)[0];
                         const email = row['Email'] || row['email'] || Object.values(row)[1];
-                        const depart = row['Phòng ban'] || row['Department'] || row['department'] || Object.values(row)[2] || '';
-
+                        let depart = row['Phòng ban'] || row['Department'] || row['department'] || Object.values(row)[2] || '';
+                        
+                        depart = String(depart).trim();
+        
                         if (name && email && String(email).includes('@')) {
                             const key = emailToKey(String(email).trim());
                             newStaffData[key] = {
                                 name: String(name).trim(),
                                 email: String(email).trim(),
-                                depart: String(depart).trim(),
+                                depart: depart,
                                 lan: 'vi',
                                 theme: 'dark'
                             };
+                            
+                            if (depart && depart.toLowerCase() !== 'unknown' && depart.toLowerCase() !== 'chưa rõ') {
+                                newDepartmentsSet.add(depart);
+                            }
+                            
                             count++;
                         }
                     });
-
+        
                     if (count === 0) throw new Error("Không tìm thấy dữ liệu hợp lệ (Cần cột Tên, Email)");
+                    
                     const currentDoc = await getDocument("staff_list", "staffs") || {};
                     const guests = {};
                     Object.keys(currentDoc).forEach(k => {
                         if (k.startsWith('guest_')) guests[k] = currentDoc[k];
                     });
-
                     const finalData = { ...newStaffData, ...guests };
                     
                     await setDoc(doc(db, "staff_list", "staffs"), finalData);
-
-                    showToast(`Đã nhập thành công ${count} nhân viên.`, 'success');
+        
+                    const sortedDepartments = Array.from(newDepartmentsSet).sort();
+                    await setDoc(doc(db, "admin_list", "departments"), { list: sortedDepartments });
+        
+                    showToast(`Đã nhập ${count} nhân viên và cập nhật ${sortedDepartments.length} phòng ban.`, 'success');
+                    
                     await renderAdminPersonnel();
-
+        
                 } catch (err) {
                     console.error(err);
                     showToast('Lỗi nhập file: ' + err.message, 'error');
@@ -1835,12 +1853,13 @@
                         const index = departments.indexOf(oldName);
                         if (index > -1) {
                             departments[index] = newName;
+                            departments.sort();
                             
                             await updateDoc(deptDocRef, { list: departments });
         
                             const allStaff = await getDocument("staff_list", "staffs");
                             const staffUpdates = {};
-                            let affectedUserKeys = [];
+                            let affectedUserKeys = []; 
         
                             Object.entries(allStaff).forEach(([key, user]) => {
                                 if (user.depart === oldName) {
@@ -1863,10 +1882,13 @@
                                     if (weekDoc) {
                                         const orderUpdates = {};
                                         let hasUpdate = false;
+                                        
                                         Object.keys(weekDoc).forEach(userKey => {
-                                            if (weekDoc[userKey] && weekDoc[userKey].depart === oldName) {
-                                                orderUpdates[`${userKey}.depart`] = newName;
-                                                hasUpdate = true;
+                                            if (weekDoc[userKey] && typeof weekDoc[userKey] === 'object') {
+                                                if (weekDoc[userKey].depart === oldName) {
+                                                    orderUpdates[`${userKey}.depart`] = newName;
+                                                    hasUpdate = true;
+                                                }
                                             }
                                         });
         
@@ -1877,7 +1899,7 @@
                                 }));
                             }
                             
-                            showToast(`Đã đổi tên và đồng bộ dữ liệu tháng.`);
+                            showToast(`Đã đổi tên và đồng bộ dữ liệu thống kê tháng.`);
                         }
                     } else {
                         departments.push(newName);
@@ -1895,36 +1917,102 @@
             }
         
             else if (classList.contains('delete-department-btn')) {
-                state.deleteTarget = { name: dataset.name };
-                el('delete-department-text').textContent = `Xóa phòng ban "${dataset.name}"?`;
+                const deptToDelete = dataset.name;
+                state.deleteTarget = { name: deptToDelete };
+                
+                const departments = await getDepartmentsList();
+                
+                const availableDepartments = departments.filter(d => d !== deptToDelete);
+        
+                if (availableDepartments.length === 0) {
+                    showToast('Không còn phòng ban nào khác để chuyển nhân sự. Vui lòng tạo thêm phòng ban trước.', 'error');
+                    return;
+                }
+        
+                const transferSelect = el('transfer-department-select');
+                transferSelect.innerHTML = '';
+                availableDepartments.forEach(dept => {
+                    const opt = document.createElement('option');
+                    opt.value = dept;
+                    opt.textContent = dept;
+                    transferSelect.appendChild(opt);
+                });
+        
+                el('delete-department-text').textContent = `Bạn đang xóa phòng ban: "${deptToDelete}"`;
                 el('delete-department-modal').classList.remove('hidden');
             }
-        
+            
             else if (id === 'confirm-delete-department-btn') {
                 showLoader();
                 try {
-                    const targetName = state.deleteTarget.name;
+                    const oldName = state.deleteTarget.name;
+                    const newName = el('transfer-department-select').value;
+                    
+                    if (!newName) {
+                        showToast('Vui lòng chọn phòng ban để chuyển tới', 'error');
+                        hideLoader(); return;
+                    }
+        
                     const deptDocRef = doc(db, "admin_list", "departments");
                     let departments = await getDepartmentsList();
         
-                    departments = departments.filter(d => d !== targetName);
+                    departments = departments.filter(d => d !== oldName);
                     await updateDoc(deptDocRef, { list: departments });
         
                     const allStaff = await getDocument("staff_list", "staffs");
-                    const updates = {};
+                    const staffUpdates = {};
+                    let affectedUserKeys = [];
+        
                     Object.entries(allStaff).forEach(([key, user]) => {
-                        if (user.depart === targetName) updates[`${key}.depart`] = "";
+                        if (user.depart === oldName) {
+                            staffUpdates[`${key}.depart`] = newName;
+                            affectedUserKeys.push(key);
+                        }
                     });
         
-                    if (Object.keys(updates).length > 0) {
-                        await updateDoc(doc(db, "staff_list", "staffs"), updates);
+                    if (affectedUserKeys.length > 0) {
+                        await updateDoc(doc(db, "staff_list", "staffs"), staffUpdates);
                     }
         
-                    showToast('Đã xóa phòng ban.');
+                    if (affectedUserKeys.length > 0) {
+                        const targetWeeks = getWeeksInMonth(new Date());
+                        
+                        await Promise.all(targetWeeks.map(async (weekStr) => {
+                            const weekDocRef = doc(db, "order_list", weekStr);
+                            const weekDoc = await getDocument("order_list", weekStr);
+                            
+                            if (weekDoc) {
+                                const orderUpdates = {};
+                                let hasUpdate = false;
+                                
+                                Object.keys(weekDoc).forEach(userKey => {
+                                    if (weekDoc[userKey] && typeof weekDoc[userKey] === 'object') {
+                                        if (weekDoc[userKey].depart === oldName) {
+                                            orderUpdates[`${userKey}.depart`] = newName;
+                                            hasUpdate = true;
+                                        }
+                                    }
+                                });
+        
+                                if (hasUpdate) {
+                                    await updateDoc(weekDocRef, orderUpdates);
+                                }
+                            }
+                        }));
+                    }
+        
+                    showToast(`Đã xóa "${oldName}" và chuyển ${affectedUserKeys.length} nhân sự sang "${newName}".`);
                     el('delete-department-modal').classList.add('hidden');
                     await renderAdminPersonnel();
-                } catch (err) { console.error(err); showToast('Lỗi: ' + err.message, 'error'); } finally { hideLoader(); }
+        
+                } catch (err) { 
+                    console.error(err); 
+                    showToast('Lỗi: ' + err.message, 'error'); 
+                } finally { 
+                    hideLoader(); 
+                }
             }
+        
             else if (target.closest('.toggle-card-header')) {
                 const header = target.closest('.toggle-card-header');
                 const targetId = header.dataset.target;
