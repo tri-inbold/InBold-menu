@@ -300,7 +300,7 @@
                     <label class="form-label">Tên phòng ban</label>
                     <input type="text" id="department-name-input" class="form-input" placeholder="Nhập tên phòng ban...">
                 </div>
-                <button id="save-department-btn" class="btn btn-primary btn-block">Lưu</button>
+                <button id="save-department-btn" class="btn btn-primary btn-block">Lưu & Đồng bộ</button>
             </div>
         </div>
         
@@ -312,7 +312,7 @@
                 </div>
                 <p id="delete-department-text" class="text-muted mb-3"></p>
                 <div style="background: rgba(245, 101, 101, 0.1); color: var(--error); padding: 10px; border-radius: 8px; font-size: 12px; margin-bottom: 1rem;">
-                    <i class="fas fa-exclamation-triangle"></i> Lưu ý: Hành động này sẽ xóa tên phòng ban khỏi danh sách quản lý. Những nhân viên đang thuộc phòng ban này sẽ bị mất thông tin phòng ban (trống).
+                    <i class="fas fa-exclamation-triangle"></i> Cảnh báo: Nhân sự thuộc phòng ban này sẽ bị mất thông tin phòng ban (trống). Dữ liệu thống kê cũ không bị thay đổi.
                 </div>
                 <div style="display: flex; gap: 12px;">
                     <button class="btn btn-secondary" data-modal="delete-department-modal" style="flex: 1;">Hủy</button>
@@ -381,6 +381,7 @@
 
         const state = {
             isEditingMenu: false,
+            personnelViewMode: 'staff',
             currentUser: null, staffProfile: null, isAdmin: false,
             currentTab: 'today', adminSubTab: 'stats', authReady: false,
             menuFilterMode: 'auto', orderSelection: {},
@@ -508,6 +509,22 @@
             const yearStart = new Date(d.getFullYear(), 0, 1);
             const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
             return `${d.getFullYear()}_${weekNo}`;
+        };
+
+        const getWeeksInMonth = (date) => {
+            const weeks = new Set();
+            const year = date.getFullYear();
+            const month = date.getMonth();
+            
+            let d = new Date(year, month, 1);
+            
+            while (d.getMonth() === month) {
+                weeks.add(getWeekString(d));
+                d.setDate(d.getDate() + 7);
+            }
+            weeks.add(getWeekString(new Date(year, month + 1, 0)));
+            
+            return Array.from(weeks);
         };
         const getDayKey = (date = new Date()) => ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][date.getDay()];
         const showLoader = () => el('loader').classList.remove('hidden');
@@ -1012,26 +1029,20 @@
 
         async function getDepartmentsList() {
             let deptDoc = await getDocument("admin_list", "departments");
-            let departments = [];
-        
-            if (deptDoc && deptDoc.list) {
-                departments = deptDoc.list;
-            } else {
-                const allStaff = await getDocument("staff_list", "staffs");
-                if (allStaff) {
-                    const tempSet = new Set();
-                    Object.values(allStaff).forEach(p => {
-                        if (p.depart && p.depart.trim() !== '' && p.depart !== 'Unknown' && p.depart !== 'Chưa rõ') {
-                            tempSet.add(p.depart.trim());
-                        }
-                    });
-                    departments = Array.from(tempSet).sort();
-                    await setDoc(doc(db, "admin_list", "departments"), { list: departments });
-                }
+            if (deptDoc && deptDoc.list) return deptDoc.list.sort();
+            
+            const allStaff = await getDocument("staff_list", "staffs");
+            if (allStaff) {
+                const tempSet = new Set();
+                Object.values(allStaff).forEach(p => {
+                    if (p.depart && p.depart.trim() && p.depart !== 'Unknown') tempSet.add(p.depart.trim());
+                });
+                const list = Array.from(tempSet).sort();
+                await setDoc(doc(db, "admin_list", "departments"), { list });
+                return list;
             }
-            return departments.sort();
+            return [];
         }
-        
         async function renderAdminDepartments() {
             const departments = await getDepartmentsList();
             const allStaff = await getDocument("staff_list", "staffs");
@@ -1311,49 +1322,105 @@
         }
 
         async function renderAdminPersonnel(searchTerm = '') {
-            const allStaff = await getDocument("staff_list", "staffs");
-            let sorted = allStaff ? Object.entries(allStaff).filter(([key]) => !key.startsWith('guest_')).sort((a, b) => a[1].name.localeCompare(b[1].name)) : [];
-            if (searchTerm) {
-                const lowerTerm = searchTerm.toLowerCase();
-                sorted = sorted.filter(([_, p]) => p.name.toLowerCase().includes(lowerTerm) || p.email.toLowerCase().includes(lowerTerm));
-            }
+            let html = `<div class="mt-3">`;
             
-            el('admin-content').innerHTML = `
-            <div class="mt-3">
+            html += `
+            <div style="display:flex; gap:10px; margin-bottom:1.5rem; background:var(--card-bg); padding:4px; border-radius:8px; border:1px solid var(--border);">
+                <button class="btn ${state.personnelViewMode === 'staff' ? 'btn-primary' : 'btn-secondary'}" style="flex:1; border:none;" onclick="switchPersonnelMode('staff')">
+                    <i class="fas fa-users"></i> Nhân viên
+                </button>
+                <button class="btn ${state.personnelViewMode === 'dept' ? 'btn-primary' : 'btn-secondary'}" style="flex:1; border:none;" onclick="switchPersonnelMode('dept')">
+                    <i class="fas fa-building"></i> Phòng ban
+                </button>
+            </div>`;
+        
+            if (state.personnelViewMode === 'staff') {
+                const allStaff = await getDocument("staff_list", "staffs");
+                let sorted = allStaff ? Object.entries(allStaff).filter(([key]) => !key.startsWith('guest_')).sort((a, b) => a[1].name.localeCompare(b[1].name)) : [];
+                
+                if (searchTerm) {
+                    const lowerTerm = searchTerm.toLowerCase();
+                    sorted = sorted.filter(([_, p]) => p.name.toLowerCase().includes(lowerTerm) || p.email.toLowerCase().includes(lowerTerm));
+                }
+        
+                html += `
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; gap: 8px;">
                     <div class="search-wrapper" style="flex:1;">
                         <i class="fas fa-search search-icon"></i>
                         <input type="text" id="search-personnel" class="search-input" placeholder="${__('searchStaff')}" value="${searchTerm}">
                     </div>
-                    
                     <button id="add-personnel-btn" class="icon-btn" title="Thêm thủ công"><i class="fas fa-plus"></i></button>
                     <button id="export-personnel-btn" class="icon-btn" title="Xuất Excel"><i class="fas fa-file-excel"></i></button>
                 </div>
-
+                
                 <div style="margin-bottom: 1rem;">
-                    <button onclick="document.getElementById('personnel-import-input').click()" class="btn btn-secondary btn-block" style="border: 1px dashed var(--border);">
-                        <i class="fas fa-file-upload" style="color:var(--warning)"></i> Tải lên Excel (Ghi đè DB)
+                     <button onclick="document.getElementById('personnel-import-input').click()" class="btn btn-secondary btn-block" style="border: 1px dashed var(--border); font-size:12px;">
+                        <i class="fas fa-file-upload" style="color:var(--warning)"></i> Import Excel (Ghi đè)
                     </button>
                     <input type="file" id="personnel-import-input" class="hidden" accept=".xlsx, .xls, .csv">
                 </div>
-
+        
                 <div class="table-wrapper">
                     <table>
-                        <thead><tr><th>${__('personnel')}</th><th class="hide-mobile">${__('email')}</th><th class="hide-mobile">${__('department')}</th><th>${__('actions')}</th></tr></thead>
+                        <thead><tr><th>${__('personnel')}</th><th class="hide-mobile">${__('email')}</th><th class="hide-mobile">${__('department')}</th><th> </th></tr></thead>
                         <tbody>
                             ${sorted.length > 0 ? sorted.map(([key, p]) => `<tr><td>${p.name}</td><td class="hide-mobile">${p.email}</td><td class="hide-mobile">${p.depart || '-'}</td><td style="white-space: nowrap;"><div class="action-buttons"><button class="icon-btn edit-personnel-btn" data-key="${key}"><i class="fas fa-edit"></i></button><button class="icon-btn delete-personnel-btn" data-key="${key}" data-name="${p.name}"><i class="fas fa-trash"></i></button></div></td></tr>`).join('') : `<tr><td colspan="4" class="text-center text-muted p-3">${__('noData')}</td></tr>`}
                         </tbody>
                     </table>
+                </div>`;
+            } else {
+                const departments = await getDepartmentsList();
+                
+                const allStaff = await getDocument("staff_list", "staffs");
+                const counts = {};
+                departments.forEach(d => counts[d] = 0);
+                if (allStaff) {
+                    Object.values(allStaff).forEach(p => {
+                        if (p.depart && departments.includes(p.depart)) counts[p.depart] = (counts[p.depart] || 0) + 1;
+                    });
+                }
+        
+                html += `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                    <h3 style="color:var(--primary);font-size:16px;">Danh sách (${departments.length})</h3>
+                    <button id="add-department-btn" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Thêm mới</button>
                 </div>
-            </div>`;
-            
+        
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Tên phòng ban</th><th class="text-center">Nhân sự</th><th style="width:100px;"> </th></tr></thead>
+                        <tbody>
+                            ${departments.length > 0 ? departments.map(d => `
+                            <tr>
+                                <td><span style="font-weight:600;">${d}</span></td>
+                                <td class="text-center">${counts[d] || 0}</td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="icon-btn edit-department-btn" data-name="${d}"><i class="fas fa-edit"></i></button>
+                                        <button class="icon-btn delete-department-btn" data-name="${d}"><i class="fas fa-trash"></i></button>
+                                    </div>
+                                </td>
+                            </tr>`).join('') : `<tr><td colspan="3" class="text-center text-muted p-3">Chưa có phòng ban</td></tr>`}
+                        </tbody>
+                    </table>
+                </div>`;
+            }
+        
+            html += `</div>`;
+            el('admin-content').innerHTML = html;
+        
             const searchInput = el('search-personnel');
-            if(searchInput) {
+            if (searchInput) {
                 searchInput.focus();
                 const val = searchInput.value; searchInput.value = ''; searchInput.value = val;
                 searchInput.addEventListener('input', (e) => renderAdminPersonnel(e.target.value));
             }
         }
+        
+        window.switchPersonnelMode = async (mode) => {
+            state.personnelViewMode = mode;
+            await renderAdminPersonnel();
+        };
         
         async function syncUserProfile() {
             const userEmailKey = emailToKey(state.currentUser.email);
@@ -1731,17 +1798,18 @@
                     hideLoader(); 
                 }
             }
+
             else if (id === 'add-department-btn') {
-                el('department-modal-title').textContent = 'Thêm phòng ban mới';
+                el('department-modal-title').textContent = 'Thêm phòng ban';
                 el('department-original-name').value = '';
                 el('department-name-input').value = '';
                 el('department-modal').classList.remove('hidden');
                 el('department-name-input').focus();
             }
-        
+            
             else if (classList.contains('edit-department-btn')) {
                 const name = dataset.name;
-                el('department-modal-title').textContent = 'Đổi tên phòng ban';
+                el('department-modal-title').textContent = 'Đổi tên & Đồng bộ';
                 el('department-original-name').value = name;
                 el('department-name-input').value = name;
                 el('department-modal').classList.remove('hidden');
@@ -1754,68 +1822,81 @@
                     const newName = el('department-name-input').value.trim();
                     const oldName = el('department-original-name').value;
                     
-                    if (!newName) {
-                        showToast('Vui lòng nhập tên phòng ban', 'error');
-                        hideLoader();
-                        return;
-                    }
+                    if (!newName) { showToast('Vui lòng nhập tên', 'error'); hideLoader(); return; }
         
                     const deptDocRef = doc(db, "admin_list", "departments");
-                    const deptData = await getDocument("admin_list", "departments");
-                    let list = deptData ? (deptData.list || []) : [];
+                    const departments = await getDepartmentsList();
         
-                    if (list.includes(newName) && newName !== oldName) {
-                        showToast('Tên phòng ban này đã tồn tại', 'error');
-                        hideLoader();
-                        return;
+                    if (departments.includes(newName) && newName !== oldName) {
+                        showToast('Tên phòng ban đã tồn tại', 'error'); hideLoader(); return;
                     }
         
                     if (oldName) {
-                        const index = list.indexOf(oldName);
+                        const index = departments.indexOf(oldName);
                         if (index > -1) {
-                            list[index] = newName;
-                            await updateDoc(deptDocRef, { list: list });
-                            const allStaff = await getDocument("staff_list", "staffs");
-                            const updates = {};
-                            let updateCount = 0;
+                            departments[index] = newName;
                             
+                            await updateDoc(deptDocRef, { list: departments });
+        
+                            const allStaff = await getDocument("staff_list", "staffs");
+                            const staffUpdates = {};
+                            let affectedUserKeys = [];
+        
                             Object.entries(allStaff).forEach(([key, user]) => {
                                 if (user.depart === oldName) {
-                                    updates[`${key}.depart`] = newName;
-                                    updateCount++;
+                                    staffUpdates[`${key}.depart`] = newName;
+                                    affectedUserKeys.push(key);
                                 }
                             });
         
-                            if (updateCount > 0) {
-                                await updateDoc(doc(db, "staff_list", "staffs"), updates);
+                            if (affectedUserKeys.length > 0) {
+                                await updateDoc(doc(db, "staff_list", "staffs"), staffUpdates);
                             }
-                            showToast(`Đã đổi tên và cập nhật cho ${updateCount} nhân sự.`);
+        
+                            if (affectedUserKeys.length > 0) {
+                                const targetWeeks = getWeeksInMonth(new Date());
+                                
+                                await Promise.all(targetWeeks.map(async (weekStr) => {
+                                    const weekDocRef = doc(db, "order_list", weekStr);
+                                    const weekDoc = await getDocument("order_list", weekStr);
+                                    
+                                    if (weekDoc) {
+                                        const orderUpdates = {};
+                                        let hasUpdate = false;
+                                        Object.keys(weekDoc).forEach(userKey => {
+                                            if (weekDoc[userKey] && weekDoc[userKey].depart === oldName) {
+                                                orderUpdates[`${userKey}.depart`] = newName;
+                                                hasUpdate = true;
+                                            }
+                                        });
+        
+                                        if (hasUpdate) {
+                                            await updateDoc(weekDocRef, orderUpdates);
+                                        }
+                                    }
+                                }));
+                            }
+                            
+                            showToast(`Đã đổi tên và đồng bộ dữ liệu tháng.`);
                         }
                     } else {
-                        list.push(newName);
-                        list.sort();
-                        if (deptData) {
-                            await updateDoc(deptDocRef, { list: list });
-                        } else {
-                            await setDoc(deptDocRef, { list: list });
-                        }
-                        showToast('Đã thêm phòng ban mới');
+                        departments.push(newName);
+                        departments.sort();
+                        await setDoc(deptDocRef, { list: departments }, { merge: true });
+                        showToast('Đã thêm phòng ban');
                     }
         
                     el('department-modal').classList.add('hidden');
-                    await renderAdminDepartments();
+                    await renderAdminPersonnel();
         
                 } catch (err) {
-                    console.error(err);
-                    showToast('Lỗi: ' + err.message, 'error');
-                } finally {
-                    hideLoader();
-                }
+                    console.error(err); showToast('Lỗi: ' + err.message, 'error');
+                } finally { hideLoader(); }
             }
         
             else if (classList.contains('delete-department-btn')) {
                 state.deleteTarget = { name: dataset.name };
-                el('delete-department-text').textContent = `Bạn có chắc chắn muốn xóa phòng ban "${dataset.name}"?`;
+                el('delete-department-text').textContent = `Xóa phòng ban "${dataset.name}"?`;
                 el('delete-department-modal').classList.remove('hidden');
             }
         
@@ -1824,37 +1905,25 @@
                 try {
                     const targetName = state.deleteTarget.name;
                     const deptDocRef = doc(db, "admin_list", "departments");
-                    const deptData = await getDocument("admin_list", "departments");
-                    let list = deptData ? (deptData.list || []) : [];
+                    let departments = await getDepartmentsList();
         
-                    list = list.filter(d => d !== targetName);
-                    await updateDoc(deptDocRef, { list: list });
+                    departments = departments.filter(d => d !== targetName);
+                    await updateDoc(deptDocRef, { list: departments });
         
                     const allStaff = await getDocument("staff_list", "staffs");
                     const updates = {};
-                    let updateCount = 0;
-                    
                     Object.entries(allStaff).forEach(([key, user]) => {
-                        if (user.depart === targetName) {
-                            updates[`${key}.depart`] = "";
-                            updateCount++;
-                        }
+                        if (user.depart === targetName) updates[`${key}.depart`] = "";
                     });
         
-                    if (updateCount > 0) {
+                    if (Object.keys(updates).length > 0) {
                         await updateDoc(doc(db, "staff_list", "staffs"), updates);
                     }
         
-                    showToast(`Đã xóa phòng ban. ${updateCount} nhân sự bị mất thông tin phòng ban.`);
+                    showToast('Đã xóa phòng ban.');
                     el('delete-department-modal').classList.add('hidden');
-                    await renderAdminDepartments();
-        
-                } catch (err) {
-                    console.error(err);
-                    showToast('Lỗi: ' + err.message, 'error');
-                } finally {
-                    hideLoader();
-                }
+                    await renderAdminPersonnel();
+                } catch (err) { console.error(err); showToast('Lỗi: ' + err.message, 'error'); } finally { hideLoader(); }
             }
             else if (target.closest('.toggle-card-header')) {
                 const header = target.closest('.toggle-card-header');
@@ -2008,9 +2077,11 @@
                 el('personnel-modal-title').textContent = 'Thêm nhân viên'; el('personnel-original-email-key').value = ''; el('personnel-name-input').value = ''; el('personnel-email-input').value = ''; el('personnel-depart-select').innerHTML = '';
                 const allStaff = await getDocument("staff_list", "staffs");
                 const departments = await getDepartmentsList();
-                departments.forEach(dept => { const opt = document.createElement('option'); opt.value = dept; opt.textContent = dept; el('personnel-depart-select').appendChild(opt); });
-                const other = document.createElement('option'); other.value = '__other__'; other.textContent = 'Khác (nhập mới)'; el('personnel-depart-select').appendChild(other);
-                el('personnel-modal').classList.remove('hidden');
+                el('personnel-depart-select').innerHTML = '';
+                departments.forEach(dept => {
+                    const opt = document.createElement('option'); opt.value = dept; opt.textContent = dept; 
+                    el('personnel-depart-select').appendChild(opt); 
+                });
             }
             else if (classList.contains('edit-personnel-btn')) {
                 const userKey = dataset.key;
@@ -2018,10 +2089,13 @@
                 const userData = allStaff[userKey];
                 if (!userData) return;
                 el('personnel-modal-title').textContent = 'Chỉnh sửa nhân viên'; el('personnel-original-email-key').value = userKey; el('personnel-name-input').value = userData.name; el('personnel-email-input').value = userData.email; el('personnel-depart-select').innerHTML = '';
-                const departments = await getDepartmentsList();
-                departments.forEach(dept => { const opt = document.createElement('option'); opt.value = dept; opt.textContent = dept; opt.selected = dept === userData.depart; el('personnel-depart-select').appendChild(opt); });
-                const other = document.createElement('option'); other.value = '__other__'; other.textContent = 'Khác (nhập mới)'; el('personnel-depart-select').appendChild(other);
-                el('personnel-modal').classList.remove('hidden');
+                const departments = await getDepartmentsList(); 
+                el('personnel-depart-select').innerHTML = '';
+                departments.forEach(dept => {
+                    const opt = document.createElement('option'); opt.value = dept; opt.textContent = dept; 
+                    opt.selected = dept === userData.depart;
+                    el('personnel-depart-select').appendChild(opt); 
+                });
             }
             else if (classList.contains('delete-personnel-btn')) { state.deleteTarget = { key: dataset.key, name: dataset.name }; el('delete-personnel-text').textContent = `Xóa nhân viên "${dataset.name}"?`; el('delete-personnel-modal').classList.remove('hidden'); }
             else if (id === 'save-personnel-btn') {
