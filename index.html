@@ -103,7 +103,7 @@
         .card { background: var(--card-bg); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1rem; border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: all 0.2s ease; }
         @media (min-width: 769px) { .card { padding: 1.5rem; } }
         .card:hover { box-shadow: var(--shadow-md); }
-        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; transition: margin-bottom 0.3s ease; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; transition: margin-bottom 0.3s ease; transition: margin-bottom 0.2s ease; }
         .card-header.collapsed { margin-bottom: 0 !important; border-bottom: none; }
         
         .btn-upload { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 500; }
@@ -980,7 +980,7 @@
             const currentTheme = profile.theme || 'dark';
             
             document.documentElement.setAttribute('data-theme', currentTheme);
-
+        
             el('main-content').innerHTML = `
             <div class="card">
                 <div class="profile-section">
@@ -995,7 +995,7 @@
                                 <div class="toggle-option lang-toggle-btn ${profile.lan === 'en' ? 'active' : ''}" data-lang="en">English</div>
                             </div>
                         </div>
-
+        
                         <div>
                             <div class="toggle-group">
                                 <div class="toggle-option theme-toggle-btn ${currentTheme === 'dark' ? 'active' : ''}" data-theme="dark"><i class="fas fa-moon"></i> Dark</div>
@@ -1003,17 +1003,14 @@
                             </div>
                         </div>
                     </div>
-
-                    <div class="profile-menu">
-                        <a href="mailto:${SUPPORT_EMAIL}" style="text-decoration:none; color:inherit;" class="profile-menu-item">
-                            <i class="fas fa-headset" style="color:var(--primary);"></i>
-                            <span class="profile-menu-label">${__('support')}</span>
+        
+                    <div style="margin-top: 3rem; display: flex; justify-content: center; gap: 12px;">
+                        <a href="mailto:${SUPPORT_EMAIL}" class="btn btn-secondary" style="text-decoration: none; min-width: 110px;">
+                            <i class="fas fa-headset"></i> ${__('support')}
                         </a>
-                    </div>
-                    
-                    <div class="text-center" style="margin-top: 3rem;">
-                        <button id="logout-menu-item" class="btn btn-secondary btn-small">
-                            <i class="fas fa-sign-out-alt"></i>${__('logout')}
+                        
+                        <button id="logout-menu-item" class="btn btn-secondary" style="min-width: 110px;">
+                            <i class="fas fa-sign-out-alt"></i> ${__('logout')}
                         </button>
                     </div>
                 </div>
@@ -2022,8 +2019,7 @@
                 if (listEl) {
                     listEl.classList.toggle('hidden');
                     if (icon) icon.classList.toggle('rotate');
-                    
-                    header.classList.toggle('collapsed', listEl.classList.contains('hidden'));
+                    header.classList.toggle('collapsed', isHidden);
                 }
             } 
             else if (id === 'skip-everyone-btn') {
