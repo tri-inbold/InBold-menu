@@ -289,6 +289,38 @@
             </div>
         </div>
 
+        <div id="department-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="department-modal-title" class="modal-title"></h2>
+                    <button class="close-btn" data-modal="department-modal"><i class="fas fa-times"></i></button>
+                </div>
+                <input type="hidden" id="department-original-name">
+                <div class="form-group">
+                    <label class="form-label">Tên phòng ban</label>
+                    <input type="text" id="department-name-input" class="form-input" placeholder="Nhập tên phòng ban...">
+                </div>
+                <button id="save-department-btn" class="btn btn-primary btn-block">Lưu</button>
+            </div>
+        </div>
+        
+        <div id="delete-department-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title">Xóa phòng ban</h2>
+                    <button class="close-btn" data-modal="delete-department-modal"><i class="fas fa-times"></i></button>
+                </div>
+                <p id="delete-department-text" class="text-muted mb-3"></p>
+                <div style="background: rgba(245, 101, 101, 0.1); color: var(--error); padding: 10px; border-radius: 8px; font-size: 12px; margin-bottom: 1rem;">
+                    <i class="fas fa-exclamation-triangle"></i> Lưu ý: Hành động này sẽ xóa tên phòng ban khỏi danh sách quản lý. Những nhân viên đang thuộc phòng ban này sẽ bị mất thông tin phòng ban (trống).
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn btn-secondary" data-modal="delete-department-modal" style="flex: 1;">Hủy</button>
+                    <button id="confirm-delete-department-btn" class="btn btn-primary" style="background: var(--error); border-color: var(--error); flex: 1;">Xóa</button>
+                </div>
+            </div>
+        </div>
+        
         <div id="skip-option-modal" class="modal hidden">
             <div class="modal-content">
                 <div class="modal-header"><h2 class="modal-title">Nhường suất ăn</h2><button class="close-btn" data-modal="skip-option-modal"><i class="fas fa-times"></i></button></div>
@@ -964,7 +996,87 @@
 
         async function renderAdmin() {
             el('main-content').innerHTML = `<div class="card"><div class="tabs"><button class="tab-btn ${state.adminSubTab === 'support' ? 'active' : ''}" data-subtab="support"><i class="fas fa-headset"></i><span class="tab-label">${__('support')}</span></button><button class="tab-btn ${state.adminSubTab === 'stats' ? 'active' : ''}" data-subtab="stats"><i class="fas fa-chart-pie"></i><span class="tab-label">${__('stats')}</span></button><button class="tab-btn ${state.adminSubTab === 'menu' ? 'active' : ''}" data-subtab="menu"><i class="fas fa-utensils"></i><span class="tab-label">${__('menu')}</span></button><button class="tab-btn ${state.adminSubTab === 'personnel' ? 'active' : ''}" data-subtab="personnel"><i class="fas fa-user-group"></i><span class="tab-label">${__('personnel')}</span></button></div><div id="admin-content"></div></div>`;
+            el('main-content').innerHTML = `<div class="card">
+                <div class="tabs">
+                    <button class="tab-btn ${state.adminSubTab === 'support' ? 'active' : ''}" data-subtab="support"><i class="fas fa-headset"></i><span class="tab-label">${__('support')}</span></button>
+                    <button class="tab-btn ${state.adminSubTab === 'stats' ? 'active' : ''}" data-subtab="stats"><i class="fas fa-chart-pie"></i><span class="tab-label">${__('stats')}</span></button>
+                    <button class="tab-btn ${state.adminSubTab === 'menu' ? 'active' : ''}" data-subtab="menu"><i class="fas fa-utensils"></i><span class="tab-label">${__('menu')}</span></button>
+                    <button class="tab-btn ${state.adminSubTab === 'personnel' ? 'active' : ''}" data-subtab="personnel"><i class="fas fa-user-group"></i><span class="tab-label">${__('personnel')}</span></button>
+                    <!-- THÊM DÒNG NÀY -->
+                    <button class="tab-btn ${state.adminSubTab === 'departments' ? 'active' : ''}" data-subtab="departments"><i class="fas fa-building"></i><span class="tab-label">Phòng ban</span></button> 
+                </div>
+                <div id="admin-content"></div>
+            </div>`;
             await renderAdminSubTab();
+        }
+
+        async function getDepartmentsList() {
+            let deptDoc = await getDocument("admin_list", "departments");
+            let departments = [];
+        
+            if (deptDoc && deptDoc.list) {
+                departments = deptDoc.list;
+            } else {
+                const allStaff = await getDocument("staff_list", "staffs");
+                if (allStaff) {
+                    const tempSet = new Set();
+                    Object.values(allStaff).forEach(p => {
+                        if (p.depart && p.depart.trim() !== '' && p.depart !== 'Unknown' && p.depart !== 'Chưa rõ') {
+                            tempSet.add(p.depart.trim());
+                        }
+                    });
+                    departments = Array.from(tempSet).sort();
+                    await setDoc(doc(db, "admin_list", "departments"), { list: departments });
+                }
+            }
+            return departments.sort();
+        }
+        
+        async function renderAdminDepartments() {
+            const departments = await getDepartmentsList();
+            const allStaff = await getDocument("staff_list", "staffs");
+            const counts = {};
+            departments.forEach(d => counts[d] = 0);
+            if (allStaff) {
+                Object.values(allStaff).forEach(p => {
+                    if (p.depart && departments.includes(p.depart)) {
+                        counts[p.depart] = (counts[p.depart] || 0) + 1;
+                    }
+                });
+            }
+        
+            el('admin-content').innerHTML = `
+            <div class="mt-3">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                    <h3 style="color:var(--primary);font-size:18px;">Quản lý Phòng ban (${departments.length})</h3>
+                    <button id="add-department-btn" class="btn btn-primary"><i class="fas fa-plus"></i> Thêm phòng ban</button>
+                </div>
+        
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tên phòng ban</th>
+                                <th class="text-center">Số lượng NS</th>
+                                <th style="width:100px;">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${departments.length > 0 ? departments.map(d => `
+                            <tr>
+                                <td><span style="font-weight:600;">${d}</span></td>
+                                <td class="text-center">${counts[d] || 0}</td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="icon-btn edit-department-btn" data-name="${d}"><i class="fas fa-edit"></i></button>
+                                        <button class="icon-btn delete-department-btn" data-name="${d}"><i class="fas fa-trash"></i></button>
+                                    </div>
+                                </td>
+                            </tr>`).join('') : `<tr><td colspan="3" class="text-center text-muted p-3">Chưa có phòng ban nào</td></tr>`}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
         }
         async function renderAdminSubTab() {
             switch (state.adminSubTab) {
@@ -972,6 +1084,7 @@
                 case 'support': await renderAdminSupport(); break;
                 case 'menu': await renderAdminMenu(); break;
                 case 'personnel': await renderAdminPersonnel(); break;
+                case 'departments': await renderAdminDepartments(); break;
             }
         }
         async function renderAdminStats() {
@@ -999,7 +1112,6 @@
             <div class="mt-3">
                 <h3 style="color:var(--primary);margin-bottom:1rem;font-size:18px;">${__('notOrderedYet')} (${notOrderedList.length})</h3>
                 
-                <!-- Thanh tìm kiếm mới -->
                 <div class="search-bar mb-2">
                     <div class="search-wrapper">
                         <i class="fas fa-search search-icon"></i>
@@ -1164,7 +1276,6 @@
                 let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin:1.5rem 0 1rem;"><h3 style="color:var(--primary);font-size:18px;margin:0;">${title}</h3>`;
                 
                 if (weekKey === 'nextWeek') {
-                    // Cập nhật nút tải lên có chữ
                     html += `<button onclick="document.getElementById('menu-file-input').click()" class="btn-upload"><i class="fas fa-file-excel" style="color:#16a34a"></i> Tải lên Excel</button><input type="file" id="menu-file-input" class="hidden" accept=".xlsx, .xls, .csv">`;
                 }
                 html += `</div>`;
@@ -1184,7 +1295,6 @@
 
             if (hasNextWeekData && !state.isEditingMenu) {
                 contentHTML += renderReadOnlyMenuSection(nextWeekMenu, `${__('menuNextWeek')} (${nextWeek.split('_')[1]})`, true);
-                // Đã loại bỏ nút "Chỉnh sửa lại" ở đây theo yêu cầu
                 contentHTML += `<div class="mt-3 text-center"><p class="text-muted mb-2"><i class="fas fa-check-circle" style="color:var(--success)"></i> ${__('menuSavedState')}</p></div>`;
             } else {
                 contentHTML += renderEditableMenuSection('nextWeek', nextWeekMenu, `${__('menuNextWeek')} (${nextWeek.split('_')[1]})`);
@@ -1211,7 +1321,6 @@
             el('admin-content').innerHTML = `
             <div class="mt-3">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; gap: 8px;">
-                     <!-- Search Bar -->
                     <div class="search-wrapper" style="flex:1;">
                         <i class="fas fa-search search-icon"></i>
                         <input type="text" id="search-personnel" class="search-input" placeholder="${__('searchStaff')}" value="${searchTerm}">
@@ -1221,7 +1330,6 @@
                     <button id="export-personnel-btn" class="icon-btn" title="Xuất Excel"><i class="fas fa-file-excel"></i></button>
                 </div>
 
-                <!-- Nút Tải lên Excel Ghi đè -->
                 <div style="margin-bottom: 1rem;">
                     <button onclick="document.getElementById('personnel-import-input').click()" class="btn btn-secondary btn-block" style="border: 1px dashed var(--border);">
                         <i class="fas fa-file-upload" style="color:var(--warning)"></i> Tải lên Excel (Ghi đè DB)
@@ -1343,7 +1451,6 @@
                 } else { e.target.value = ''; }
             }
             else if (id === 'menu-file-input') {
-                // ... (Giữ nguyên logic menu file input cũ của bạn ở đây) ...
                 const file = e.target.files[0];
                 if (!file) return;
                 showLoader();
@@ -1354,23 +1461,16 @@
                     let sheetName = workbook.SheetNames.find(n => n.toLowerCase() === 'menu') || workbook.SheetNames[0];
                     const sheet = workbook.Sheets[sheetName];
                     const rows = XLSX.utils.sheet_to_json(sheet, {header: 1});
-                    // ... (logic xử lý menu cũ) ...
-                    // Đoạn này dài, bạn giữ nguyên code cũ của menu
-                    // Chỉ cần đảm bảo đóng ngoặc đúng cho else if này
-                    // Code rút gọn để bạn dễ nhìn vị trí chèn:
                     let colMap = { mon: -1, tue: -1, wed: -1, thu: -1, fri: -1 };
                     let dataStartRow = -1;
                     for(let i=0; i < Math.min(rows.length, 10); i++) {
-                         // ... logic tìm dòng tiêu đề ...
                          const row = rows[i].map(c => String(c || '').toLowerCase().trim());
                          if (row.includes('mon') || row.includes('thứ 2')) { dataStartRow = i + 1; /*...*/ break; }
                     }
-                    // ... xử lý import menu ...
                      for (const dayKey of ['mon', 'tue', 'wed', 'thu', 'fri']) {
                         const container = el(`menu-dishes-nextWeek-${dayKey}`);
                         if (container) {
                             container.innerHTML = ''; 
-                            // ... logic render lại menu ...
                         }
                     }
                     document.querySelectorAll('.menu-dish-textarea').forEach(autoResizeTextarea);
@@ -1631,6 +1731,131 @@
                     hideLoader(); 
                 }
             }
+            else if (id === 'add-department-btn') {
+                el('department-modal-title').textContent = 'Thêm phòng ban mới';
+                el('department-original-name').value = '';
+                el('department-name-input').value = '';
+                el('department-modal').classList.remove('hidden');
+                el('department-name-input').focus();
+            }
+        
+            else if (classList.contains('edit-department-btn')) {
+                const name = dataset.name;
+                el('department-modal-title').textContent = 'Đổi tên phòng ban';
+                el('department-original-name').value = name;
+                el('department-name-input').value = name;
+                el('department-modal').classList.remove('hidden');
+                el('department-name-input').focus();
+            }
+        
+            else if (id === 'save-department-btn') {
+                showLoader();
+                try {
+                    const newName = el('department-name-input').value.trim();
+                    const oldName = el('department-original-name').value;
+                    
+                    if (!newName) {
+                        showToast('Vui lòng nhập tên phòng ban', 'error');
+                        hideLoader();
+                        return;
+                    }
+        
+                    const deptDocRef = doc(db, "admin_list", "departments");
+                    const deptData = await getDocument("admin_list", "departments");
+                    let list = deptData ? (deptData.list || []) : [];
+        
+                    if (list.includes(newName) && newName !== oldName) {
+                        showToast('Tên phòng ban này đã tồn tại', 'error');
+                        hideLoader();
+                        return;
+                    }
+        
+                    if (oldName) {
+                        const index = list.indexOf(oldName);
+                        if (index > -1) {
+                            list[index] = newName;
+                            await updateDoc(deptDocRef, { list: list });
+                            const allStaff = await getDocument("staff_list", "staffs");
+                            const updates = {};
+                            let updateCount = 0;
+                            
+                            Object.entries(allStaff).forEach(([key, user]) => {
+                                if (user.depart === oldName) {
+                                    updates[`${key}.depart`] = newName;
+                                    updateCount++;
+                                }
+                            });
+        
+                            if (updateCount > 0) {
+                                await updateDoc(doc(db, "staff_list", "staffs"), updates);
+                            }
+                            showToast(`Đã đổi tên và cập nhật cho ${updateCount} nhân sự.`);
+                        }
+                    } else {
+                        list.push(newName);
+                        list.sort();
+                        if (deptData) {
+                            await updateDoc(deptDocRef, { list: list });
+                        } else {
+                            await setDoc(deptDocRef, { list: list });
+                        }
+                        showToast('Đã thêm phòng ban mới');
+                    }
+        
+                    el('department-modal').classList.add('hidden');
+                    await renderAdminDepartments();
+        
+                } catch (err) {
+                    console.error(err);
+                    showToast('Lỗi: ' + err.message, 'error');
+                } finally {
+                    hideLoader();
+                }
+            }
+        
+            else if (classList.contains('delete-department-btn')) {
+                state.deleteTarget = { name: dataset.name };
+                el('delete-department-text').textContent = `Bạn có chắc chắn muốn xóa phòng ban "${dataset.name}"?`;
+                el('delete-department-modal').classList.remove('hidden');
+            }
+        
+            else if (id === 'confirm-delete-department-btn') {
+                showLoader();
+                try {
+                    const targetName = state.deleteTarget.name;
+                    const deptDocRef = doc(db, "admin_list", "departments");
+                    const deptData = await getDocument("admin_list", "departments");
+                    let list = deptData ? (deptData.list || []) : [];
+        
+                    list = list.filter(d => d !== targetName);
+                    await updateDoc(deptDocRef, { list: list });
+        
+                    const allStaff = await getDocument("staff_list", "staffs");
+                    const updates = {};
+                    let updateCount = 0;
+                    
+                    Object.entries(allStaff).forEach(([key, user]) => {
+                        if (user.depart === targetName) {
+                            updates[`${key}.depart`] = "";
+                            updateCount++;
+                        }
+                    });
+        
+                    if (updateCount > 0) {
+                        await updateDoc(doc(db, "staff_list", "staffs"), updates);
+                    }
+        
+                    showToast(`Đã xóa phòng ban. ${updateCount} nhân sự bị mất thông tin phòng ban.`);
+                    el('delete-department-modal').classList.add('hidden');
+                    await renderAdminDepartments();
+        
+                } catch (err) {
+                    console.error(err);
+                    showToast('Lỗi: ' + err.message, 'error');
+                } finally {
+                    hideLoader();
+                }
+            }
             else if (target.closest('.toggle-card-header')) {
                 const header = target.closest('.toggle-card-header');
                 const targetId = header.dataset.target;
@@ -1782,7 +2007,7 @@
             else if (id === 'add-personnel-btn') {
                 el('personnel-modal-title').textContent = 'Thêm nhân viên'; el('personnel-original-email-key').value = ''; el('personnel-name-input').value = ''; el('personnel-email-input').value = ''; el('personnel-depart-select').innerHTML = '';
                 const allStaff = await getDocument("staff_list", "staffs");
-                const departments = allStaff ? [...new Set(Object.values(allStaff).map(p => p.depart).filter(Boolean))].sort() : [];
+                const departments = await getDepartmentsList();
                 departments.forEach(dept => { const opt = document.createElement('option'); opt.value = dept; opt.textContent = dept; el('personnel-depart-select').appendChild(opt); });
                 const other = document.createElement('option'); other.value = '__other__'; other.textContent = 'Khác (nhập mới)'; el('personnel-depart-select').appendChild(other);
                 el('personnel-modal').classList.remove('hidden');
@@ -1793,7 +2018,7 @@
                 const userData = allStaff[userKey];
                 if (!userData) return;
                 el('personnel-modal-title').textContent = 'Chỉnh sửa nhân viên'; el('personnel-original-email-key').value = userKey; el('personnel-name-input').value = userData.name; el('personnel-email-input').value = userData.email; el('personnel-depart-select').innerHTML = '';
-                const departments = [...new Set(Object.values(allStaff).map(p => p.depart).filter(Boolean))].sort();
+                const departments = await getDepartmentsList();
                 departments.forEach(dept => { const opt = document.createElement('option'); opt.value = dept; opt.textContent = dept; opt.selected = dept === userData.depart; el('personnel-depart-select').appendChild(opt); });
                 const other = document.createElement('option'); other.value = '__other__'; other.textContent = 'Khác (nhập mới)'; el('personnel-depart-select').appendChild(other);
                 el('personnel-modal').classList.remove('hidden');
