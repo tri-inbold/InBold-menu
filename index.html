@@ -2325,7 +2325,7 @@
                 const icon = header.querySelector('.toggle-icon');
                 
                 if (listEl) {
-                    const isHidden = listEl.classList.toggle('hidden');
+                    listEl.classList.toggle('hidden');
                     if (icon) icon.classList.toggle('rotate');
                     header.classList.toggle('collapsed', isHidden);
                 }
