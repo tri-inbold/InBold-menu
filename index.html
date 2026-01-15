@@ -34,6 +34,8 @@
             --radius-sm: 8px;
             --radius-md: 12px;
             --radius-lg: 16px;
+            --loader-bg: #0f172a;
+            --loader-color: #ffffff;
         }
 
         :root[data-theme="light"] {
@@ -55,6 +57,8 @@
             --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
             --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --loader-bg: #ffffff;
+            --loader-color: #0f172a; /* Màu chữ đen/xanh đậm */
         }
 
         [data-theme="light"] .btn-primary,
@@ -224,7 +228,8 @@
         .toast-icon.error { background: linear-gradient(135deg, #f56565, #c53030); }
         #toast-notification span { font-weight: 600; font-size: 14px; color: var(--text); }
         
-        #loader { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #0f172a; display: flex; align-items: center; justify-content: center; z-index: 9999; }
+        #loader { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--loader-bg); color: var(--loader-color); display: flex; align-items: center; justify-content: center; z-index: 9999; transition: background-color 0.3s ease, color 0.3s ease; }
+        #loader svg path { fill: var(--loader-color) !important; transition: fill 0.3s ease; }        
         .static-logo { width: 180px; max-width: 40%; height: auto; }
 
         .table-wrapper { overflow-x: auto; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 1rem; }
@@ -1520,7 +1525,7 @@
                     e.target.insertBefore(option, e.target.querySelector('option[value="__other__"]'));
                 } else { e.target.value = ''; }
             }
-            else if (id === 'menu-file-input') {
+else if (id === 'menu-file-input') {
                 const file = e.target.files[0];
                 if (!file) return;
                 showLoader();
@@ -1528,24 +1533,98 @@
                     await loadXLSXLibrary();
                     const data = await file.arrayBuffer();
                     const workbook = XLSX.read(data);
-                    let sheetName = workbook.SheetNames.find(n => n.toLowerCase() === 'menu') || workbook.SheetNames[0];
+                    
+                    // Tìm sheet có tên chứa "menu" hoặc lấy sheet đầu tiên
+                    let sheetName = workbook.SheetNames.find(n => n.toLowerCase().includes('menu')) || workbook.SheetNames[0];
                     const sheet = workbook.Sheets[sheetName];
+                    
+                    // Đọc file dưới dạng mảng các dòng (header: 1)
                     const rows = XLSX.utils.sheet_to_json(sheet, {header: 1});
+                    
                     let colMap = { mon: -1, tue: -1, wed: -1, thu: -1, fri: -1 };
                     let dataStartRow = -1;
+
                     for(let i=0; i < Math.min(rows.length, 10); i++) {
                          const row = rows[i].map(c => String(c || '').toLowerCase().trim());
-                         if (row.includes('mon') || row.includes('thứ 2')) { dataStartRow = i + 1; /*...*/ break; }
+                         // Logic tìm tiêu đề: Chứa 'mon' hoặc 'thứ 2'
+                         if (row.includes('mon') || row.includes('thứ 2')) { 
+                             dataStartRow = i + 1;
+                             
+                             row.forEach((cell, idx) => {
+                                 if (cell.includes('mon') || cell.includes('thứ 2')) colMap.mon = idx;
+                                 else if (cell.includes('tue') || cell.includes('thứ 3')) colMap.tue = idx;
+                                 else if (cell.includes('wed') || cell.includes('thứ 4')) colMap.wed = idx;
+                                 else if (cell.includes('thu') || cell.includes('thứ 5')) colMap.thu = idx;
+                                 else if (cell.includes('fri') || cell.includes('thứ 6')) colMap.fri = idx;
+                             });
+                             break; 
+                         }
                     }
+
+                    if (dataStartRow === -1) throw new Error("Không tìm thấy dòng tiêu đề (Mon/Thứ 2...) trong file.");
+
+                    const extractedMenu = { mon: [], tue: [], wed: [], thu: [], fri: [] };
+                    
+                    for (let i = dataStartRow; i < rows.length; i++) {
+                        const row = rows[i];
+                        if (!row || row.length === 0) continue;
+
+                        ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(day => {
+                            const colIdx = colMap[day];
+                            if (colIdx > -1) {
+                                let val = row[colIdx];
+                                if (val) {
+                                    val = String(val).trim();
+                                    if (val && !val.toLowerCase().startsWith('stt') && !val.toLowerCase().includes('no order') && !val.toLowerCase().includes('không đặt cơm')) {
+                                        extractedMenu[day].push(val);
+                                    }
+                                }
+                            }
+                        });
+                    }
+
                      for (const dayKey of ['mon', 'tue', 'wed', 'thu', 'fri']) {
                         const container = el(`menu-dishes-nextWeek-${dayKey}`);
                         if (container) {
-                            container.innerHTML = ''; 
+                            container.innerHTML = '';
+                            
+                            const dishes = extractedMenu[dayKey];
+                            dishes.forEach((dish, index) => {
+                                const div = document.createElement('div');
+                                div.style.display = 'flex';
+                                div.style.gap = '0.5rem';
+                                div.style.alignItems = 'center';
+                                div.style.marginTop = '0.5rem';
+                                
+                                div.innerHTML = `
+                                    <textarea class="form-textarea menu-dish-textarea" data-week="nextWeek" data-day="${dayKey}" data-index="${index}" placeholder="${__('oneDishPerLine')}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;">${dish}</textarea>
+                                    <button class="icon-btn remove-menu-dish-btn" data-week="nextWeek" data-day="${dayKey}" data-index="${index}"><i class="fas fa-times"></i></button>
+                                `;
+                                container.appendChild(div);
+                            });
+
+                            const emptyDiv = document.createElement('div');
+                            emptyDiv.style.display = 'flex';
+                            emptyDiv.style.gap = '0.5rem';
+                            emptyDiv.style.alignItems = 'center';
+                            emptyDiv.style.marginTop = '0.5rem';
+                            emptyDiv.innerHTML = `
+                                <textarea class="form-textarea menu-dish-textarea" data-week="nextWeek" data-day="${dayKey}" data-index="${dishes.length}" placeholder="${__('oneDishPerLine')}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;"></textarea>
+                                <button class="icon-btn remove-menu-dish-btn hidden" data-week="nextWeek" data-day="${dayKey}" data-index="${dishes.length}"><i class="fas fa-times"></i></button>
+                            `;
+                            container.appendChild(emptyDiv);
                         }
                     }
+                    
                     document.querySelectorAll('.menu-dish-textarea').forEach(autoResizeTextarea);
-                    showToast('Đã nhập dữ liệu menu thành công.');
-                } catch (err) { console.error(err); showToast('Lỗi đọc file: ' + err.message, 'error'); } finally { hideLoader(); e.target.value = ''; }
+                    showToast(`Đã nhập menu thành công!`);
+                } catch (err) { 
+                    console.error(err); 
+                    showToast('Lỗi đọc file: ' + err.message, 'error'); 
+                } finally { 
+                    hideLoader(); 
+                    e.target.value = ''; 
+                }
             }
 
            else if (id === 'personnel-import-input') {
