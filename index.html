@@ -185,6 +185,29 @@
         .btn-secondary:hover { background: var(--card-hover); }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-block { width: 100%; }
+
+        .status-icon { display: inline-flex; justify-content: center; align-items: center; width: 32px; height: 32px; border-radius: 50%; font-size: 14px; }
+        .status-sun { background: rgba(249, 115, 22, 0.15); color: #f97316; }
+        .status-moon { background: rgba(102, 126, 234, 0.15); color: #667eea; }
+        .status-missing { background: rgba(237, 137, 54, 0.2); color: var(--warning); border: 1px solid var(--warning); font-weight: bold; }
+        
+        .support-row { cursor: pointer; transition: background-color 0.2s; }
+        .support-row:hover { background-color: var(--card-hover); }
+        .support-row.expanded { background-color: rgba(102, 126, 234, 0.05); border-bottom: none; }
+        
+        .detail-row { background-color: rgba(102, 126, 234, 0.05); }
+        .detail-content { padding: 1rem; border-top: 1px dashed var(--border); }
+        
+        .mini-dish-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+        .mini-dish-item { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; cursor: pointer; background: var(--card-bg);opacity: 0.6;}
+        .mini-dish-item.selected { border-color: var(--primary); background: rgba(102, 126, 234, 0.1); opacity: 1; font-weight: 600;}
+        .mini-dish-item:hover:not(.disabled) { opacity: 1; border-color: var(--text-muted); }
+        .mini-dish-item.disabled { cursor: not-allowed; opacity: 0.4; background: rgba(0,0,0,0.1); }
+        
+        .day-block { margin-bottom: 1rem; }
+        .day-label { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; display: block;}
+        .day-label.past { text-decoration: line-through; opacity: 0.7; }
+
         
         .icon-btn { width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--card-bg); border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; }
         .icon-btn:hover { background: var(--card-hover); }
@@ -1112,73 +1135,182 @@
             await renderStatsContent();
         }
         async function renderAdminSupport(searchTerm = '') {
-            const [allStaff, weekDoc] = await Promise.all([getDocument("staff_list", "staffs"), getDocument('order_list', getWeekString(new Date()))]);
+            const today = new Date();
+            const currentWeekStr = getWeekString(today);
             
-            let notOrderedList = allStaff ? Object.entries(allStaff)
-                .filter(([key]) => !key.startsWith('guest_') && (!weekDoc || !weekDoc[key] || weekDoc[key].order === 'reopen'))
-                .map(([key, profile]) => ({ key, profile }))
-                .sort((a, b) => a.profile.name.localeCompare(b.profile.name)) : [];
-
+            // Lấy dữ liệu
+            const [allStaff, weekDoc] = await Promise.all([
+                getDocument("staff_list", "staffs"), 
+                getDocument('order_list', currentWeekStr)
+            ]);
+            
+            const menu = weekDoc ? weekDoc.menu : {};
+            
+            // Xử lý danh sách nhân viên
+            let staffList = allStaff ? Object.entries(allStaff)
+                .filter(([key]) => !key.startsWith('guest_'))
+                .map(([key, profile]) => {
+                    const orderData = weekDoc && weekDoc[key] ? weekDoc[key] : null;
+                    let status = 'missing'; // missing, morning, evening
+                    
+                    if (orderData && orderData.order === 'ordered') {
+                        const shift = (orderData.shift || 'morning').toLowerCase();
+                        status = (shift.includes('evening') || shift === 'e') ? 'evening' : 'morning';
+                    }
+                    
+                    return { key, profile, orderData, status };
+                })
+                .sort((a, b) => {
+                    // Sắp xếp: Chưa đặt lên đầu, sau đó theo tên
+                    if (a.status === 'missing' && b.status !== 'missing') return -1;
+                    if (a.status !== 'missing' && b.status === 'missing') return 1;
+                    return a.profile.name.localeCompare(b.profile.name);
+                }) : [];
+        
+            // Lọc theo tìm kiếm
             if (searchTerm) {
                 const lowerTerm = searchTerm.toLowerCase();
-                notOrderedList = notOrderedList.filter(item => 
+                staffList = staffList.filter(item => 
                     item.profile.name.toLowerCase().includes(lowerTerm) || 
                     item.profile.email.toLowerCase().includes(lowerTerm)
                 );
             }
-
-            el('admin-content').innerHTML = `
-            <div class="mt-3">
-                <h3 style="color:var(--primary);margin-bottom:1rem;font-size:18px;">${__('notOrderedYet')} (${notOrderedList.length})</h3>
-                
-                <div class="search-bar mb-2">
-                    <div class="search-wrapper">
-                        <i class="fas fa-search search-icon"></i>
-                        <input type="text" id="search-support" class="search-input" placeholder="${__('searchStaff')}" value="${searchTerm}">
-                    </div>
+        
+            // --- RENDER HTML ---
+            let html = `<div class="mt-3">`;
+            
+            // Thanh tìm kiếm
+            html += `
+            <div class="search-bar mb-2">
+                <div class="search-wrapper">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="search-support" class="search-input" placeholder="${__('searchStaff')}" value="${searchTerm}">
                 </div>
-
-                ${notOrderedList.length > 0 ? `
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>${__('name')}</th>
-                                <th class="hide-mobile">${__('email')}</th>
-                                <th class="hide-mobile">${__('department')}</th>
-                                <th style="width:60px;">${__('actions')}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${notOrderedList.map(item => `
-                            <tr>
-                                <td>${item.profile.name}</td>
-                                <td class="hide-mobile">${item.profile.email}</td>
-                                <td class="hide-mobile">${item.profile.depart || '-'}</td>
-                                <td>
-                                    <button class="icon-btn reopen-order-btn" data-key="${item.key}" data-name="${item.profile.name}" title="${__('reopenOrderFor')}">
-                                        <i class="fas fa-redo"></i>
-                                    </button>
-                                </td>
-                            </tr>`).join('')}
-                        </tbody>
-                    </table>
-                </div>` : `<p class="text-center text-muted p-3">${searchTerm ? __('notFound') : __('everyoneOrdered')}</p>`}
-                
-                <h3 style="color:var(--primary);margin:2rem 0 1rem;font-size:18px;">${__('orderForGuest')}</h3>
-                <button id="add-guest-order-btn" class="btn btn-primary btn-block"><i class="fas fa-plus"></i> ${__('addGuest')}</button>
             </div>`;
-
+        
+            if (staffList.length > 0) {
+                html += `<div class="table-wrapper"><table>
+                    <thead>
+                        <tr>
+                            <th style="width: 50px; text-align: center;">TT</th>
+                            <th>${__('name')}</th>
+                            <th class="hide-mobile">${__('email')}</th>
+                            <th class="hide-mobile">${__('department')}</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+        
+                const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
+                const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
+                
+                // Logic khóa ngày quá khứ
+                const currentDayIdx = today.getDay(); // 0=Sun, 1=Mon...
+                // Nếu CN (0) hoặc T7 (6) thì coi như qua tuần hoặc cuối tuần -> Logic dưới đây chỉ đúng cho T2-T6
+                
+                staffList.forEach(item => {
+                    const { key, profile, orderData, status } = item;
+                    
+                    // Icon trạng thái
+                    let iconHtml = '';
+                    if (status === 'morning') iconHtml = `<div class="status-icon status-sun" title="Ca sáng"><i class="fas fa-sun"></i></div>`;
+                    else if (status === 'evening') iconHtml = `<div class="status-icon status-moon" title="Ca chiều"><i class="fas fa-moon"></i></div>`;
+                    else iconHtml = `<div class="status-icon status-missing" title="Chưa đặt"><i class="fas fa-times"></i></div>`;
+        
+                    // Hàng chính
+                    html += `
+                    <tr class="support-row" data-target="detail-${key}">
+                        <td style="text-align: center;">${iconHtml}</td>
+                        <td style="font-weight: 500;">${profile.name} <i class="fas fa-caret-down" style="margin-left: 4px; color: var(--text-muted); font-size: 10px;"></i></td>
+                        <td class="hide-mobile">${profile.email}</td>
+                        <td class="hide-mobile">${profile.depart || '-'}</td>
+                    </tr>`;
+        
+                    // Hàng mở rộng (Detail Row)
+                    html += `<tr id="detail-${key}" class="detail-row hidden"><td colspan="4"><div class="detail-content">`;
+                    
+                    // 1. Chọn Ca
+                    const currentShift = orderData ? orderData.shift : 'morning';
+                    html += `<div class="form-group" style="max-width: 300px;">
+                        <label class="form-label">Ca ăn</label>
+                        <div class="shift-toggle">
+                            <input type="radio" id="shift-m-${key}" name="shift-${key}" value="morning" ${currentShift !== 'evening' ? 'checked' : ''}>
+                            <label for="shift-m-${key}">${__('morning')}</label>
+                            <input type="radio" id="shift-e-${key}" name="shift-${key}" value="evening" ${currentShift === 'evening' ? 'checked' : ''}>
+                            <label for="shift-e-${key}">${__('evening')}</label>
+                        </div>
+                    </div>`;
+        
+                    // 2. Menu từng ngày
+                    html += `<div style="margin-bottom: 1.5rem;">`;
+                    dayKeys.forEach((dKey, idx) => {
+                        // Logic khóa: Ngày (idx + 1) < currentDayIdx => Đã qua. 
+                        // Ví dụ: Hôm nay là Thứ 4 (3). Mon(1), Tue(2) bị khóa. Wed(3) mở.
+                        // Lưu ý: getDay() trả về CN=0, T2=1. dKey index: 0=Mon, 1=Tue... => Ngày thực tế = idx + 1
+                        const isPast = (idx + 1) < currentDayIdx && currentDayIdx !== 0 && currentDayIdx !== 6;
+                        const userDishRaw = orderData ? orderData[dKey] : '';
+                        const { dish: currentDish } = parseDishValue(userDishRaw);
+                        const dishes = menu[dKey] || [];
+        
+                        html += `<div class="day-block">
+                            <span class="day-label ${isPast ? 'past' : ''}">${dayNames[dKey]} ${isPast ? '(Đã qua)' : ''}</span>
+                            <div class="mini-dish-list">`;
+                        
+                        if (dishes.length > 0) {
+                            dishes.forEach(dish => {
+                                const isSelected = dish === currentDish;
+                                const disabledClass = isPast ? 'disabled' : '';
+                                html += `<div class="mini-dish-item ${isSelected ? 'selected' : ''} ${disabledClass}" 
+                                              data-dish="${dish}" 
+                                              data-day="${dKey}" 
+                                              data-key="${key}"
+                                              ${isPast ? '' : 'onclick="selectAdminDish(this)"'}>
+                                            ${parseDish(dish)}
+                                         </div>`;
+                            });
+                        } else {
+                            html += `<span class="text-muted" style="font-size:12px;">${__('rest')}</span>`;
+                        }
+                        html += `</div></div>`; // End day-block & list
+                    });
+                    html += `</div>`;
+        
+                    // 3. Action Buttons
+                    html += `<div style="display: flex; gap: 10px;">
+                        <button class="btn btn-primary admin-save-user-btn" data-key="${key}" style="flex: 2;"><i class="fas fa-save"></i> ${__('save')}</button>
+                        <button class="btn btn-secondary reopen-order-btn" data-key="${key}" data-name="${profile.name}" style="flex: 1; border: 1px solid var(--error); color: var(--error);"><i class="fas fa-redo"></i> Reopen</button>
+                    </div>`;
+        
+                    html += `</div></td></tr>`;
+                });
+        
+                html += `</tbody></table></div>`;
+            } else {
+                html += `<p class="text-center text-muted p-3">${__('notFound')}</p>`;
+            }
+        
+            // Guest Order Button
+            html += `<h3 style="color:var(--primary);margin:2rem 0 1rem;font-size:18px;">${__('orderForGuest')}</h3>
+                     <button id="add-guest-order-btn" class="btn btn-primary btn-block"><i class="fas fa-plus"></i> ${__('addGuest')}</button>
+                     </div>`;
+        
+            el('admin-content').innerHTML = html;
+        
             const searchInput = el('search-support');
             if(searchInput) {
                 searchInput.focus();
-                const val = searchInput.value; 
-                searchInput.value = ''; 
-                searchInput.value = val;
-                
+                const val = searchInput.value; searchInput.value = ''; searchInput.value = val;
                 searchInput.addEventListener('input', (e) => renderAdminSupport(e.target.value));
             }
         }
+        
+        // Hàm hỗ trợ chọn món trong Admin view (được gọi từ onclick trong HTML string)
+        window.selectAdminDish = (elem) => {
+            // Bỏ chọn các món khác trong cùng ngày của user đó
+            const parent = elem.parentElement;
+            parent.querySelectorAll('.mini-dish-item').forEach(el => el.classList.remove('selected'));
+            // Chọn món này
+            elem.classList.add('selected');
+        };
         async function renderStatsContent() {
             const statsContent = el('stats-content');
             const headers = { ordered: `<i class="fas fa-list-ul" title="${__('ordered')}"></i>`, eaten: `<i class="fas fa-check" title="${__('eaten')}"></i>`, notEaten: `<i class="fas fa-xmark" title="${__('notEaten')}"></i>` };
@@ -1805,6 +1937,81 @@
                 if (weekDoc && weekDoc[userEmailKey] && weekDoc[userEmailKey].order === 'reopen') await renderReopenOrderSection(el('order-section-container'));
                 else await renderOrderSection(el('order-section-container'));
             } 
+            // 1. Toggle hàng chi tiết (Support Tab)
+            else if (target.closest('.support-row')) {
+                const row = target.closest('.support-row');
+                const targetId = row.dataset.target;
+                const detailRow = el(targetId);
+                
+                if (detailRow) {
+                    const isHidden = detailRow.classList.toggle('hidden');
+                    row.classList.toggle('expanded', !isHidden);
+                }
+            }
+
+            // 2. Admin Save User Order
+            else if (classList.contains('admin-save-user-btn')) {
+                showLoader();
+                try {
+                    const userKey = dataset.key;
+                    const weekStr = getWeekString(new Date());
+                    
+                    // Lấy Shift
+                    const shiftInput = document.querySelector(`input[name="shift-${userKey}"]:checked`);
+                    const shift = shiftInput ? shiftInput.value : 'morning';
+
+                    // Lấy Staff Info để đảm bảo có data nếu user chưa từng đặt
+                    const allStaff = await getDocument("staff_list", "staffs");
+                    const userProfile = allStaff[userKey];
+
+                    // Tạo payload cơ bản
+                    const payload = {
+                        [userKey]: {
+                            name: userProfile.name,
+                            email: userProfile.email,
+                            depart: userProfile.depart,
+                            shift: shift,
+                            order: 'ordered'
+                        }
+                    };
+
+                    // Lấy các món ăn ĐƯỢC CHỌN (class .selected) trong detail row
+                    const detailRow = el(`detail-${userKey}`);
+                    const selectedItems = detailRow.querySelectorAll('.mini-dish-item.selected');
+                    
+                    // Lấy dữ liệu cũ để giữ lại các ngày quá khứ (không bị overwrite thành null)
+                    const currentWeekDoc = await getDocument('order_list', weekStr);
+                    const oldOrderData = currentWeekDoc && currentWeekDoc[userKey] ? currentWeekDoc[userKey] : {};
+
+                    // Merge dữ liệu cũ vào payload trước
+                    ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(d => {
+                        if (oldOrderData[d]) payload[userKey][d] = oldOrderData[d];
+                    });
+
+                    // Ghi đè các món mới chọn (chỉ những ngày cho phép sửa mới có class selected đc click)
+                    selectedItems.forEach(item => {
+                        const day = item.dataset.day;
+                        const dish = item.dataset.dish;
+                        
+                        // Check logic ignore/not (tương tự khi user tự đặt)
+                        const isNoOrder = dish.toLowerCase().includes('không đặt cơm') || dish.toLowerCase().includes('no order');
+                        const prefix = isNoOrder ? '[ignore] ' : 'not: ';
+                        
+                        payload[userKey][day] = `${prefix}${dish}`;
+                    });
+
+                    await setDoc(doc(db, 'order_list', weekStr), payload, { merge: true });
+                    
+                    showToast('Đã cập nhật thực đơn thành công');
+                    await renderAdminSupport(); // Re-render để cập nhật icon status
+
+                } catch (err) {
+                    console.error(err);
+                    showToast('Lỗi khi lưu: ' + err.message, 'error');
+                } finally {
+                    hideLoader();
+                }
+            }
             else if (classList.contains('order-dish-item') && !classList.contains('guest-dish-item')) {
                 const { dayKey, dish } = dataset;
                 state.orderSelection[dayKey] = dish;
