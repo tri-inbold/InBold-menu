@@ -1537,24 +1537,32 @@
                     let sheetName = workbook.SheetNames.find(n => n.toLowerCase().includes('menu')) || workbook.SheetNames[0];
                     const sheet = workbook.Sheets[sheetName];
                     
+                    // Đọc dữ liệu dạng mảng dòng
                     const rows = XLSX.utils.sheet_to_json(sheet, {header: 1, defval: ""});
                     
+                    // Khởi tạo map cột với giá trị -1
                     let colMap = { mon: -1, tue: -1, wed: -1, thu: -1, fri: -1 };
                     let dataStartRow = -1;
 
+                    // 1. Tìm dòng tiêu đề
                     for(let i=0; i < Math.min(rows.length, 20); i++) {
                          const row = rows[i].map(c => String(c || '').toLowerCase().trim());
                          
-                         if (row.some(c => c.includes('mon') || c.includes('thứ 2'))) {
+                         // Nếu dòng chứa 'mon' hoặc 'thứ 2'
+                         if (row.some(c => c === 'mon' || c === 'thứ 2')) {
                              dataStartRow = i + 1;
                              
+                             // Map cột: QUAN TRỌNG - CHỈ LẤY CỘT ĐẦU TIÊN TÌM THẤY
+                             // Để tránh lấy nhầm block tiếng Anh ở phía sau file CSV
                              row.forEach((cell, idx) => {
-                                 const c = String(cell).toLowerCase();
-                                 if (c.includes('mon') || c.includes('thứ 2')) colMap.mon = idx;
-                                 else if (c.includes('tue') || c.includes('thứ 3')) colMap.tue = idx;
-                                 else if (c.includes('wed') || c.includes('thứ 4')) colMap.wed = idx;
-                                 else if (c.includes('thu') || c.includes('thứ 5')) colMap.thu = idx;
-                                 else if (c.includes('fri') || c.includes('thứ 6')) colMap.fri = idx;
+                                 const c = String(cell).toLowerCase().trim();
+                                 
+                                 // Chỉ gán nếu chưa gán (giá trị đang là -1)
+                                 if (colMap.mon === -1 && (c === 'mon' || c === 'thứ 2')) colMap.mon = idx;
+                                 else if (colMap.tue === -1 && (c === 'tue' || c === 'thứ 3')) colMap.tue = idx;
+                                 else if (colMap.wed === -1 && (c === 'wed' || c === 'thứ 4')) colMap.wed = idx;
+                                 else if (colMap.thu === -1 && (c === 'thu' || c === 'thứ 5')) colMap.thu = idx;
+                                 else if (colMap.fri === -1 && (c === 'fri' || c === 'thứ 6')) colMap.fri = idx;
                              });
                              break; 
                          }
@@ -1562,6 +1570,7 @@
 
                     if (dataStartRow === -1) throw new Error("Không tìm thấy dòng tiêu đề ngày (Mon/Thứ 2...)");
 
+                    // 2. Trích xuất dữ liệu
                     const extractedMenu = { mon: [], tue: [], wed: [], thu: [], fri: [] };
                     
                     for (let i = dataStartRow; i < rows.length; i++) {
@@ -1575,13 +1584,15 @@
                                 if (val) {
                                     val = String(val).trim();
                                     
+                                    // Loại bỏ các dòng tiêu đề lặp lại hoặc các dòng rác
                                     const lowerVal = val.toLowerCase();
-                                    if (val && 
-                                        !lowerVal.startsWith('stt') && 
-                                        !lowerVal.startsWith('no.') && 
-                                        !lowerVal.includes('no order') && 
-                                        !lowerVal.includes('không đặt cơm')) {
-                                        
+                                    const isGarbage = 
+                                        lowerVal.startsWith('stt') || 
+                                        lowerVal.startsWith('no.') || 
+                                        lowerVal.includes('no order') || 
+                                        lowerVal.includes('không đặt cơm');
+
+                                    if (!isGarbage) {
                                         extractedMenu[day].push(val);
                                     }
                                 }
@@ -1589,6 +1600,7 @@
                         });
                     }
 
+                    // 3. Render ra giao diện
                      for (const dayKey of ['mon', 'tue', 'wed', 'thu', 'fri']) {
                         const container = el(`menu-dishes-nextWeek-${dayKey}`);
                         if (container) {
@@ -1633,7 +1645,7 @@
                 }
             }
 
-           else if (id === 'personnel-import-input') {
+            else if (id === 'personnel-import-input') {
                 const file = e.target.files[0];
                 if (!file) return;
         
