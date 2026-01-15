@@ -1891,7 +1891,7 @@
         });
 
         document.body.addEventListener('click', async (e) => {
-            const target = e.target.closest('button, a, .profile-menu-item, .order-dish-item, .toggle-card-header, .toggle-option');
+        const target = e.target.closest('button, a, .profile-menu-item, .order-dish-item, .toggle-card-header, .toggle-option, .support-row');
             if (!target) return;
             const { id, classList, dataset } = target;
 
@@ -1950,14 +1950,12 @@
                 if (weekDoc && weekDoc[userEmailKey] && weekDoc[userEmailKey].order === 'reopen') await renderReopenOrderSection(el('order-section-container'));
                 else await renderOrderSection(el('order-section-container'));
             } 
-            else if (target.closest('.support-row')) {
-                const row = target.closest('.support-row');
-                const targetId = row.dataset.target;
+            else if (classList.contains('support-row')) {
+                const targetId = dataset.target;
                 const detailRow = el(targetId);
-                
                 if (detailRow) {
                     const isHidden = detailRow.classList.toggle('hidden');
-                    row.classList.toggle('expanded', !isHidden);
+                    target.classList.toggle('expanded', !isHidden);
                 }
             }
 
