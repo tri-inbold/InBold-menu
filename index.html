@@ -1525,7 +1525,7 @@
                     e.target.insertBefore(option, e.target.querySelector('option[value="__other__"]'));
                 } else { e.target.value = ''; }
             }
-else if (id === 'menu-file-input') {
+            else if (id === 'menu-file-input') {
                 const file = e.target.files[0];
                 if (!file) return;
                 showLoader();
@@ -1534,34 +1534,33 @@ else if (id === 'menu-file-input') {
                     const data = await file.arrayBuffer();
                     const workbook = XLSX.read(data);
                     
-                    // Tìm sheet có tên chứa "menu" hoặc lấy sheet đầu tiên
                     let sheetName = workbook.SheetNames.find(n => n.toLowerCase().includes('menu')) || workbook.SheetNames[0];
                     const sheet = workbook.Sheets[sheetName];
                     
-                    // Đọc file dưới dạng mảng các dòng (header: 1)
-                    const rows = XLSX.utils.sheet_to_json(sheet, {header: 1});
+                    const rows = XLSX.utils.sheet_to_json(sheet, {header: 1, defval: ""});
                     
                     let colMap = { mon: -1, tue: -1, wed: -1, thu: -1, fri: -1 };
                     let dataStartRow = -1;
 
-                    for(let i=0; i < Math.min(rows.length, 10); i++) {
+                    for(let i=0; i < Math.min(rows.length, 20); i++) {
                          const row = rows[i].map(c => String(c || '').toLowerCase().trim());
-                         // Logic tìm tiêu đề: Chứa 'mon' hoặc 'thứ 2'
-                         if (row.includes('mon') || row.includes('thứ 2')) { 
+                         
+                         if (row.some(c => c.includes('mon') || c.includes('thứ 2'))) {
                              dataStartRow = i + 1;
                              
                              row.forEach((cell, idx) => {
-                                 if (cell.includes('mon') || cell.includes('thứ 2')) colMap.mon = idx;
-                                 else if (cell.includes('tue') || cell.includes('thứ 3')) colMap.tue = idx;
-                                 else if (cell.includes('wed') || cell.includes('thứ 4')) colMap.wed = idx;
-                                 else if (cell.includes('thu') || cell.includes('thứ 5')) colMap.thu = idx;
-                                 else if (cell.includes('fri') || cell.includes('thứ 6')) colMap.fri = idx;
+                                 const c = String(cell).toLowerCase();
+                                 if (c.includes('mon') || c.includes('thứ 2')) colMap.mon = idx;
+                                 else if (c.includes('tue') || c.includes('thứ 3')) colMap.tue = idx;
+                                 else if (c.includes('wed') || c.includes('thứ 4')) colMap.wed = idx;
+                                 else if (c.includes('thu') || c.includes('thứ 5')) colMap.thu = idx;
+                                 else if (c.includes('fri') || c.includes('thứ 6')) colMap.fri = idx;
                              });
                              break; 
                          }
                     }
 
-                    if (dataStartRow === -1) throw new Error("Không tìm thấy dòng tiêu đề (Mon/Thứ 2...) trong file.");
+                    if (dataStartRow === -1) throw new Error("Không tìm thấy dòng tiêu đề ngày (Mon/Thứ 2...)");
 
                     const extractedMenu = { mon: [], tue: [], wed: [], thu: [], fri: [] };
                     
@@ -1575,7 +1574,14 @@ else if (id === 'menu-file-input') {
                                 let val = row[colIdx];
                                 if (val) {
                                     val = String(val).trim();
-                                    if (val && !val.toLowerCase().startsWith('stt') && !val.toLowerCase().includes('no order') && !val.toLowerCase().includes('không đặt cơm')) {
+                                    
+                                    const lowerVal = val.toLowerCase();
+                                    if (val && 
+                                        !lowerVal.startsWith('stt') && 
+                                        !lowerVal.startsWith('no.') && 
+                                        !lowerVal.includes('no order') && 
+                                        !lowerVal.includes('không đặt cơm')) {
+                                        
                                         extractedMenu[day].push(val);
                                     }
                                 }
@@ -1586,7 +1592,7 @@ else if (id === 'menu-file-input') {
                      for (const dayKey of ['mon', 'tue', 'wed', 'thu', 'fri']) {
                         const container = el(`menu-dishes-nextWeek-${dayKey}`);
                         if (container) {
-                            container.innerHTML = '';
+                            container.innerHTML = ''; 
                             
                             const dishes = extractedMenu[dayKey];
                             dishes.forEach((dish, index) => {
