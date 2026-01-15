@@ -186,14 +186,33 @@
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-block { width: 100%; }
 
-        .status-icon { display: inline-flex; justify-content: center; align-items: center; width: 32px; height: 32px; border-radius: 50%; font-size: 14px; }
-        .status-sun { background: rgba(249, 115, 22, 0.15); color: #f97316; }
-        .status-moon { background: rgba(102, 126, 234, 0.15); color: #667eea; }
-        .status-missing { background: rgba(237, 137, 54, 0.2); color: var(--warning); border: 1px solid var(--warning); font-weight: bold; }
+        .status-icon {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            font-size: 13px;
+        }
+        /* Ca sáng/chiều: Đơn giản, không nền hoặc nền rất nhạt */
+        .status-sun { color: #f97316; background: transparent; border: 1px solid rgba(249, 115, 22, 0.3); }
+        .status-moon { color: #667eea; background: transparent; border: 1px solid rgba(102, 126, 234, 0.3); }
+        
+        /* Chưa đặt: Highlight Cam đậm */
+        .status-missing { 
+            background: rgba(237, 137, 54, 0.15); 
+            color: var(--warning); 
+            border: 1px solid var(--warning); 
+            font-weight: bold; 
+            box-shadow: 0 0 5px rgba(237, 137, 54, 0.2);
+        }
         
         .support-row { cursor: pointer; transition: background-color 0.2s; }
         .support-row:hover { background-color: var(--card-hover); }
-        .support-row.expanded { background-color: rgba(102, 126, 234, 0.05); border-bottom: none; }
+        /* Khi mở rộng thì đổi màu nền nhẹ */
+        .support-row.expanded { background-color: rgba(102, 126, 234, 0.05); border-bottom: none; font-weight: 600; }
+
         
         .detail-row { background-color: rgba(102, 126, 234, 0.05); }
         .detail-content { padding: 1rem; border-top: 1px dashed var(--border); }
@@ -1138,7 +1157,6 @@
             const today = new Date();
             const currentWeekStr = getWeekString(today);
             
-            // Lấy dữ liệu
             const [allStaff, weekDoc] = await Promise.all([
                 getDocument("staff_list", "staffs"), 
                 getDocument('order_list', currentWeekStr)
@@ -1146,28 +1164,27 @@
             
             const menu = weekDoc ? weekDoc.menu : {};
             
-            // Xử lý danh sách nhân viên
             let staffList = allStaff ? Object.entries(allStaff)
                 .filter(([key]) => !key.startsWith('guest_'))
                 .map(([key, profile]) => {
                     const orderData = weekDoc && weekDoc[key] ? weekDoc[key] : null;
-                    let status = 'missing'; // missing, morning, evening
+                    let status = 'missing';
                     
                     if (orderData && orderData.order === 'ordered') {
                         const shift = (orderData.shift || 'morning').toLowerCase();
                         status = (shift.includes('evening') || shift === 'e') ? 'evening' : 'morning';
+                    } else if (orderData && orderData.order === 'reopen') {
+                        status = 'missing'; // Reopen cũng coi như chưa đặt xong
                     }
                     
                     return { key, profile, orderData, status };
                 })
                 .sort((a, b) => {
-                    // Sắp xếp: Chưa đặt lên đầu, sau đó theo tên
                     if (a.status === 'missing' && b.status !== 'missing') return -1;
                     if (a.status !== 'missing' && b.status === 'missing') return 1;
                     return a.profile.name.localeCompare(b.profile.name);
                 }) : [];
         
-            // Lọc theo tìm kiếm
             if (searchTerm) {
                 const lowerTerm = searchTerm.toLowerCase();
                 staffList = staffList.filter(item => 
@@ -1176,11 +1193,7 @@
                 );
             }
         
-            // --- RENDER HTML ---
-            let html = `<div class="mt-3">`;
-            
-            // Thanh tìm kiếm
-            html += `
+            let html = `<div class="mt-3">
             <div class="search-bar mb-2">
                 <div class="search-wrapper">
                     <i class="fas fa-search search-icon"></i>
@@ -1203,35 +1216,33 @@
                 const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
                 const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
                 
-                // Logic khóa ngày quá khứ
+                // Logic khóa ngày (Tương đối: Chỉ Admin mới thấy menu này nên ta có thể nới lỏng hoặc chặt chẽ tùy ý)
                 const currentDayIdx = today.getDay(); // 0=Sun, 1=Mon...
-                // Nếu CN (0) hoặc T7 (6) thì coi như qua tuần hoặc cuối tuần -> Logic dưới đây chỉ đúng cho T2-T6
-                
+        
                 staffList.forEach(item => {
                     const { key, profile, orderData, status } = item;
                     
-                    // Icon trạng thái
                     let iconHtml = '';
                     if (status === 'morning') iconHtml = `<div class="status-icon status-sun" title="Ca sáng"><i class="fas fa-sun"></i></div>`;
                     else if (status === 'evening') iconHtml = `<div class="status-icon status-moon" title="Ca chiều"><i class="fas fa-moon"></i></div>`;
                     else iconHtml = `<div class="status-icon status-missing" title="Chưa đặt"><i class="fas fa-times"></i></div>`;
         
-                    // Hàng chính
+                    // Hàng chính (Support Row)
                     html += `
                     <tr class="support-row" data-target="detail-${key}">
                         <td style="text-align: center;">${iconHtml}</td>
-                        <td style="font-weight: 500;">${profile.name} <i class="fas fa-caret-down" style="margin-left: 4px; color: var(--text-muted); font-size: 10px;"></i></td>
+                        <td style="font-weight: 500;">${profile.name}</td>
                         <td class="hide-mobile">${profile.email}</td>
                         <td class="hide-mobile">${profile.depart || '-'}</td>
                     </tr>`;
         
-                    // Hàng mở rộng (Detail Row)
+                    // Hàng chi tiết (Detail Row) - Mặc định hidden
                     html += `<tr id="detail-${key}" class="detail-row hidden"><td colspan="4"><div class="detail-content">`;
                     
-                    // 1. Chọn Ca
+                    // 1. Shift Toggle
                     const currentShift = orderData ? orderData.shift : 'morning';
                     html += `<div class="form-group" style="max-width: 300px;">
-                        <label class="form-label">Ca ăn</label>
+                        <label class="form-label" style="font-size:11px; text-transform:uppercase; color:var(--primary);">Ca làm việc</label>
                         <div class="shift-toggle">
                             <input type="radio" id="shift-m-${key}" name="shift-${key}" value="morning" ${currentShift !== 'evening' ? 'checked' : ''}>
                             <label for="shift-m-${key}">${__('morning')}</label>
@@ -1240,29 +1251,32 @@
                         </div>
                     </div>`;
         
-                    // 2. Menu từng ngày
+                    // 2. Menu List
                     html += `<div style="margin-bottom: 1.5rem;">`;
                     dayKeys.forEach((dKey, idx) => {
-                        // Logic khóa: Ngày (idx + 1) < currentDayIdx => Đã qua. 
-                        // Ví dụ: Hôm nay là Thứ 4 (3). Mon(1), Tue(2) bị khóa. Wed(3) mở.
-                        // Lưu ý: getDay() trả về CN=0, T2=1. dKey index: 0=Mon, 1=Tue... => Ngày thực tế = idx + 1
+                        // Logic: Ngày quá khứ thì disable.
+                        // idx + 1 < currentDayIdx (VD: Hôm nay T4(3). T2(1) < 3 -> True -> Past)
                         const isPast = (idx + 1) < currentDayIdx && currentDayIdx !== 0 && currentDayIdx !== 6;
+                        
                         const userDishRaw = orderData ? orderData[dKey] : '';
                         const { dish: currentDish } = parseDishValue(userDishRaw);
                         const dishes = menu[dKey] || [];
         
-                        html += `<div class="day-block">
-                            <span class="day-label ${isPast ? 'past' : ''}">${dayNames[dKey]} ${isPast ? '(Đã qua)' : ''}</span>
+                        html += `<div class="day-block" style="border-bottom:1px dashed var(--border); padding-bottom:8px; margin-bottom:8px;">
+                            <span class="day-label ${isPast ? 'past' : ''}" style="display:flex; justify-content:space-between;">
+                                <span>${dayNames[dKey]}</span>
+                                ${isPast ? '<span style="font-weight:400; font-size:10px;">(Đã qua)</span>' : ''}
+                            </span>
                             <div class="mini-dish-list">`;
                         
                         if (dishes.length > 0) {
                             dishes.forEach(dish => {
                                 const isSelected = dish === currentDish;
                                 const disabledClass = isPast ? 'disabled' : '';
+                                // onclick gọi hàm global selectAdminDish
                                 html += `<div class="mini-dish-item ${isSelected ? 'selected' : ''} ${disabledClass}" 
                                               data-dish="${dish}" 
                                               data-day="${dKey}" 
-                                              data-key="${key}"
                                               ${isPast ? '' : 'onclick="selectAdminDish(this)"'}>
                                             ${parseDish(dish)}
                                          </div>`;
@@ -1270,11 +1284,11 @@
                         } else {
                             html += `<span class="text-muted" style="font-size:12px;">${__('rest')}</span>`;
                         }
-                        html += `</div></div>`; // End day-block & list
+                        html += `</div></div>`;
                     });
                     html += `</div>`;
         
-                    // 3. Action Buttons
+                    // 3. Buttons
                     html += `<div style="display: flex; gap: 10px;">
                         <button class="btn btn-primary admin-save-user-btn" data-key="${key}" style="flex: 2;"><i class="fas fa-save"></i> ${__('save')}</button>
                         <button class="btn btn-secondary reopen-order-btn" data-key="${key}" data-name="${profile.name}" style="flex: 1; border: 1px solid var(--error); color: var(--error);"><i class="fas fa-redo"></i> Reopen</button>
@@ -1288,7 +1302,6 @@
                 html += `<p class="text-center text-muted p-3">${__('notFound')}</p>`;
             }
         
-            // Guest Order Button
             html += `<h3 style="color:var(--primary);margin:2rem 0 1rem;font-size:18px;">${__('orderForGuest')}</h3>
                      <button id="add-guest-order-btn" class="btn btn-primary btn-block"><i class="fas fa-plus"></i> ${__('addGuest')}</button>
                      </div>`;
@@ -1937,7 +1950,6 @@
                 if (weekDoc && weekDoc[userEmailKey] && weekDoc[userEmailKey].order === 'reopen') await renderReopenOrderSection(el('order-section-container'));
                 else await renderOrderSection(el('order-section-container'));
             } 
-            // 1. Toggle hàng chi tiết (Support Tab)
             else if (target.closest('.support-row')) {
                 const row = target.closest('.support-row');
                 const targetId = row.dataset.target;
@@ -1949,7 +1961,6 @@
                 }
             }
 
-            // 2. Admin Save User Order
             else if (classList.contains('admin-save-user-btn')) {
                 showLoader();
                 try {
