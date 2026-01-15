@@ -1358,16 +1358,9 @@
                         <input type="text" id="search-personnel" class="search-input" placeholder="${__('searchStaff')}" value="${searchTerm}">
                     </div>
                     <button id="add-personnel-btn" class="icon-btn" title="Thêm thủ công"><i class="fas fa-plus"></i></button>
-                    <button id="export-personnel-btn" class="icon-btn" title="Xuất Excel"><i class="fas fa-file-excel"></i></button>
-                </div>
+                </div>`;
                 
-                <div style="margin-bottom: 1rem;">
-                     <button onclick="document.getElementById('personnel-import-input').click()" class="btn btn-secondary btn-block" style="border: 1px dashed var(--border); font-size:12px;">
-                        <i class="fas fa-file-upload" style="color:var(--warning)"></i> Import Excel (Ghi đè)
-                    </button>
-                    <input type="file" id="personnel-import-input" class="hidden" accept=".xlsx, .xls, .csv">
-                </div>
-        
+                html += `
                 <div class="table-wrapper">
                     <table>
                         <thead><tr><th>${__('personnel')}</th><th class="hide-mobile">${__('email')}</th><th class="hide-mobile">${__('department')}</th><th> </th></tr></thead>
@@ -1376,6 +1369,21 @@
                         </tbody>
                     </table>
                 </div>`;
+
+                html += `
+                <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px;">
+                     <!-- Nút Import (Cảnh báo) -->
+                     <button onclick="document.getElementById('personnel-import-input').click()" class="btn btn-secondary btn-block" style="border: 1px dashed var(--warning); color: var(--warning);">
+                        <i class="fas fa-file-upload"></i> Import Excel (Ghi đè)
+                    </button>
+                    <input type="file" id="personnel-import-input" class="hidden" accept=".xlsx, .xls, .csv">
+
+                    <!-- Nút Export (Highlight màu xanh lá) -->
+                    <button id="export-personnel-btn" class="btn btn-block" style="background-color: var(--success); color: white; border: none;">
+                        <i class="fas fa-file-export"></i> Xuất Excel (Backup)
+                    </button>
+                </div>`;
+
             } else {
                 const departments = await getDepartmentsList();
                 
