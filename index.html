@@ -239,7 +239,13 @@
         }
         
         .detail-row { background-color: rgba(102, 126, 234, 0.05); }
-        .detail-content { padding: 1rem; border-top: 1px dashed var(--border); }
+        .detail-content { padding: 0; border-top: 1px dashed var(--border); }
+        .detail-inner-wrapper { padding: 1rem; }
+
+        .admin-action-buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 1rem; }
+        .btn-group-row { display: flex; gap: 8px; }
+        .btn-delete-order { background: var(--card-bg); color: var(--error); border: 1px solid var(--error); }
+        .btn-delete-order:hover { background: rgba(245, 101, 101, 0.1); }
         
         .mini-dish-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
         .mini-dish-item { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; cursor: pointer; background: var(--card-bg);opacity: 0.6;}
@@ -1268,10 +1274,13 @@
                     return `<div class="status-icon-btn ${iconClass}" data-key="${key}" data-weektype="${weekType}">${iconContent}</div>`;
                 };
         
-                // Helper render chi tiết menu (để ẩn trong row)
+                // Helper render chi tiết menu
                 const renderDetailBlock = (key, weekType, orderData, menuData, isPastWeek) => {
                     const currentShift = orderData ? orderData.shift : 'morning';
-                    let content = `<div id="detail-${weekType}-${key}" class="week-detail-container hidden">`;
+                    // Thêm wrapper để full width
+                    let content = `<div id="detail-${weekType}-${key}" class="week-detail-container hidden" style="border:none; box-shadow:none; margin:0; border-radius:0;">`;
+                    
+                    content += `<div class="detail-inner-wrapper">`; // Padding nằm ở đây
                     content += `<div class="week-detail-title"><i class="fas fa-calendar-alt"></i> Chi tiết ${weekType === 'this' ? 'Tuần này' : 'Tuần sau'}</div>`;
                     
                     // Shift
@@ -1283,11 +1292,7 @@
                     // Menu
                     content += `<div style="margin-bottom: 1rem;">`;
                     dayKeys.forEach((dKey, idx) => {
-                        // Logic khóa ngày: 
-                        // Nếu là Tuần này (this): Check quá khứ.
-                        // Nếu là Tuần sau (next): Không bao giờ là quá khứ (trừ khi logic phức tạp hơn, tạm coi là mở hết).
                         const isPast = (weekType === 'this') && ((idx + 1) < currentDayIdx && currentDayIdx !== 0 && currentDayIdx !== 6);
-                        
                         const userDishRaw = orderData ? orderData[dKey] : '';
                         const { dish: currentDish } = parseDishValue(userDishRaw);
                         const dishes = menuData[dKey] || [];
@@ -1307,13 +1312,19 @@
                     });
                     content += `</div>`;
         
-                    // Buttons
+                    // Buttons Layout Mới
                     const weekStringValue = weekType === 'this' ? thisWeekStr : nextWeekStr;
-                    content += `<div style="display: flex; gap: 10px;">
-                        <button class="btn btn-primary admin-save-user-btn" data-key="${key}" data-weekstr="${weekStringValue}" data-weektype="${weekType}" style="flex: 2;"><i class="fas fa-save"></i> Lưu ${weekType === 'this' ? 'Tuần này' : 'Tuần sau'}</button>
-                        <button class="btn btn-secondary reopen-order-btn" data-key="${key}" data-name="${allStaff[key].name}" style="flex: 1; border: 1px solid var(--error); color: var(--error);"><i class="fas fa-redo"></i> Reopen</button>
+                    const userName = allStaff[key] ? allStaff[key].name : '';
+                    
+                    content += `<div class="admin-action-buttons">
+                        <div class="btn-group-row">
+                            <button class="btn btn-delete-order" data-key="${key}" data-weekstr="${weekStringValue}" data-weektype="${weekType}" style="flex: 1;"><i class="fas fa-trash"></i> Xóa đơn</button>
+                            <button class="btn btn-secondary reopen-order-btn" data-key="${key}" data-name="${userName}" style="flex: 1; border: 1px solid var(--warning); color: var(--warning);"><i class="fas fa-redo"></i> Reopen</button>
+                        </div>
+                        <button class="btn btn-primary admin-save-user-btn" data-key="${key}" data-weekstr="${weekStringValue}" data-weektype="${weekType}" style="width: 100%;"><i class="fas fa-save"></i> Lưu ${weekType === 'this' ? 'Tuần này' : 'Tuần sau'}</button>
                     </div>`;
-                    content += `</div>`;
+                    
+                    content += `</div></div>`; // Đóng inner-wrapper và container
                     return content;
                 };
         
@@ -2161,10 +2172,10 @@
                 showLoader();
                 try {
                     const userKey = dataset.key;
-                    const weekStr = dataset.weekstr; // Lấy từ data-weekstr
-                    const weekType = dataset.weektype; // 'this' or 'next'
+                    const weekStr = dataset.weekstr; // Lấy weekString từ data attribute của nút
+                    const weekType = dataset.weektype; // Lấy 'this' hoặc 'next'
                     
-                    // Lấy Shift (Lưu ý ID radio đã đổi thêm weekType)
+                    // Lấy Shift (ID của radio input cũng đã thay đổi theo weekType)
                     const shiftInput = document.querySelector(`input[name="shift-${weekType}-${userKey}"]:checked`);
                     const shift = shiftInput ? shiftInput.value : 'morning';
 
@@ -2181,33 +2192,69 @@
                         }
                     };
 
-                    // Lấy detail block tương ứng
-                    const detailBlock = el(`detail-${weekType}-${userKey}`);
-                    const selectedItems = detailBlock.querySelectorAll('.mini-dish-item.selected');
+                    // QUAN TRỌNG: Lấy đúng ID của khung detail theo tuần
+                    const detailRow = el(`detail-${weekType}-${userKey}`);
                     
-                    const weekDoc = await getDocument('order_list', weekStr);
-                    const oldOrderData = weekDoc && weekDoc[userKey] ? weekDoc[userKey] : {};
+                    if (!detailRow) {
+                        throw new Error(`Không tìm thấy dữ liệu menu (ID: detail-${weekType}-${userKey})`);
+                    }
+
+                    const selectedItems = detailRow.querySelectorAll('.mini-dish-item.selected');
+                    
+                    // Lấy dữ liệu cũ để merge (tránh mất dữ liệu các ngày đã qua)
+                    const currentWeekDoc = await getDocument('order_list', weekStr);
+                    const oldOrderData = currentWeekDoc && currentWeekDoc[userKey] ? currentWeekDoc[userKey] : {};
 
                     ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(d => {
                         if (oldOrderData[d]) payload[userKey][d] = oldOrderData[d];
                     });
 
+                    // Ghi đè các món mới chọn
                     selectedItems.forEach(item => {
                         const day = item.dataset.day;
                         const dish = item.dataset.dish;
+                        
                         const isNoOrder = dish.toLowerCase().includes('không đặt cơm') || dish.toLowerCase().includes('no order');
                         const prefix = isNoOrder ? '[ignore] ' : 'not: ';
+                        
                         payload[userKey][day] = `${prefix}${dish}`;
                     });
 
                     await setDoc(doc(db, 'order_list', weekStr), payload, { merge: true });
+                    
                     showToast(`Đã cập nhật thực đơn (${weekType === 'this' ? 'Tuần này' : 'Tuần sau'})`);
-                    await renderAdminSupport();
+                    await renderAdminSupport(); 
 
                 } catch (err) {
                     console.error(err);
                     showToast('Lỗi khi lưu: ' + err.message, 'error');
-                } finally { hideLoader(); }
+                } finally {
+                    hideLoader();
+                }
+            }
+            // 3. Xóa đơn hàng của User (Reset về chưa đặt)
+            else if (classList.contains('btn-delete-order')) {
+                const userKey = dataset.key;
+                const weekStr = dataset.weekstr;
+                const weekType = dataset.weektype;
+
+                if (!confirm(`Bạn có chắc muốn xóa toàn bộ lựa chọn món ăn của user này trong ${weekType === 'this' ? 'Tuần này' : 'Tuần sau'}?`)) return;
+
+                showLoader();
+                try {
+                    // Xóa field của user trong document tuần đó
+                    await updateDoc(doc(db, 'order_list', weekStr), {
+                        [userKey]: deleteField()
+                    });
+                    
+                    showToast('Đã xóa đơn đặt hàng.');
+                    await renderAdminSupport();
+                } catch (err) {
+                    console.error(err);
+                    showToast('Lỗi khi xóa: ' + err.message, 'error');
+                } finally {
+                    hideLoader();
+                }
             }
             else if (dataset.action === 'eat-gift') {
                 showLoader();
