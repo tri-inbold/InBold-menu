@@ -1931,6 +1931,48 @@
 
             if (id === 'login-btn') { showLoader(); try { await signInWithPopup(auth, provider); } catch { showToast(__('error'), 'error'); } finally { hideLoader(); } }
             else if (id === 'logout-menu-item') { if (confirm(__('logoutConfirm'))) { await signOut(auth); showToast(__('loggedOut')); } }
+            else if (id === 'add-personnel-btn') {
+                el('personnel-modal-title').textContent = 'Thêm nhân viên'; el('personnel-original-email-key').value = ''; el('personnel-name-input').value = ''; el('personnel-email-input').value = ''; el('personnel-depart-select').innerHTML = '';
+                const allStaff = await getDocument("staff_list", "staffs");
+                const departments = await getDepartmentsList();
+                el('personnel-depart-select').innerHTML = '';
+                departments.forEach(dept => {
+                    const opt = document.createElement('option'); opt.value = dept; opt.textContent = dept; 
+                    el('personnel-depart-select').appendChild(opt); 
+                });
+            }
+            else if (classList.contains('edit-personnel-btn')) {
+                const userKey = dataset.key;
+                const allStaff = await getDocument("staff_list", "staffs");
+                const userData = allStaff[userKey];
+                if (!userData) return;
+                el('personnel-modal-title').textContent = 'Chỉnh sửa nhân viên'; el('personnel-original-email-key').value = userKey; el('personnel-name-input').value = userData.name; el('personnel-email-input').value = userData.email; el('personnel-depart-select').innerHTML = '';
+                const departments = await getDepartmentsList(); 
+                el('personnel-depart-select').innerHTML = '';
+                departments.forEach(dept => {
+                    const opt = document.createElement('option'); opt.value = dept; opt.textContent = dept; 
+                    opt.selected = dept === userData.depart;
+                    el('personnel-depart-select').appendChild(opt); 
+                });
+            }
+            else if (classList.contains('delete-personnel-btn')) { state.deleteTarget = { key: dataset.key, name: dataset.name }; el('delete-personnel-text').textContent = `Xóa nhân viên "${dataset.name}"?`; el('delete-personnel-modal').classList.remove('hidden'); }
+            else if (id === 'save-personnel-btn') {
+                showLoader();
+                try {
+                    const name = el('personnel-name-input').value.trim(); const email = el('personnel-email-input').value.trim(); let depart = el('personnel-depart-select').value; const originalKey = el('personnel-original-email-key').value;
+                    if (!name || !email || !email.includes('@')) { showToast('Thông tin không hợp lệ', 'error'); hideLoader(); return; }
+                    if (depart === '__other__') depart = prompt('Nhập tên phòng ban mới:').trim();
+                    const newKey = emailToKey(email); const allStaff = await getDocument("staff_list", "staffs");
+                    if ((!originalKey || originalKey !== newKey) && allStaff?.[newKey]) { showToast('Email đã tồn tại', 'error'); hideLoader(); return; }
+                    const data = { name, email, depart, lan: 'vi' };
+                    if (originalKey && originalKey !== newKey) await updateDoc(doc(db, "staff_list", "staffs"), { [originalKey]: deleteField(), [newKey]: data });
+                    else await updateDoc(doc(db, "staff_list", "staffs"), { [newKey]: data });
+                    showToast(originalKey ? 'Đã cập nhật' : 'Đã thêm'); el('personnel-modal').classList.add('hidden'); await renderAdminPersonnel();
+                } catch { showToast(__('error'), 'error'); } finally { hideLoader(); }
+            }
+            else if (id === 'confirm-delete-personnel-btn') {
+                showLoader(); try { await updateDoc(doc(db, "staff_list", "staffs"), { [state.deleteTarget.key]: deleteField() }); showToast('Đã xóa'); el('delete-personnel-modal').classList.add('hidden'); await renderAdminPersonnel(); } catch { showToast(__('error'), 'error'); } finally { hideLoader(); }
+            }
             else if (classList.contains('lang-toggle-btn')) {
                 if (dataset.lang === state.staffProfile.lan) return;
                 showLoader(); 
@@ -2618,48 +2660,6 @@
                     if (state.reopenTarget.key === emailToKey(state.currentUser.email)) { state.orderSelection = {}; state.currentTab = 'today'; await render(); } else { await renderAdmin(); }
                 } catch { showToast(__('error'), 'error'); } finally { hideLoader(); }
             } 
-            else if (id === 'add-personnel-btn') {
-                el('personnel-modal-title').textContent = 'Thêm nhân viên'; el('personnel-original-email-key').value = ''; el('personnel-name-input').value = ''; el('personnel-email-input').value = ''; el('personnel-depart-select').innerHTML = '';
-                const allStaff = await getDocument("staff_list", "staffs");
-                const departments = await getDepartmentsList();
-                el('personnel-depart-select').innerHTML = '';
-                departments.forEach(dept => {
-                    const opt = document.createElement('option'); opt.value = dept; opt.textContent = dept; 
-                    el('personnel-depart-select').appendChild(opt); 
-                });
-            }
-            else if (classList.contains('edit-personnel-btn')) {
-                const userKey = dataset.key;
-                const allStaff = await getDocument("staff_list", "staffs");
-                const userData = allStaff[userKey];
-                if (!userData) return;
-                el('personnel-modal-title').textContent = 'Chỉnh sửa nhân viên'; el('personnel-original-email-key').value = userKey; el('personnel-name-input').value = userData.name; el('personnel-email-input').value = userData.email; el('personnel-depart-select').innerHTML = '';
-                const departments = await getDepartmentsList(); 
-                el('personnel-depart-select').innerHTML = '';
-                departments.forEach(dept => {
-                    const opt = document.createElement('option'); opt.value = dept; opt.textContent = dept; 
-                    opt.selected = dept === userData.depart;
-                    el('personnel-depart-select').appendChild(opt); 
-                });
-            }
-            else if (classList.contains('delete-personnel-btn')) { state.deleteTarget = { key: dataset.key, name: dataset.name }; el('delete-personnel-text').textContent = `Xóa nhân viên "${dataset.name}"?`; el('delete-personnel-modal').classList.remove('hidden'); }
-            else if (id === 'save-personnel-btn') {
-                showLoader();
-                try {
-                    const name = el('personnel-name-input').value.trim(); const email = el('personnel-email-input').value.trim(); let depart = el('personnel-depart-select').value; const originalKey = el('personnel-original-email-key').value;
-                    if (!name || !email || !email.includes('@')) { showToast('Thông tin không hợp lệ', 'error'); hideLoader(); return; }
-                    if (depart === '__other__') depart = prompt('Nhập tên phòng ban mới:').trim();
-                    const newKey = emailToKey(email); const allStaff = await getDocument("staff_list", "staffs");
-                    if ((!originalKey || originalKey !== newKey) && allStaff?.[newKey]) { showToast('Email đã tồn tại', 'error'); hideLoader(); return; }
-                    const data = { name, email, depart, lan: 'vi' };
-                    if (originalKey && originalKey !== newKey) await updateDoc(doc(db, "staff_list", "staffs"), { [originalKey]: deleteField(), [newKey]: data });
-                    else await updateDoc(doc(db, "staff_list", "staffs"), { [newKey]: data });
-                    showToast(originalKey ? 'Đã cập nhật' : 'Đã thêm'); el('personnel-modal').classList.add('hidden'); await renderAdminPersonnel();
-                } catch { showToast(__('error'), 'error'); } finally { hideLoader(); }
-            }
-            else if (id === 'confirm-delete-personnel-btn') {
-                showLoader(); try { await updateDoc(doc(db, "staff_list", "staffs"), { [state.deleteTarget.key]: deleteField() }); showToast('Đã xóa'); el('delete-personnel-modal').classList.add('hidden'); await renderAdminPersonnel(); } catch { showToast(__('error'), 'error'); } finally { hideLoader(); }
-            }
             else if(dataset.modal) el(dataset.modal).classList.toggle('hidden');
 
             else if (id === 'edit-menu-btn') {
