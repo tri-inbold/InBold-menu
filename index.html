@@ -198,36 +198,45 @@
             transition: all 0.2s ease;
         }
         
-        /* Ca sáng (Sun): Màu Primary (giống menu-filter-btn khi active/hover) */
-        .status-sun { 
-            color: var(--primary); 
-            background: transparent; 
-            border-color: var(--primary);
-            opacity: 0.8;
+        .status-icon-btn {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            font-size: 14px;
+            border: 1px solid transparent;
+            cursor: pointer; /* Chỉ hiện bàn tay ở icon */
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
+        .status-icon-btn:hover { transform: scale(1.1); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         
-        /* Ca chiều (Moon): Màu Text (hoặc Secondary tùy theme) */
-        .status-moon { 
-            color: var(--text); 
-            background: transparent; 
-            border-color: var(--text-muted);
-            opacity: 0.8;
-        }
+        .status-sun { color: var(--primary); background: rgba(102, 126, 234, 0.1); border-color: rgba(102, 126, 234, 0.2); }
+        .status-moon { color: var(--text); background: rgba(128, 128, 128, 0.1); border-color: var(--border); }
+        .status-missing { background: var(--warning); color: #fff; border-color: var(--warning); box-shadow: 0 2px 5px rgba(237, 137, 54, 0.3); }
         
-        /* Chưa đặt (Missing): Màu Warning/Error (giống nav-item active needs-attention) */
-        .status-missing { 
-            background: var(--warning); 
-            color: #fff !important; /* Chữ trắng để nổi bật trên nền cam */
-            border-color: var(--warning);
-            box-shadow: 0 2px 5px rgba(237, 137, 54, 0.3);
-            font-weight: bold;
-        }
-        
-        .support-row { cursor: pointer; transition: background-color 0.2s; }
-        .support-row:hover { background-color: var(--card-hover); }
-        /* Khi mở rộng thì đổi màu nền nhẹ */
-        .support-row.expanded { background-color: rgba(102, 126, 234, 0.05); border-bottom: none; font-weight: 600; }
+        .support-row { cursor: default; } 
+        .support-row:hover { background-color: transparent; }
+        .support-row td { vertical-align: middle; padding: 12px 8px; }
 
+        .week-detail-container {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 10px 0;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.05);
+        }
+        .week-detail-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+        }
         
         .detail-row { background-color: rgba(102, 126, 234, 0.05); }
         .detail-content { padding: 1rem; border-top: 1px dashed var(--border); }
@@ -1172,59 +1181,75 @@
         }
         async function renderAdminSupport(searchTerm = '') {
             const today = new Date();
-            const currentWeekStr = getWeekString(today);
-            
-            const [allStaff, weekDoc] = await Promise.all([
+            const currentDayIdx = today.getDay(); // 0=Sun, 1=Mon...
+            const currentHour = today.getHours();
+        
+            // Xác định 2 tuần
+            const thisWeekStr = getWeekString(today);
+            const nextWeekStr = getWeekString(new Date(today.getTime() + 7 * 86400000));
+        
+            // Logic hiển thị cột Tuần sau: 
+            // Hiện nếu là T5(4) > 15h, hoặc T6(5), T7(6), CN(0). 
+            // Hoặc nếu user ĐÃ có dữ liệu (check sau).
+            const isNextWeekOpen = (currentDayIdx === 4 && currentHour >= 15) || currentDayIdx === 5 || currentDayIdx === 6 || currentDayIdx === 0;
+        
+            // Lấy dữ liệu 3 nguồn: Staff, Order Tuần này, Order Tuần sau
+            const [allStaff, thisWeekDoc, nextWeekDoc] = await Promise.all([
                 getDocument("staff_list", "staffs"), 
-                getDocument('order_list', currentWeekStr)
+                getDocument('order_list', thisWeekStr),
+                getDocument('order_list', nextWeekStr)
             ]);
             
-            const menu = weekDoc ? weekDoc.menu : {};
+            const menuThisWeek = thisWeekDoc ? thisWeekDoc.menu : {};
+            const menuNextWeek = nextWeekDoc ? nextWeekDoc.menu : {};
             
             let staffList = allStaff ? Object.entries(allStaff)
                 .filter(([key]) => !key.startsWith('guest_'))
                 .map(([key, profile]) => {
-                    const orderData = weekDoc && weekDoc[key] ? weekDoc[key] : null;
-                    let status = 'missing';
-                    
-                    if (orderData && orderData.order === 'ordered') {
-                        const shift = (orderData.shift || 'morning').toLowerCase();
-                        status = (shift.includes('evening') || shift === 'e') ? 'evening' : 'morning';
-                    } else if (orderData && orderData.order === 'reopen') {
-                        status = 'missing';
+                    // Dữ liệu tuần này
+                    const orderThis = thisWeekDoc && thisWeekDoc[key] ? thisWeekDoc[key] : null;
+                    let statusThis = 'missing';
+                    if (orderThis && orderThis.order === 'ordered') {
+                        const shift = (orderThis.shift || 'morning').toLowerCase();
+                        statusThis = (shift.includes('evening') || shift === 'e') ? 'evening' : 'morning';
+                    } else if (orderThis && orderThis.order === 'reopen') {
+                        statusThis = 'missing';
                     }
-                    
-                    return { key, profile, orderData, status };
+        
+                    // Dữ liệu tuần sau
+                    const orderNext = nextWeekDoc && nextWeekDoc[key] ? nextWeekDoc[key] : null;
+                    let statusNext = 'missing'; // Mặc định missing
+                    let showNext = isNextWeekOpen; // Mặc định ẩn/hiện theo thời gian
+        
+                    if (orderNext && orderNext.order === 'ordered') {
+                        const shift = (orderNext.shift || 'morning').toLowerCase();
+                        statusNext = (shift.includes('evening') || shift === 'e') ? 'evening' : 'morning';
+                        showNext = true; // Có dữ liệu thì luôn hiện
+                    } else if (orderNext && orderNext.order === 'reopen') {
+                        showNext = true;
+                    }
+        
+                    return { key, profile, orderThis, statusThis, orderNext, statusNext, showNext };
                 })
-                .sort((a, b) => {
-                    if (a.status === 'missing' && b.status !== 'missing') return -1;
-                    if (a.status !== 'missing' && b.status === 'missing') return 1;
-                    return a.profile.name.localeCompare(b.profile.name);
-                }) : [];
+                .sort((a, b) => a.profile.name.localeCompare(b.profile.name)) : [];
         
             if (searchTerm) {
-                const lowerTerm = searchTerm.toLowerCase();
-                staffList = staffList.filter(item => 
-                    item.profile.name.toLowerCase().includes(lowerTerm) || 
-                    item.profile.email.toLowerCase().includes(lowerTerm)
-                );
+                const lower = searchTerm.toLowerCase();
+                staffList = staffList.filter(i => i.profile.name.toLowerCase().includes(lower) || i.profile.email.toLowerCase().includes(lower));
             }
         
             let html = `<div class="mt-3">
             <div class="search-bar mb-2">
-                <div class="search-wrapper">
-                    <i class="fas fa-search search-icon"></i>
-                    <input type="text" id="search-support" class="search-input" placeholder="${__('searchStaff')}" value="${searchTerm}">
-                </div>
+                <div class="search-wrapper"><i class="fas fa-search search-icon"></i><input type="text" id="search-support" class="search-input" placeholder="${__('searchStaff')}" value="${searchTerm}"></div>
             </div>`;
         
             if (staffList.length > 0) {
                 html += `<div class="table-wrapper"><table>
                     <thead>
                         <tr>
-                            <th style="width: 50px; text-align: center;">TT</th>
+                            <th style="width: 50px; text-align: center;">Tuần này</th>
+                            <th style="width: 50px; text-align: center;">Tuần sau</th>
                             <th>${__('name')}</th>
-                            <th class="hide-mobile">${__('email')}</th>
                             <th class="hide-mobile">${__('department')}</th>
                         </tr>
                     </thead>
@@ -1232,96 +1257,92 @@
         
                 const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
                 const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
-                
-                const currentDayIdx = today.getDay();
         
-                staffList.forEach(item => {
-                    const { key, profile, orderData, status } = item;
+                // Helper render icon
+                const renderIcon = (status, key, weekType) => {
+                    let iconClass = 'status-missing';
+                    let iconContent = '<i class="fas fa-times"></i>';
+                    if (status === 'morning') { iconClass = 'status-sun'; iconContent = '<i class="fas fa-sun"></i>'; }
+                    else if (status === 'evening') { iconClass = 'status-moon'; iconContent = '<i class="fas fa-moon"></i>'; }
                     
-                    let iconHtml = '';
-                    if (status === 'morning') iconHtml = `<div class="status-icon status-sun" title="Ca sáng"><i class="fas fa-sun"></i></div>`;
-                    else if (status === 'evening') iconHtml = `<div class="status-icon status-moon" title="Ca chiều"><i class="fas fa-moon"></i></div>`;
-                    else iconHtml = `<div class="status-icon status-missing" title="Chưa đặt"><i class="fas fa-times"></i></div>`;
+                    return `<div class="status-icon-btn ${iconClass}" data-key="${key}" data-weektype="${weekType}">${iconContent}</div>`;
+                };
         
-                    html += `
-                    <tr class="support-row" data-target="detail-${key}">
-                        <td style="text-align: center;">${iconHtml}</td>
-                        <td style="font-weight: 500;">${profile.name}</td>
-                        <td class="hide-mobile">${profile.email}</td>
-                        <td class="hide-mobile">${profile.depart || '-'}</td>
-                    </tr>`;
-        
-                    html += `<tr id="detail-${key}" class="detail-row hidden"><td colspan="4"><div class="detail-content">`;
-                    
+                // Helper render chi tiết menu (để ẩn trong row)
+                const renderDetailBlock = (key, weekType, orderData, menuData, isPastWeek) => {
                     const currentShift = orderData ? orderData.shift : 'morning';
-                    html += `<div class="form-group" style="max-width: 300px;">
-                        <label class="form-label" style="font-size:11px; text-transform:uppercase; color:var(--primary);">Ca làm việc</label>
-                        <div class="shift-toggle">
-                            <input type="radio" id="shift-m-${key}" name="shift-${key}" value="morning" ${currentShift !== 'evening' ? 'checked' : ''}>
-                            <label for="shift-m-${key}">${__('morning')}</label>
-                            <input type="radio" id="shift-e-${key}" name="shift-${key}" value="evening" ${currentShift === 'evening' ? 'checked' : ''}>
-                            <label for="shift-e-${key}">${__('evening')}</label>
-                        </div>
-                    </div>`;
+                    let content = `<div id="detail-${weekType}-${key}" class="week-detail-container hidden">`;
+                    content += `<div class="week-detail-title"><i class="fas fa-calendar-alt"></i> Chi tiết ${weekType === 'this' ? 'Tuần này' : 'Tuần sau'}</div>`;
+                    
+                    // Shift
+                    content += `<div class="form-group" style="max-width: 300px;"><label class="form-label" style="font-size:11px;color:var(--primary);">Ca làm việc</label><div class="shift-toggle">
+                        <input type="radio" id="shift-m-${weekType}-${key}" name="shift-${weekType}-${key}" value="morning" ${currentShift !== 'evening' ? 'checked' : ''}><label for="shift-m-${weekType}-${key}">${__('morning')}</label>
+                        <input type="radio" id="shift-e-${weekType}-${key}" name="shift-${weekType}-${key}" value="evening" ${currentShift === 'evening' ? 'checked' : ''}><label for="shift-e-${weekType}-${key}">${__('evening')}</label>
+                    </div></div>`;
         
-                    html += `<div style="margin-bottom: 1.5rem;">`;
+                    // Menu
+                    content += `<div style="margin-bottom: 1rem;">`;
                     dayKeys.forEach((dKey, idx) => {
-                        const isPast = (idx + 1) < currentDayIdx && currentDayIdx !== 0 && currentDayIdx !== 6;
+                        // Logic khóa ngày: 
+                        // Nếu là Tuần này (this): Check quá khứ.
+                        // Nếu là Tuần sau (next): Không bao giờ là quá khứ (trừ khi logic phức tạp hơn, tạm coi là mở hết).
+                        const isPast = (weekType === 'this') && ((idx + 1) < currentDayIdx && currentDayIdx !== 0 && currentDayIdx !== 6);
                         
                         const userDishRaw = orderData ? orderData[dKey] : '';
                         const { dish: currentDish } = parseDishValue(userDishRaw);
-                        const dishes = menu[dKey] || [];
+                        const dishes = menuData[dKey] || [];
         
-                        html += `<div class="day-block" style="border-bottom:1px dashed var(--border); padding-bottom:8px; margin-bottom:8px;">
-                            <span class="day-label ${isPast ? 'past' : ''}" style="display:flex; justify-content:space-between;">
-                                <span>${dayNames[dKey]}</span>
-                                ${isPast ? '<span style="font-weight:400; font-size:10px;">(Đã qua)</span>' : ''}
-                            </span>
+                        content += `<div class="day-block" style="border-bottom:1px dashed var(--border); padding-bottom:8px; margin-bottom:8px;">
+                            <span class="day-label ${isPast ? 'past' : ''}" style="display:flex; justify-content:space-between;"><span>${dayNames[dKey]}</span>${isPast ? '<span style="font-size:10px;">(Đã qua)</span>' : ''}</span>
                             <div class="mini-dish-list">`;
                         
                         if (dishes.length > 0) {
                             dishes.forEach(dish => {
                                 const isSelected = dish === currentDish;
                                 const disabledClass = isPast ? 'disabled' : '';
-                                html += `<div class="mini-dish-item ${isSelected ? 'selected' : ''} ${disabledClass}" 
-                                              data-dish="${dish}" 
-                                              data-day="${dKey}" 
-                                              ${isPast ? '' : 'onclick="selectAdminDish(this)"'}>
-                                            ${parseDish(dish)}
-                                         </div>`;
+                                content += `<div class="mini-dish-item ${isSelected ? 'selected' : ''} ${disabledClass}" data-dish="${dish}" data-day="${dKey}" ${isPast ? '' : 'onclick="selectAdminDish(this)"'}>${parseDish(dish)}</div>`;
                             });
-                        } else {
-                            html += `<span class="text-muted" style="font-size:12px;">${__('rest')}</span>`;
-                        }
-                        html += `</div></div>`;
+                        } else { content += `<span class="text-muted" style="font-size:12px;">${__('rest')}</span>`; }
+                        content += `</div></div>`;
                     });
-                    html += `</div>`;
+                    content += `</div>`;
         
-                    html += `<div style="display: flex; gap: 10px;">
-                        <button class="btn btn-primary admin-save-user-btn" data-key="${key}" style="flex: 2;"><i class="fas fa-save"></i> ${__('save')}</button>
-                        <button class="btn btn-secondary reopen-order-btn" data-key="${key}" data-name="${profile.name}" style="flex: 1; border: 1px solid var(--error); color: var(--error);"><i class="fas fa-redo"></i> Reopen</button>
+                    // Buttons
+                    const weekStringValue = weekType === 'this' ? thisWeekStr : nextWeekStr;
+                    content += `<div style="display: flex; gap: 10px;">
+                        <button class="btn btn-primary admin-save-user-btn" data-key="${key}" data-weekstr="${weekStringValue}" data-weektype="${weekType}" style="flex: 2;"><i class="fas fa-save"></i> Lưu ${weekType === 'this' ? 'Tuần này' : 'Tuần sau'}</button>
+                        <button class="btn btn-secondary reopen-order-btn" data-key="${key}" data-name="${allStaff[key].name}" style="flex: 1; border: 1px solid var(--error); color: var(--error);"><i class="fas fa-redo"></i> Reopen</button>
                     </div>`;
+                    content += `</div>`;
+                    return content;
+                };
         
-                    html += `</div></td></tr>`;
+                staffList.forEach(item => {
+                    const { key, profile, orderThis, statusThis, orderNext, statusNext, showNext } = item;
+        
+                    // Hàng chính
+                    html += `<tr class="support-row">
+                        <td style="text-align: center;">${renderIcon(statusThis, key, 'this')}</td>
+                        <td style="text-align: center;">${showNext ? renderIcon(statusNext, key, 'next') : '<span class="text-muted">-</span>'}</td>
+                        <td style="font-weight: 500;">${profile.name}</td>
+                        <td class="hide-mobile">${profile.depart || '-'}</td>
+                    </tr>`;
+        
+                    // Hàng chi tiết (chứa 2 block hidden cho tuần này và tuần sau)
+                    html += `<tr id="row-detail-${key}" class="detail-row hidden"><td colspan="4"><div class="detail-content">
+                        ${renderDetailBlock(key, 'this', orderThis, menuThisWeek, false)}
+                        ${showNext ? renderDetailBlock(key, 'next', orderNext, menuNextWeek, false) : ''}
+                    </div></td></tr>`;
                 });
         
                 html += `</tbody></table></div>`;
-            } else {
-                html += `<p class="text-center text-muted p-3">${__('notFound')}</p>`;
-            }
+            } else { html += `<p class="text-center text-muted p-3">${__('notFound')}</p>`; }
         
-            html += `<h3 style="color:var(--primary);margin:2rem 0 1rem;font-size:18px;">${__('orderForGuest')}</h3>
-                     <button id="add-guest-order-btn" class="btn btn-primary btn-block"><i class="fas fa-plus"></i> ${__('addGuest')}</button>
-                     </div>`;
-        
+            html += `<h3 style="color:var(--primary);margin:2rem 0 1rem;font-size:18px;">${__('orderForGuest')}</h3><button id="add-guest-order-btn" class="btn btn-primary btn-block"><i class="fas fa-plus"></i> ${__('addGuest')}</button></div>`;
+            
             el('admin-content').innerHTML = html;
-        
             const searchInput = el('search-support');
-            if(searchInput) {
-                searchInput.focus();
-                const val = searchInput.value; searchInput.value = ''; searchInput.value = val;
-                searchInput.addEventListener('input', (e) => renderAdminSupport(e.target.value));
-            }
+            if(searchInput) { searchInput.focus(); const val = searchInput.value; searchInput.value = ''; searchInput.value = val; searchInput.addEventListener('input', (e) => renderAdminSupport(e.target.value)); }
         }
         
         window.selectAdminDish = (elem) => {
@@ -1886,7 +1907,7 @@
         });
 
         document.body.addEventListener('click', async (e) => {
-        const target = e.target.closest('button, a, .profile-menu-item, .order-dish-item, .toggle-card-header, .toggle-option, .support-row');
+        const target = e.target.closest('button, a, .profile-menu-item, .order-dish-item, .toggle-card-header, .toggle-option, .support-row, .status-icon-btn');
             if (!target) return;
             const { id, classList, dataset } = target;
 
@@ -2102,6 +2123,91 @@
                         });
                     }
                 }
+            }
+            else if (classList.contains('status-icon-btn')) {
+                const key = dataset.key;
+                const weekType = dataset.weektype; // 'this' or 'next'
+                
+                const rowDetail = el(`row-detail-${key}`);
+                const detailBlock = el(`detail-${weekType}-${key}`);
+                const otherWeekType = weekType === 'this' ? 'next' : 'this';
+                const otherDetailBlock = el(`detail-${otherWeekType}-${key}`);
+
+                if (rowDetail && detailBlock) {
+                    // Nếu hàng đang đóng -> Mở hàng, mở block tuần này
+                    if (rowDetail.classList.contains('hidden')) {
+                        rowDetail.classList.remove('hidden');
+                        detailBlock.classList.remove('hidden');
+                        if(otherDetailBlock) otherDetailBlock.classList.add('hidden'); // Đảm bảo block kia đóng
+                    } 
+                    // Nếu hàng đang mở
+                    else {
+                        // Nếu đang hiện đúng block này -> Đóng lại tất cả
+                        if (!detailBlock.classList.contains('hidden')) {
+                            rowDetail.classList.add('hidden');
+                            detailBlock.classList.add('hidden');
+                        } 
+                        // Nếu đang hiện block kia -> Chuyển sang block này
+                        else {
+                            if(otherDetailBlock) otherDetailBlock.classList.add('hidden');
+                            detailBlock.classList.remove('hidden');
+                        }
+                    }
+                }
+            }
+
+            // 2. Admin Save User Order (Cập nhật logic lấy đúng tuần)
+            else if (classList.contains('admin-save-user-btn')) {
+                showLoader();
+                try {
+                    const userKey = dataset.key;
+                    const weekStr = dataset.weekstr; // Lấy từ data-weekstr
+                    const weekType = dataset.weektype; // 'this' or 'next'
+                    
+                    // Lấy Shift (Lưu ý ID radio đã đổi thêm weekType)
+                    const shiftInput = document.querySelector(`input[name="shift-${weekType}-${userKey}"]:checked`);
+                    const shift = shiftInput ? shiftInput.value : 'morning';
+
+                    const allStaff = await getDocument("staff_list", "staffs");
+                    const userProfile = allStaff[userKey];
+
+                    const payload = {
+                        [userKey]: {
+                            name: userProfile.name,
+                            email: userProfile.email,
+                            depart: userProfile.depart,
+                            shift: shift,
+                            order: 'ordered'
+                        }
+                    };
+
+                    // Lấy detail block tương ứng
+                    const detailBlock = el(`detail-${weekType}-${userKey}`);
+                    const selectedItems = detailBlock.querySelectorAll('.mini-dish-item.selected');
+                    
+                    const weekDoc = await getDocument('order_list', weekStr);
+                    const oldOrderData = weekDoc && weekDoc[userKey] ? weekDoc[userKey] : {};
+
+                    ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(d => {
+                        if (oldOrderData[d]) payload[userKey][d] = oldOrderData[d];
+                    });
+
+                    selectedItems.forEach(item => {
+                        const day = item.dataset.day;
+                        const dish = item.dataset.dish;
+                        const isNoOrder = dish.toLowerCase().includes('không đặt cơm') || dish.toLowerCase().includes('no order');
+                        const prefix = isNoOrder ? '[ignore] ' : 'not: ';
+                        payload[userKey][day] = `${prefix}${dish}`;
+                    });
+
+                    await setDoc(doc(db, 'order_list', weekStr), payload, { merge: true });
+                    showToast(`Đã cập nhật thực đơn (${weekType === 'this' ? 'Tuần này' : 'Tuần sau'})`);
+                    await renderAdminSupport();
+
+                } catch (err) {
+                    console.error(err);
+                    showToast('Lỗi khi lưu: ' + err.message, 'error');
+                } finally { hideLoader(); }
             }
             else if (dataset.action === 'eat-gift') {
                 showLoader();
