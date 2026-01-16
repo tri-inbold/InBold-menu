@@ -220,6 +220,15 @@
         .support-row:hover { background-color: transparent; }
         .support-row td { vertical-align: middle; padding: 12px 8px; }
 
+        .support-row td:nth-child(1),
+        .support-row td:nth-child(2),
+        thead th:nth-child(1),
+        thead th:nth-child(2) {
+            padding-left: 2px !important;
+            padding-right: 2px !important;
+            width: 40px !important;
+        }
+
         .week-detail-container {
             background: var(--card-bg);
             border: 1px solid var(--border);
@@ -1253,8 +1262,8 @@
                 html += `<div class="table-wrapper"><table>
                     <thead>
                         <tr>
-                            <th style="width: 50px; text-align: center;">Tuần này</th>
-                            <th style="width: 50px; text-align: center;">Tuần sau</th>
+                            <th style="text-align: center;">T.Này</th>
+                            <th style="text-align: center;">T.Sau</th>
                             <th>${__('name')}</th>
                             <th class="hide-mobile">${__('department')}</th>
                         </tr>
