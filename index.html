@@ -2027,61 +2027,6 @@
                     target.classList.toggle('expanded', !isHidden);
                 }
             }
-
-            else if (classList.contains('admin-save-user-btn')) {
-                showLoader();
-                try {
-                    const userKey = dataset.key;
-                    const weekStr = getWeekString(new Date());
-                    
-                    const shiftInput = document.querySelector(`input[name="shift-${userKey}"]:checked`);
-                    const shift = shiftInput ? shiftInput.value : 'morning';
-
-                    const allStaff = await getDocument("staff_list", "staffs");
-                    const userProfile = allStaff[userKey];
-
-                    const payload = {
-                        [userKey]: {
-                            name: userProfile.name,
-                            email: userProfile.email,
-                            depart: userProfile.depart,
-                            shift: shift,
-                            order: 'ordered'
-                        }
-                    };
-
-                    const detailRow = el(`detail-${userKey}`);
-                    const selectedItems = detailRow.querySelectorAll('.mini-dish-item.selected');
-                    
-                    const currentWeekDoc = await getDocument('order_list', weekStr);
-                    const oldOrderData = currentWeekDoc && currentWeekDoc[userKey] ? currentWeekDoc[userKey] : {};
-
-                    ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(d => {
-                        if (oldOrderData[d]) payload[userKey][d] = oldOrderData[d];
-                    });
-
-                    selectedItems.forEach(item => {
-                        const day = item.dataset.day;
-                        const dish = item.dataset.dish;
-                        
-                        const isNoOrder = dish.toLowerCase().includes('không đặt cơm') || dish.toLowerCase().includes('no order');
-                        const prefix = isNoOrder ? '[ignore] ' : 'not: ';
-                        
-                        payload[userKey][day] = `${prefix}${dish}`;
-                    });
-
-                    await setDoc(doc(db, 'order_list', weekStr), payload, { merge: true });
-                    
-                    showToast('Đã cập nhật thực đơn thành công');
-                    await renderAdminSupport();
-
-                } catch (err) {
-                    console.error(err);
-                    showToast('Lỗi khi lưu: ' + err.message, 'error');
-                } finally {
-                    hideLoader();
-                }
-            }
             else if (classList.contains('order-dish-item') && !classList.contains('guest-dish-item')) {
                 const { dayKey, dish } = dataset;
                 state.orderSelection[dayKey] = dish;
@@ -2210,14 +2155,16 @@
             }
 
             // 2. Admin Save User Order (Cập nhật logic lấy đúng tuần)
+            // --- BẮT ĐẦU ĐOẠN CẦN THAY THẾ ---
             else if (classList.contains('admin-save-user-btn')) {
                 showLoader();
                 try {
                     const userKey = dataset.key;
-                    const weekStr = dataset.weekstr; // Lấy weekString từ data attribute của nút
-                    const weekType = dataset.weektype; // Lấy 'this' hoặc 'next'
+                    // Lấy thông tin từ data attribute của nút (đã được cập nhật trong HTML)
+                    const weekStr = dataset.weekstr; 
+                    const weekType = dataset.weektype; 
                     
-                    // Lấy Shift (ID của radio input cũng đã thay đổi theo weekType)
+                    // Lấy Shift: Selector phải khớp với ID radio mới (có weekType)
                     const shiftInput = document.querySelector(`input[name="shift-${weekType}-${userKey}"]:checked`);
                     const shift = shiftInput ? shiftInput.value : 'morning';
 
@@ -2234,16 +2181,17 @@
                         }
                     };
 
-                    // QUAN TRỌNG: Lấy đúng ID của khung detail theo tuần
+                    // SỬA LỖI: Chọn đúng ID khung detail theo tuần (weekType)
                     const detailRow = el(`detail-${weekType}-${userKey}`);
                     
                     if (!detailRow) {
-                        throw new Error(`Không tìm thấy dữ liệu menu (ID: detail-${weekType}-${userKey})`);
+                         // Nếu không tìm thấy, thử tìm lại (fallback) hoặc báo lỗi
+                        throw new Error("Không tìm thấy khung chọn món. Vui lòng tải lại trang.");
                     }
 
                     const selectedItems = detailRow.querySelectorAll('.mini-dish-item.selected');
                     
-                    // Lấy dữ liệu cũ để merge (tránh mất dữ liệu các ngày đã qua)
+                    // Lấy dữ liệu cũ để merge
                     const currentWeekDoc = await getDocument('order_list', weekStr);
                     const oldOrderData = currentWeekDoc && currentWeekDoc[userKey] ? currentWeekDoc[userKey] : {};
 
@@ -2251,7 +2199,6 @@
                         if (oldOrderData[d]) payload[userKey][d] = oldOrderData[d];
                     });
 
-                    // Ghi đè các món mới chọn
                     selectedItems.forEach(item => {
                         const day = item.dataset.day;
                         const dish = item.dataset.dish;
@@ -2265,7 +2212,8 @@
                     await setDoc(doc(db, 'order_list', weekStr), payload, { merge: true });
                     
                     showToast(`Đã cập nhật thực đơn (${weekType === 'this' ? 'Tuần này' : 'Tuần sau'})`);
-                    await renderAdminSupport(); 
+                    // Reload lại đúng view admin
+                    await renderAdminSupport();
 
                 } catch (err) {
                     console.error(err);
@@ -2274,6 +2222,7 @@
                     hideLoader();
                 }
             }
+            // --- KẾT THÚC ĐOẠN CẦN THAY THẾ ---
             // 3. Xóa đơn hàng của User (Reset về chưa đặt)
             else if (classList.contains('btn-delete-order')) {
                 const userKey = dataset.key;
