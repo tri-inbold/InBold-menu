@@ -2516,27 +2516,6 @@
             } 
             else if (id === 'stats-today-btn') { state.statsViewDate = new Date(); el('stats-date-picker').value = state.statsViewDate.toISOString().split('T')[0]; await renderStatsContent(); } 
             else if (classList.contains('remove-menu-dish-btn')) { target.closest('div[style*="display:flex"]').remove(); } 
-            else if (id === 'save-menu-nextWeek') {
-                showLoader();
-                try {
-                    const weekStr = dataset.week;
-                    const weekKey = 'nextWeek';
-                    const weekDoc = await getDocument('order_list', weekStr) || {};
-                    const menuToSave = { ...(weekDoc.menu || {}) };
-                    for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
-                        const container = el(`menu-dishes-${weekKey}-${day}`);
-                        if (container) {
-                            const newDishes = Array.from(container.querySelectorAll('.menu-dish-textarea')).map(t => t.value.trim()).filter(Boolean);
-                            const existingDishes = menuToSave[day] || [];
-                            const finalDishes = [...existingDishes, ...newDishes];
-                            if (!finalDishes.some(d => d.includes('Không đặt cơm'))) finalDishes.push('Không đặt cơm | No order');
-                            menuToSave[day] = finalDishes;
-                        }
-                    }
-                    await setDoc(doc(db, 'order_list', weekStr), { menu: menuToSave }, { merge: true });
-                    showToast(__('menuSaved')); await renderAdminMenu();
-                } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); }
-            } 
             else if (id === 'export-stats-btn') {
                 try {
                     await loadXLSXLibrary();
