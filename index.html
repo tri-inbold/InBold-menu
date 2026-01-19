@@ -1563,11 +1563,11 @@
             let contentHTML = `<div class="mt-3">`;
 
             contentHTML += `
-            <div style="display:flex; gap:10px; margin-bottom:1.5rem; background:var(--card-bg); padding:4px; border-radius:8px; border:1px solid var(--border);">
-                <button class="btn ${state.adminMenuTab === 'this' ? 'btn-primary' : 'btn-secondary'}" style="flex:1; border:none;" onclick="switchAdminMenuTab('this')">
+            <div style="display:flex; gap:6px; margin-bottom:1.5rem; background:var(--card-bg); padding:4px; border-radius:8px; border:1px solid var(--border);">
+                <button class="btn" style="flex:1; border:none; box-shadow:none; transition:all 0.2s; background: ${state.adminMenuTab === 'this' ? 'var(--primary)' : 'transparent'}; color: ${state.adminMenuTab === 'this' ? 'white' : 'var(--text-muted)'}; font-weight:600;" onclick="switchAdminMenuTab('this')">
                     <i class="fas fa-calendar-week"></i> Tuần này (${thisWeek.split('_')[1]})
                 </button>
-                <button class="btn ${state.adminMenuTab === 'next' ? 'btn-primary' : 'btn-secondary'}" style="flex:1; border:none;" onclick="switchAdminMenuTab('next')">
+                <button class="btn" style="flex:1; border:none; box-shadow:none; transition:all 0.2s; background: ${state.adminMenuTab === 'next' ? 'var(--primary)' : 'transparent'}; color: ${state.adminMenuTab === 'next' ? 'white' : 'var(--text-muted)'}; font-weight:600;" onclick="switchAdminMenuTab('next')">
                     <i class="fas fa-calendar-plus"></i> Tuần sau (${nextWeek.split('_')[1]})
                 </button>
             </div>`;
@@ -1601,11 +1601,11 @@
             let html = `<div class="mt-3">`;
             
             html += `
-            <div style="display:flex; gap:10px; margin-bottom:1.5rem; background:var(--card-bg); padding:4px; border-radius:8px; border:1px solid var(--border);">
-                <button class="btn ${state.personnelViewMode === 'staff' ? 'btn-primary' : 'btn-secondary'}" style="flex:1; border:none;" onclick="switchPersonnelMode('staff')">
+            <div style="display:flex; gap:6px; margin-bottom:1.5rem; background:var(--card-bg); padding:4px; border-radius:8px; border:1px solid var(--border);">
+                <button class="btn" style="flex:1; border:none; box-shadow:none; transition:all 0.2s; background: ${state.personnelViewMode === 'staff' ? 'var(--primary)' : 'transparent'}; color: ${state.personnelViewMode === 'staff' ? 'white' : 'var(--text-muted)'}; font-weight:600;" onclick="switchPersonnelMode('staff')">
                     <i class="fas fa-users"></i> Nhân viên
                 </button>
-                <button class="btn ${state.personnelViewMode === 'dept' ? 'btn-primary' : 'btn-secondary'}" style="flex:1; border:none;" onclick="switchPersonnelMode('dept')">
+                <button class="btn" style="flex:1; border:none; box-shadow:none; transition:all 0.2s; background: ${state.personnelViewMode === 'dept' ? 'var(--primary)' : 'transparent'}; color: ${state.personnelViewMode === 'dept' ? 'white' : 'var(--text-muted)'}; font-weight:600;" onclick="switchPersonnelMode('dept')">
                     <i class="fas fa-building"></i> Phòng ban
                 </button>
             </div>`;
