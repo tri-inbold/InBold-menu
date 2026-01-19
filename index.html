@@ -1940,6 +1940,7 @@
                     const opt = document.createElement('option'); opt.value = dept; opt.textContent = dept; 
                     el('personnel-depart-select').appendChild(opt); 
                 });
+                el('personnel-modal').classList.remove('hidden');
             }
             else if (classList.contains('edit-personnel-btn')) {
                 const userKey = dataset.key;
@@ -1954,6 +1955,7 @@
                     opt.selected = dept === userData.depart;
                     el('personnel-depart-select').appendChild(opt); 
                 });
+                el('personnel-modal').classList.remove('hidden');
             }
             else if (classList.contains('delete-personnel-btn')) { state.deleteTarget = { key: dataset.key, name: dataset.name }; el('delete-personnel-text').textContent = `Xóa nhân viên "${dataset.name}"?`; el('delete-personnel-modal').classList.remove('hidden'); }
             else if (id === 'save-personnel-btn') {
