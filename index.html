@@ -159,6 +159,73 @@
         .order-dish-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: rgba(102, 126, 234, 0.05); border-radius: var(--radius-sm); border: 1px solid transparent; cursor: pointer; }
         .order-dish-item:hover, .order-dish-item.selected { border-color: var(--primary); background: rgba(102, 126, 234, 0.12); }
         .order-dish-name { flex: 1; font-size: 14px; font-weight: 500; }
+
+        .date-navigator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 8px;
+            border-radius: 12px;
+            max-width: 350px;
+            margin: 0 auto;
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .nav-arrow-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%; /* Tròn */
+            border: 1px solid transparent;
+            background: rgba(102, 126, 234, 0.1);
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .nav-arrow-btn:hover { background: var(--primary); color: white; }
+
+        .date-display-wrapper {
+            flex: 1;
+            text-align: center;
+            position: relative;
+            cursor: pointer;
+        }
+        
+        .date-display-text {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text);
+            display: block;
+            padding: 4px 0;
+            user-select: none;
+        }
+        
+        .hidden-date-input {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            opacity: 0; cursor: pointer; z-index: 2;
+        }
+
+        .today-link {
+            font-size: 13px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 10px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .today-link:hover { color: var(--primary); background: rgba(102, 126, 234, 0.1); }
         
         .staff-list { list-style: none; }
         .staff-item { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 1rem; background: rgb(25, 34, 49); border-radius: var(--radius-sm); margin-bottom: 4px; border: 1px solid transparent; }
@@ -1153,9 +1220,66 @@
                 case 'personnel': await renderAdminPersonnel(); break; 
             }
         }
+        function getStatsDateDisplayText(date, mode) {
+            const d = new Date(date);
+            const day = d.getDate();
+            const month = d.getMonth() + 1;
+            const year = d.getFullYear();
+            
+            if (mode === 'day') {
+                const dayNames = [__('sun'), __('mon'), __('tue'), __('wed'), __('thu'), __('fri'), __('sat')];
+                return `${dayNames[d.getDay()]}, ${day < 10 ? '0'+day : day}/${month < 10 ? '0'+month : month}/${year}`;
+            } 
+            else if (mode === 'week') {
+                const weekStr = getWeekString(d);
+                const start = new Date(d);
+                start.setDate(start.getDate() - (start.getDay() || 7) + 1);
+                const end = new Date(start);
+                end.setDate(end.getDate() + 6);
+                
+                return `Tuần ${weekStr.split('_')[1]} (${start.getDate()}/${start.getMonth()+1} - ${end.getDate()}/${end.getMonth()+1})`;
+            } 
+            else {
+                return `Tháng ${month}/${year}`;
+            }
+        }
         async function renderAdminStats() {
             const dateStr = state.statsViewDate.toISOString().split('T')[0];
-            el('admin-content').innerHTML = `<div class="mt-3"><div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;"><div class="shift-toggle" id="stats-mode-container"><input type="radio" id="stats-day" name="stats-mode" value="day" ${state.statsViewMode === 'day' ? 'checked' : ''}><label for="stats-day">${__('day')}</label><input type="radio" id="stats-week" name="stats-mode" value="week" ${state.statsViewMode === 'week' ? 'checked' : ''}><label for="stats-week">${__('week')}</label><input type="radio" id="stats-month" name="stats-mode" value="month" ${state.statsViewMode === 'month' ? 'checked' : ''}><label for="stats-month">${__('month')}</label></div><div style="display:flex;gap:8px;"><button id="stats-today-btn" class="icon-btn" title="${__('today')}"><i class="fas fa-calendar-day"></i></button><div style="position:relative;"><label for="stats-date-picker" class="icon-btn"><i class="fas fa-calendar-days"></i></label><input type="date" id="stats-date-picker" value="${dateStr}" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;"></div></div></div><div id="stats-content" class="mt-2"></div><button id="export-stats-btn" class="btn btn-primary btn-block mt-3"><i class="fas fa-file-excel"></i> ${__('downloadXLSX')}</button></div>`;
+            const displayText = getStatsDateDisplayText(state.statsViewDate, state.statsViewMode);
+            
+            el('admin-content').innerHTML = `
+            <div class="mt-3">
+                <div style="display:flex; gap:10px; margin-bottom:1.5rem; background:var(--card-bg); padding:4px; border-radius:8px; border:1px solid var(--border);">
+                    <button class="btn stats-mode-btn ${state.statsViewMode === 'day' ? 'btn-primary' : 'btn-secondary'}" data-mode="day" style="flex:1; border:none;">
+                        ${__('day')}
+                    </button>
+                    <button class="btn stats-mode-btn ${state.statsViewMode === 'week' ? 'btn-primary' : 'btn-secondary'}" data-mode="week" style="flex:1; border:none;">
+                        ${__('week')}
+                    </button>
+                    <button class="btn stats-mode-btn ${state.statsViewMode === 'month' ? 'btn-primary' : 'btn-secondary'}" data-mode="month" style="flex:1; border:none;">
+                        ${__('month')}
+                    </button>
+                </div>
+
+                <div class="date-navigator">
+                    <button id="prev-date-btn" class="nav-arrow-btn"><i class="fas fa-chevron-left"></i></button>
+                    
+                    <div class="date-display-wrapper">
+                        <span class="date-display-text">${displayText}</span>
+                        <input type="date" id="stats-date-picker" class="hidden-date-input" value="${dateStr}">
+                    </div>
+                    
+                    <button id="next-date-btn" class="nav-arrow-btn"><i class="fas fa-chevron-right"></i></button>
+                </div>
+                
+                <div class="text-center">
+                    <div id="stats-today-link" class="today-link"><i class="fas fa-calendar-day"></i> Hôm nay</div>
+                </div>
+
+                <div id="stats-content" class="mt-2"></div>
+                <button id="export-stats-btn" class="btn btn-primary btn-block mt-3"><i class="fas fa-file-excel"></i> ${__('downloadXLSX')}</button>
+            </div>`;
+            
             await renderStatsContent();
         }
         async function renderAdminSupport(searchTerm = '') {
@@ -1536,13 +1660,11 @@
 
                 html += `
                 <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px;">
-                     <!-- Nút Import (Cảnh báo) -->
                      <button onclick="document.getElementById('personnel-import-input').click()" class="btn btn-secondary btn-block" style="border: 1px dashed var(--warning); color: var(--warning);">
                         <i class="fas fa-file-upload"></i> Import Excel (Ghi đè)
                     </button>
                     <input type="file" id="personnel-import-input" class="hidden" accept=".xlsx, .xls, .csv">
 
-                    <!-- Nút Export (Highlight màu xanh lá) -->
                     <button id="export-personnel-btn" class="btn btn-block" style="background-color: var(--success); color: white; border: none;">
                         <i class="fas fa-file-export"></i> Xuất Excel (Backup)
                     </button>
@@ -1684,7 +1806,7 @@
 
         document.body.addEventListener('change', async (e) => {
             const { id, name, value, type, checked } = e.target;
-            if (id === 'stats-date-picker') { state.statsViewDate = new Date(value); await renderStatsContent(); }
+            if (id === 'stats-date-picker') { state.statsViewDate = new Date(value);  await renderAdminStats(); }
             else if (name === 'stats-mode') { state.statsViewMode = value; await renderStatsContent(); }
             else if (name === 'guest-week') { await renderGuestOrderDays(value); }
             else if (name === 'user-shift') { if (type === 'radio' && checked) state.userShiftSelection = value; }
@@ -2009,6 +2131,30 @@
                     const isHidden = detailRow.classList.toggle('hidden');
                     target.classList.toggle('expanded', !isHidden);
                 }
+            }
+            else if (classList.contains('stats-mode-btn')) {
+                state.statsViewMode = dataset.mode;
+                await renderAdminStats();
+            }
+            else if (id === 'prev-date-btn') {
+                const d = new Date(state.statsViewDate);
+                if (state.statsViewMode === 'day') d.setDate(d.getDate() - 1);
+                else if (state.statsViewMode === 'week') d.setDate(d.getDate() - 7);
+                else if (state.statsViewMode === 'month') d.setMonth(d.getMonth() - 1);
+                state.statsViewDate = d;
+                await renderAdminStats();
+            }
+            else if (id === 'next-date-btn') {
+                const d = new Date(state.statsViewDate);
+                if (state.statsViewMode === 'day') d.setDate(d.getDate() + 1);
+                else if (state.statsViewMode === 'week') d.setDate(d.getDate() + 7);
+                else if (state.statsViewMode === 'month') d.setMonth(d.getMonth() + 1);
+                state.statsViewDate = d;
+                await renderAdminStats();
+            }
+            else if (id === 'stats-today-link') {
+                state.statsViewDate = new Date();
+                await renderAdminStats();
             }
             else if (classList.contains('order-dish-item') && !classList.contains('guest-dish-item')) {
                 const { dayKey, dish } = dataset;
