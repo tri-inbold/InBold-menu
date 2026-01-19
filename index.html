@@ -1194,12 +1194,9 @@
             const thisWeekStr = getWeekString(today);
             const nextWeekStr = getWeekString(new Date(today.getTime() + 7 * 86400000));
         
-            // Logic hiển thị cột Tuần sau: 
-            // Hiện nếu là T5(4) > 15h, hoặc T6(5), T7(6), CN(0). 
-            // Hoặc nếu user ĐÃ có dữ liệu (check sau).
+            // Logic hiển thị cột Tuần sau
             const isNextWeekOpen = (currentDayIdx === 4 && currentHour >= 15) || currentDayIdx === 5 || currentDayIdx === 6 || currentDayIdx === 0;
         
-            // Lấy dữ liệu 3 nguồn: Staff, Order Tuần này, Order Tuần sau
             const [allStaff, thisWeekDoc, nextWeekDoc] = await Promise.all([
                 getDocument("staff_list", "staffs"), 
                 getDocument('order_list', thisWeekStr),
@@ -1224,13 +1221,13 @@
         
                     // Dữ liệu tuần sau
                     const orderNext = nextWeekDoc && nextWeekDoc[key] ? nextWeekDoc[key] : null;
-                    let statusNext = 'missing'; // Mặc định missing
-                    let showNext = isNextWeekOpen; // Mặc định ẩn/hiện theo thời gian
+                    let statusNext = 'missing'; 
+                    let showNext = isNextWeekOpen; 
         
                     if (orderNext && orderNext.order === 'ordered') {
                         const shift = (orderNext.shift || 'morning').toLowerCase();
                         statusNext = (shift.includes('evening') || shift === 'e') ? 'evening' : 'morning';
-                        showNext = true; // Có dữ liệu thì luôn hiện
+                        showNext = true; 
                     } else if (orderNext && orderNext.order === 'reopen') {
                         showNext = true;
                     }
@@ -1244,9 +1241,14 @@
                 staffList = staffList.filter(i => i.profile.name.toLowerCase().includes(lower) || i.profile.email.toLowerCase().includes(lower));
             }
         
+            // --- THAY ĐỔI Ở ĐÂY: Thêm nút add-guest-order-btn vào cạnh ô tìm kiếm ---
             let html = `<div class="mt-3">
             <div class="search-bar mb-2">
-                <div class="search-wrapper"><i class="fas fa-search search-icon"></i><input type="text" id="search-support" class="search-input" placeholder="${__('searchStaff')}" value="${searchTerm}"></div>
+                <div class="search-wrapper">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="search-support" class="search-input" placeholder="${__('searchStaff')}" value="${searchTerm}">
+                </div>
+                <button id="add-guest-order-btn" class="icon-btn" title="${__('addGuest')}"><i class="fas fa-user-plus"></i></button>
             </div>`;
         
             if (staffList.length > 0) {
@@ -1277,10 +1279,10 @@
                 // Helper render chi tiết menu
                 const renderDetailBlock = (key, weekType, orderData, menuData, isPastWeek) => {
                     const currentShift = orderData ? orderData.shift : 'morning';
-                    // Thêm wrapper để full width
+                    
                     let content = `<div id="detail-${weekType}-${key}" class="week-detail-container hidden" style="border:none; box-shadow:none; margin:0; border-radius:0;">`;
                     
-                    content += `<div class="detail-inner-wrapper">`; // Padding nằm ở đây
+                    content += `<div class="detail-inner-wrapper">`;
                     content += `<div class="week-detail-title"><i class="fas fa-calendar-alt"></i> Chi tiết ${weekType === 'this' ? 'Tuần này' : 'Tuần sau'}</div>`;
                     
                     // Shift
@@ -1324,7 +1326,7 @@
                         <button class="btn btn-primary admin-save-user-btn" data-key="${key}" data-weekstr="${weekStringValue}" data-weektype="${weekType}" style="width: 100%;"><i class="fas fa-save"></i> Lưu ${weekType === 'this' ? 'Tuần này' : 'Tuần sau'}</button>
                     </div>`;
                     
-                    content += `</div></div>`; // Đóng inner-wrapper và container
+                    content += `</div></div>`; 
                     return content;
                 };
         
@@ -1339,7 +1341,7 @@
                         <td class="hide-mobile">${profile.depart || '-'}</td>
                     </tr>`;
         
-                    // Hàng chi tiết (chứa 2 block hidden cho tuần này và tuần sau)
+                    // Hàng chi tiết
                     html += `<tr id="row-detail-${key}" class="detail-row hidden"><td colspan="4"><div class="detail-content">
                         ${renderDetailBlock(key, 'this', orderThis, menuThisWeek, false)}
                         ${showNext ? renderDetailBlock(key, 'next', orderNext, menuNextWeek, false) : ''}
@@ -1349,11 +1351,18 @@
                 html += `</tbody></table></div>`;
             } else { html += `<p class="text-center text-muted p-3">${__('notFound')}</p>`; }
         
-            html += `<h3 style="color:var(--primary);margin:2rem 0 1rem;font-size:18px;">${__('orderForGuest')}</h3><button id="add-guest-order-btn" class="btn btn-primary btn-block"><i class="fas fa-plus"></i> ${__('addGuest')}</button></div>`;
+            // --- Đã xóa nút add guest cũ ở đây ---
+            html += `</div>`;
             
             el('admin-content').innerHTML = html;
             const searchInput = el('search-support');
-            if(searchInput) { searchInput.focus(); const val = searchInput.value; searchInput.value = ''; searchInput.value = val; searchInput.addEventListener('input', (e) => renderAdminSupport(e.target.value)); }
+            if(searchInput) { 
+                searchInput.focus(); 
+                const val = searchInput.value; 
+                searchInput.value = ''; 
+                searchInput.value = val; 
+                searchInput.addEventListener('input', (e) => renderAdminSupport(e.target.value)); 
+            }
         }
         
         window.selectAdminDish = (elem) => {
