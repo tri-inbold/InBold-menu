@@ -2575,7 +2575,6 @@
                     hideLoader(); 
                 }
             }
-        
             else if (target.closest('.toggle-card-header')) {
                 const header = target.closest('.toggle-card-header');
                 const targetId = header.dataset.target;
@@ -2583,7 +2582,7 @@
                 const icon = header.querySelector('.toggle-icon');
                 
                 if (listEl) {
-                    listEl.classList.toggle('hidden');
+                    const isHidden = listEl.classList.toggle('hidden');
                     if (icon) icon.classList.toggle('rotate');
                     header.classList.toggle('collapsed', isHidden);
                 }
