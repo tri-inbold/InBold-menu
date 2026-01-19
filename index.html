@@ -2115,26 +2115,24 @@
             else if (classList.contains('stats-mode-btn')) {
                 state.statsViewMode = dataset.mode;
                 await renderAdminStats();
+            }       
+            if (!e.target.closest('#stats-options-btn') && !e.target.closest('.stats-dropdown')) {
+                const dropdown = el('stats-dropdown');
+                if (dropdown && dropdown.classList.contains('show')) {
+                    dropdown.classList.remove('show');
+                }
             }
             else if (target.closest('#stats-options-btn')) {
                 const dropdown = el('stats-dropdown');
                 if (dropdown) dropdown.classList.toggle('show');
             }
-            
             else if (dataset.action === 'set-mode') {
                 state.statsViewMode = dataset.mode;
                 await renderAdminStats();
             }
-            
             else if (target.closest('#stats-today-btn')) {
                 state.statsViewDate = new Date();
                 await renderAdminStats();
-            }
-            if (!target.closest('#stats-options-btn') && !target.closest('.stats-dropdown')) {
-                const dropdown = el('stats-dropdown');
-                if (dropdown && dropdown.classList.contains('show')) {
-                    dropdown.classList.remove('show');
-                }
             }
             else if (id === 'prev-date-btn') {
                 const d = new Date(state.statsViewDate);
