@@ -2253,9 +2253,58 @@
                 } catch (err) { console.error(err); showToast('Lỗi khi lưu: ' + err.message, 'error'); } finally { hideLoader(); }
             }
             else if (classList.contains('btn-delete-order')) {
-                const userKey = dataset.key; const weekStr = dataset.weekstr; const weekType = dataset.weektype;
-                if (!confirm(`Bạn có chắc muốn hủy toàn bộ lựa chọn món ăn của user này trong ${weekType === 'this' ? 'Tuần này' : 'Tuần sau'}?`)) return;
-                showLoader(); try { await updateDoc(doc(db, 'order_list', weekStr), { [userKey]: deleteField() }); showToast('Đã hủy món đã hàng.'); await renderAdminSupport(); } catch (err) { console.error(err); showToast('Lỗi khi hủy: ' + err.message, 'error'); } finally { hideLoader(); }
+                const userKey = dataset.key;
+                const weekStr = dataset.weekstr;
+                const weekType = dataset.weektype;
+
+                if (!confirm(`Bạn có chắc muốn hủy các món CHƯA ĂN của người này trong ${weekType === 'this' ? 'Tuần này' : 'Tuần sau'}?`)) return;
+
+                showLoader();
+                try {
+                    const weekDoc = await getDocument('order_list', weekStr);
+                    const userData = weekDoc ? weekDoc[userKey] : null;
+
+                    if (!userData) {
+                        showToast('Không tìm thấy dữ liệu người dùng.', 'error');
+                        hideLoader();
+                        return;
+                    }
+
+                    const updates = {};
+                    let hasEatenData = false;
+                    const days = ['mon', 'tue', 'wed', 'thu', 'fri'];
+
+                    days.forEach(day => {
+                        const dishValue = userData[day];
+                        if (dishValue && dishValue.includes('eaten:')) {
+                            hasEatenData = true;
+                        } 
+                        else {
+                            updates[`${userKey}.${day}`] = deleteField();
+                        }
+                    });
+
+                    if (!hasEatenData) {
+                        await updateDoc(doc(db, 'order_list', weekStr), {
+                            [userKey]: deleteField()
+                        });
+                        showToast('Đã xóa toàn bộ đơn đặt hàng.');
+                    } else {
+
+                        updates[`${userKey}.order`] = 'cancelled'; 
+                        if (Object.keys(updates).length > 0) {
+                            await updateDoc(doc(db, 'order_list', weekStr), updates);
+                        }
+                        showToast('Đã hủy các món chưa ăn. Giữ lại lịch sử món đã ăn.');
+                    }
+
+                    await renderAdminSupport();
+                } catch (err) {
+                    console.error(err);
+                    showToast('Lỗi khi hủy: ' + err.message, 'error');
+                } finally {
+                    hideLoader();
+                }
             }
             else if (dataset.action === 'eat-gift') {
                 showLoader(); try { const weekString = getWeekString(new Date()); const { giverKey, day, dish } = dataset; await updateDoc(doc(db, 'order_list', weekString), { [`${giverKey}.${day}`]: `eaten: ${dish}` }); showToast('Đã xác nhận ăn món được nhường!'); await render(); } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); }
