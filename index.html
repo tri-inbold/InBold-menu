@@ -2001,22 +2001,36 @@
         });
 
         document.body.addEventListener('click', async (e) => {
-        const target = e.target.closest('button, a, .profile-menu-item, .order-dish-item, .toggle-card-header, .toggle-option, .support-row, .status-icon-btn, .dropdown-item');
+            // 1. Xử lý đóng Dropdown (Đặt đầu tiên để luôn chạy khi click bất kỳ đâu)
+            // Logic: Nếu click KHÔNG trúng nút Option VÀ KHÔNG trúng Menu Dropdown thì đóng menu
+            if (!e.target.closest('#stats-options-btn') && !e.target.closest('.stats-dropdown')) {
+                const dropdown = el('stats-dropdown');
+                if (dropdown && dropdown.classList.contains('show')) {
+                    dropdown.classList.remove('show');
+                }
+            }
+
+            // 2. Xác định mục tiêu click hợp lệ
+            const target = e.target.closest('button, a, .profile-menu-item, .order-dish-item, .toggle-card-header, .toggle-option, .support-row, .status-icon-btn, .dropdown-item');
             if (!target) return;
+
             const { id, classList, dataset } = target;
+
+            // --- BẮT ĐẦU CHUỖI XỬ LÝ SỰ KIỆN ---
 
             if (classList.contains('nav-item')) {
                 if (dataset.tab === state.currentTab) return;
                 document.querySelector('.nav-item.active').classList.remove('active'); target.classList.add('active');
                 state.currentTab = dataset.tab; await render(); return;
             }
-            if (dataset.subtab) { state.adminSubTab = dataset.subtab; await renderAdmin(); return; }
+            else if (dataset.subtab) { state.adminSubTab = dataset.subtab; await renderAdmin(); return; }
 
-            if (id === 'login-btn') { showLoader(); try { await signInWithPopup(auth, provider); } catch { showToast(__('error'), 'error'); } finally { hideLoader(); } }
+            else if (id === 'login-btn') { showLoader(); try { await signInWithPopup(auth, provider); } catch { showToast(__('error'), 'error'); } finally { hideLoader(); } }
             else if (id === 'logout-menu-item') { if (confirm(__('logoutConfirm'))) { await signOut(auth); showToast(__('loggedOut')); } }
+            
+            // --- CÁC NÚT QUẢN LÝ NHÂN SỰ ---
             else if (id === 'add-personnel-btn') {
                 el('personnel-modal-title').textContent = 'Thêm nhân viên'; el('personnel-original-email-key').value = ''; el('personnel-name-input').value = ''; el('personnel-email-input').value = ''; el('personnel-depart-select').innerHTML = '';
-                const allStaff = await getDocument("staff_list", "staffs");
                 const departments = await getDepartmentsList();
                 el('personnel-depart-select').innerHTML = '';
                 departments.forEach(dept => {
@@ -2058,6 +2072,8 @@
             else if (id === 'confirm-delete-personnel-btn') {
                 showLoader(); try { await updateDoc(doc(db, "staff_list", "staffs"), { [state.deleteTarget.key]: deleteField() }); showToast('Đã xóa'); el('delete-personnel-modal').classList.add('hidden'); await renderAdminPersonnel(); } catch { showToast(__('error'), 'error'); } finally { hideLoader(); }
             }
+            
+            // --- CÁC NÚT SETTING GIAO DIỆN ---
             else if (classList.contains('lang-toggle-btn')) {
                 if (dataset.lang === state.staffProfile.lan) return;
                 showLoader(); 
@@ -2071,7 +2087,6 @@
             else if (classList.contains('theme-toggle-btn')) {
                 const newTheme = dataset.theme;
                 if (newTheme === state.staffProfile.theme) return;
-                
                 showLoader();
                 try {
                     document.documentElement.setAttribute('data-theme', newTheme);
@@ -2079,24 +2094,21 @@
                     state.staffProfile.theme = newTheme; 
                     await render(); 
                     showToast('Đã đổi giao diện'); 
-                } catch (err) { 
-                    console.error(err);
-                    showToast(__('error'), 'error'); 
-                    document.documentElement.setAttribute('data-theme', state.staffProfile.theme || 'dark');
-                } finally { 
-                    hideLoader(); 
-                }
+                } catch (err) { console.error(err); showToast(__('error'), 'error'); document.documentElement.setAttribute('data-theme', state.staffProfile.theme || 'dark'); } finally { hideLoader(); }
             }
-            else if (classList.contains('toggle-card-header')) {
-                const targetId = dataset.target;
+            
+            // --- CÁC NÚT TOGGLE ---
+            else if (target.closest('.toggle-card-header')) {
+                const header = target.closest('.toggle-card-header');
+                const targetId = header.dataset.target;
                 const listEl = el(targetId);
-                const icon = target.querySelector('.toggle-icon');
-                
+                const icon = header.querySelector('.toggle-icon');
                 if (listEl) {
-                    listEl.classList.toggle('hidden');
+                    const isHidden = listEl.classList.toggle('hidden');
                     if (icon) icon.classList.toggle('rotate');
+                    header.classList.toggle('collapsed', isHidden);
                 }
-            }
+            } 
             else if (classList.contains('order-day-tab-btn')) {
                 state.currentOrderDay = dataset.dayKey;
                 const userEmailKey = emailToKey(state.currentUser.email);
@@ -2112,28 +2124,25 @@
                     target.classList.toggle('expanded', !isHidden);
                 }
             }
-            else if (classList.contains('stats-mode-btn')) {
-                state.statsViewMode = dataset.mode;
-                await renderAdminStats();
-            }       
-            if (!e.target.closest('#stats-options-btn') && !e.target.closest('.stats-dropdown')) {
-                const dropdown = el('stats-dropdown');
-                if (dropdown && dropdown.classList.contains('show')) {
-                    dropdown.classList.remove('show');
-                }
-            }
+
+            // --- XỬ LÝ SỰ KIỆN CHO THỐNG KÊ (Đã sửa lỗi gãy chuỗi if/else) ---
+            
+            // 1. Mở Dropdown Stats
             else if (target.closest('#stats-options-btn')) {
                 const dropdown = el('stats-dropdown');
                 if (dropdown) dropdown.classList.toggle('show');
             }
+            // 2. Chọn chế độ từ Dropdown
             else if (dataset.action === 'set-mode') {
                 state.statsViewMode = dataset.mode;
                 await renderAdminStats();
             }
+            // 3. Chọn Hôm nay từ Dropdown
             else if (target.closest('#stats-today-btn')) {
                 state.statsViewDate = new Date();
                 await renderAdminStats();
             }
+            // 4. Nút lùi ngày
             else if (id === 'prev-date-btn') {
                 const d = new Date(state.statsViewDate);
                 if (state.statsViewMode === 'day') d.setDate(d.getDate() - 1);
@@ -2142,6 +2151,7 @@
                 state.statsViewDate = d;
                 await renderAdminStats();
             }
+            // 5. Nút tiến ngày
             else if (id === 'next-date-btn') {
                 const d = new Date(state.statsViewDate);
                 if (state.statsViewMode === 'day') d.setDate(d.getDate() + 1);
@@ -2150,10 +2160,8 @@
                 state.statsViewDate = d;
                 await renderAdminStats();
             }
-            else if (id === 'stats-today-link') {
-                state.statsViewDate = new Date();
-                await renderAdminStats();
-            }
+
+            // --- CÁC NÚT CHỨC NĂNG KHÁC ---
             else if (classList.contains('order-dish-item') && !classList.contains('guest-dish-item')) {
                 const { dayKey, dish } = dataset;
                 state.orderSelection[dayKey] = dish;
@@ -2169,577 +2177,191 @@
                 try {
                     const today = new Date();
                     const isReopen = id === 'submit-reopen-order-btn';
-            
                     let targetWeek;
-                    if (isReopen) {
-                        targetWeek = getWeekString(today);
-                    } else {
-                        const dayOfWeek = today.getDay();
-                        const hour = today.getHours();
-            
-                        const canOrderNextWeek =
-                            (dayOfWeek === 4 && hour >= 15) ||
-                            dayOfWeek === 5 ||
-                            dayOfWeek === 6 ||
-                            dayOfWeek === 0;
-            
-                        targetWeek = canOrderNextWeek
-                            ? getWeekString(new Date(today.getTime() + 7 * 86400000))
-                            : getWeekString(today);
+                    if (isReopen) { targetWeek = getWeekString(today); } 
+                    else {
+                        const dayOfWeek = today.getDay(); const hour = today.getHours();
+                        const canOrderNextWeek = (dayOfWeek === 4 && hour >= 15) || dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0;
+                        targetWeek = canOrderNextWeek ? getWeekString(new Date(today.getTime() + 7 * 86400000)) : getWeekString(today);
                     }
-            
                     const userKey = emailToKey(state.currentUser.email);
-            
-                    const payload = {
-                        [userKey]: {
-                            name: state.staffProfile.name,
-                            email: state.currentUser.email,
-                            depart: state.staffProfile.depart,
-                            shift: state.userShiftSelection,
-                            order: 'ordered'
-                        }
-                    };
-            
+                    const payload = { [userKey]: { name: state.staffProfile.name, email: state.currentUser.email, depart: state.staffProfile.depart, shift: state.userShiftSelection, order: 'ordered' } };
                     for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
                         if (state.orderSelection[day]) {
                             const dishName = state.orderSelection[day];
-                            const isNoOrder =
-                                dishName.toLowerCase().includes('không đặt cơm') ||
-                                dishName.toLowerCase().includes('no order');
-            
+                            const isNoOrder = dishName.toLowerCase().includes('không đặt cơm') || dishName.toLowerCase().includes('no order');
                             const prefix = isNoOrder ? '[ignore] ' : 'not: ';
                             payload[userKey][day] = `${prefix}${dishName}`;
                         }
                     }
-            
-                    await setDoc(
-                        doc(db, 'order_list', targetWeek),
-                        payload,
-                        { merge: true }
-                    );
-            
-                    showToast(__('orderSuccess'));
-                    state.orderSelection = {};
-                    state.currentOrderDay = 'mon';
-                    await render();
-                    await checkOrderNotification();
-            
-                } catch (e) {
-                    console.error(e);
-                    showToast(__('orderFailed'), 'error');
-                } finally {
-                    hideLoader();
-                }
+                    await setDoc(doc(db, 'order_list', targetWeek), payload, { merge: true });
+                    showToast(__('orderSuccess')); state.orderSelection = {}; state.currentOrderDay = 'mon'; await render(); await checkOrderNotification();
+                } catch (e) { console.error(e); showToast(__('orderFailed'), 'error'); } finally { hideLoader(); }
             }
-
             else if (dataset.action === 'skip-modal') {
                 state.skipTarget = { day: dataset.day, dish: dataset.dish };
                 el('skip-option-modal').classList.remove('hidden');
-                
                 const datalist = el('staff-suggestions');
                 if (datalist.children.length === 0) {
                     const allStaff = await getDocument("staff_list", "staffs");
                     if (allStaff) {
                         const names = Object.values(allStaff).map(s => s.name).filter(n => n !== state.staffProfile.name).sort();
-                        names.forEach(name => {
-                            const opt = document.createElement('option');
-                            opt.value = name;
-                            datalist.appendChild(opt);
-                        });
+                        names.forEach(name => { const opt = document.createElement('option'); opt.value = name; datalist.appendChild(opt); });
                     }
                 }
             }
             else if (classList.contains('status-icon-btn')) {
                 const key = dataset.key;
                 const weekType = dataset.weektype;
-                
                 const rowDetail = el(`row-detail-${key}`);
                 const detailBlock = el(`detail-${weekType}-${key}`);
-                
                 const otherWeekType = weekType === 'this' ? 'next' : 'this';
                 const otherDetailBlock = el(`detail-${otherWeekType}-${key}`);
-
                 if (rowDetail && detailBlock) {
                     if (rowDetail.classList.contains('hidden')) {
-                        rowDetail.classList.remove('hidden');
-                        detailBlock.classList.remove('hidden');
+                        rowDetail.classList.remove('hidden'); detailBlock.classList.remove('hidden');
                         if(otherDetailBlock) otherDetailBlock.classList.add('hidden');
-                    } 
-                    else {
-                        if (!detailBlock.classList.contains('hidden')) {
-                            rowDetail.classList.add('hidden');
-                            detailBlock.classList.add('hidden');
-                        } 
-                        else {
-                            if(otherDetailBlock) otherDetailBlock.classList.add('hidden');
-                            detailBlock.classList.remove('hidden');
-                        }
+                    } else {
+                        if (!detailBlock.classList.contains('hidden')) { rowDetail.classList.add('hidden'); detailBlock.classList.add('hidden'); } 
+                        else { if(otherDetailBlock) otherDetailBlock.classList.add('hidden'); detailBlock.classList.remove('hidden'); }
                     }
                 }
             }
-
             else if (classList.contains('admin-save-user-btn')) {
                 showLoader();
                 try {
-                    const userKey = dataset.key;
-                    const weekStr = dataset.weekstr; 
-                    const weekType = dataset.weektype; 
-                    
+                    const userKey = dataset.key; const weekStr = dataset.weekstr; const weekType = dataset.weektype; 
                     const shiftInput = document.querySelector(`input[name="shift-${weekType}-${userKey}"]:checked`);
                     const shift = shiftInput ? shiftInput.value : 'morning';
-
                     const allStaff = await getDocument("staff_list", "staffs");
                     const userProfile = allStaff[userKey];
-
-                    const payload = {
-                        [userKey]: {
-                            name: userProfile.name,
-                            email: userProfile.email,
-                            depart: userProfile.depart,
-                            shift: shift,
-                            order: 'ordered'
-                        }
-                    };
-
+                    const payload = { [userKey]: { name: userProfile.name, email: userProfile.email, depart: userProfile.depart, shift: shift, order: 'ordered' } };
                     const detailRow = el(`detail-${weekType}-${userKey}`);
-                    
-                    if (!detailRow) {
-                        throw new Error("Không tìm thấy khung chọn món. Vui lòng tải lại trang.");
-                    }
-
+                    if (!detailRow) throw new Error("Không tìm thấy khung chọn món. Vui lòng tải lại trang.");
                     const selectedItems = detailRow.querySelectorAll('.mini-dish-item.selected');
-                    
                     const currentWeekDoc = await getDocument('order_list', weekStr);
                     const oldOrderData = currentWeekDoc && currentWeekDoc[userKey] ? currentWeekDoc[userKey] : {};
-
-                    ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(d => {
-                        if (oldOrderData[d]) payload[userKey][d] = oldOrderData[d];
-                    });
-
+                    ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(d => { if (oldOrderData[d]) payload[userKey][d] = oldOrderData[d]; });
                     selectedItems.forEach(item => {
-                        const day = item.dataset.day;
-                        const dish = item.dataset.dish;
-                        
+                        const day = item.dataset.day; const dish = item.dataset.dish;
                         const isNoOrder = dish.toLowerCase().includes('không đặt cơm') || dish.toLowerCase().includes('no order');
                         const prefix = isNoOrder ? '[ignore] ' : 'not: ';
-                        
                         payload[userKey][day] = `${prefix}${dish}`;
                     });
-
                     await setDoc(doc(db, 'order_list', weekStr), payload, { merge: true });
-                    
-                    showToast(`Đã cập nhật thực đơn (${weekType === 'this' ? 'Tuần này' : 'Tuần sau'})`);
-                    await renderAdminSupport();
-
-                } catch (err) {
-                    console.error(err);
-                    showToast('Lỗi khi lưu: ' + err.message, 'error');
-                } finally {
-                    hideLoader();
-                }
+                    showToast(`Đã cập nhật thực đơn (${weekType === 'this' ? 'Tuần này' : 'Tuần sau'})`); await renderAdminSupport();
+                } catch (err) { console.error(err); showToast('Lỗi khi lưu: ' + err.message, 'error'); } finally { hideLoader(); }
             }
             else if (classList.contains('btn-delete-order')) {
-                const userKey = dataset.key;
-                const weekStr = dataset.weekstr;
-                const weekType = dataset.weektype;
-
+                const userKey = dataset.key; const weekStr = dataset.weekstr; const weekType = dataset.weektype;
                 if (!confirm(`Bạn có chắc muốn hủy toàn bộ lựa chọn món ăn của user này trong ${weekType === 'this' ? 'Tuần này' : 'Tuần sau'}?`)) return;
-
-                showLoader();
-                try {
-                    await updateDoc(doc(db, 'order_list', weekStr), {
-                        [userKey]: deleteField()
-                    });
-                    
-                    showToast('Đã hủy món đã hàng.');
-                    await renderAdminSupport();
-                } catch (err) {
-                    console.error(err);
-                    showToast('Lỗi khi hủy: ' + err.message, 'error');
-                } finally {
-                    hideLoader();
-                }
+                showLoader(); try { await updateDoc(doc(db, 'order_list', weekStr), { [userKey]: deleteField() }); showToast('Đã hủy món đã hàng.'); await renderAdminSupport(); } catch (err) { console.error(err); showToast('Lỗi khi hủy: ' + err.message, 'error'); } finally { hideLoader(); }
             }
             else if (dataset.action === 'eat-gift') {
-                showLoader();
-                try {
-                    const weekString = getWeekString(new Date());
-                    const { giverKey, day, dish } = dataset;
-                    
-
-                    await updateDoc(doc(db, 'order_list', weekString), { [`${giverKey}.${day}`]: `eaten: ${dish}` });
-                    
-                    showToast('Đã xác nhận ăn món được nhường!'); 
-                    await render();
-                } catch (err) { 
-                    console.error(err); 
-                    showToast(__('error'), 'error'); 
-                } finally { 
-                    hideLoader(); 
-                }
+                showLoader(); try { const weekString = getWeekString(new Date()); const { giverKey, day, dish } = dataset; await updateDoc(doc(db, 'order_list', weekString), { [`${giverKey}.${day}`]: `eaten: ${dish}` }); showToast('Đã xác nhận ăn món được nhường!'); await render(); } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); }
             }
-
             else if (id === 'add-department-btn') {
-                el('department-modal-title').textContent = 'Thêm phòng ban';
-                el('department-original-name').value = '';
-                el('department-name-input').value = '';
-                el('department-modal').classList.remove('hidden');
-                el('department-name-input').focus();
+                el('department-modal-title').textContent = 'Thêm phòng ban'; el('department-original-name').value = ''; el('department-name-input').value = ''; el('department-modal').classList.remove('hidden'); el('department-name-input').focus();
             }
-            
             else if (classList.contains('edit-department-btn')) {
-                const name = dataset.name;
-                el('department-modal-title').textContent = 'Đổi tên & Đồng bộ';
-                el('department-original-name').value = name;
-                el('department-name-input').value = name;
-                el('department-modal').classList.remove('hidden');
-                el('department-name-input').focus();
+                const name = dataset.name; el('department-modal-title').textContent = 'Đổi tên & Đồng bộ'; el('department-original-name').value = name; el('department-name-input').value = name; el('department-modal').classList.remove('hidden'); el('department-name-input').focus();
             }
-        
             else if (id === 'save-department-btn') {
                 showLoader();
                 try {
-                    const newName = el('department-name-input').value.trim();
-                    const oldName = el('department-original-name').value;
-                    
+                    const newName = el('department-name-input').value.trim(); const oldName = el('department-original-name').value;
                     if (!newName) { showToast('Vui lòng nhập tên', 'error'); hideLoader(); return; }
-        
-                    const deptDocRef = doc(db, "admin_list", "departments");
-                    const departments = await getDepartmentsList();
-        
-                    if (departments.includes(newName) && newName !== oldName) {
-                        showToast('Tên phòng ban đã tồn tại', 'error'); hideLoader(); return;
-                    }
-        
+                    const deptDocRef = doc(db, "admin_list", "departments"); const departments = await getDepartmentsList();
+                    if (departments.includes(newName) && newName !== oldName) { showToast('Tên phòng ban đã tồn tại', 'error'); hideLoader(); return; }
                     if (oldName) {
                         const index = departments.indexOf(oldName);
                         if (index > -1) {
-                            departments[index] = newName;
-                            departments.sort();
-                            
-                            await updateDoc(deptDocRef, { list: departments });
-        
-                            const allStaff = await getDocument("staff_list", "staffs");
-                            const staffUpdates = {};
-                            let affectedUserKeys = []; 
-        
-                            Object.entries(allStaff).forEach(([key, user]) => {
-                                if (user.depart === oldName) {
-                                    staffUpdates[`${key}.depart`] = newName;
-                                    affectedUserKeys.push(key);
-                                }
-                            });
-        
-                            if (affectedUserKeys.length > 0) {
-                                await updateDoc(doc(db, "staff_list", "staffs"), staffUpdates);
-                            }
-        
+                            departments[index] = newName; departments.sort(); await updateDoc(deptDocRef, { list: departments });
+                            const allStaff = await getDocument("staff_list", "staffs"); const staffUpdates = {}; let affectedUserKeys = []; 
+                            Object.entries(allStaff).forEach(([key, user]) => { if (user.depart === oldName) { staffUpdates[`${key}.depart`] = newName; affectedUserKeys.push(key); } });
+                            if (affectedUserKeys.length > 0) { await updateDoc(doc(db, "staff_list", "staffs"), staffUpdates); }
                             if (affectedUserKeys.length > 0) {
                                 const targetWeeks = getWeeksInMonth(new Date());
-                                
                                 await Promise.all(targetWeeks.map(async (weekStr) => {
-                                    const weekDocRef = doc(db, "order_list", weekStr);
-                                    const weekDoc = await getDocument("order_list", weekStr);
-                                    
+                                    const weekDocRef = doc(db, "order_list", weekStr); const weekDoc = await getDocument("order_list", weekStr);
                                     if (weekDoc) {
-                                        const orderUpdates = {};
-                                        let hasUpdate = false;
-                                        
-                                        Object.keys(weekDoc).forEach(userKey => {
-                                            if (weekDoc[userKey] && typeof weekDoc[userKey] === 'object') {
-                                                if (weekDoc[userKey].depart === oldName) {
-                                                    orderUpdates[`${userKey}.depart`] = newName;
-                                                    hasUpdate = true;
-                                                }
-                                            }
-                                        });
-        
-                                        if (hasUpdate) {
-                                            await updateDoc(weekDocRef, orderUpdates);
-                                        }
+                                        const orderUpdates = {}; let hasUpdate = false;
+                                        Object.keys(weekDoc).forEach(userKey => { if (weekDoc[userKey] && typeof weekDoc[userKey] === 'object') { if (weekDoc[userKey].depart === oldName) { orderUpdates[`${userKey}.depart`] = newName; hasUpdate = true; } } });
+                                        if (hasUpdate) { await updateDoc(weekDocRef, orderUpdates); }
                                     }
                                 }));
                             }
-                            
                             showToast(`Đã đổi tên và đồng bộ dữ liệu thống kê tháng.`);
                         }
                     } else {
-                        departments.push(newName);
-                        departments.sort();
-                        await setDoc(deptDocRef, { list: departments }, { merge: true });
-                        showToast('Đã thêm phòng ban');
+                        departments.push(newName); departments.sort(); await setDoc(deptDocRef, { list: departments }, { merge: true }); showToast('Đã thêm phòng ban');
                     }
-        
-                    el('department-modal').classList.add('hidden');
-                    await renderAdminPersonnel();
-        
-                } catch (err) {
-                    console.error(err); showToast('Lỗi: ' + err.message, 'error');
-                } finally { hideLoader(); }
+                    el('department-modal').classList.add('hidden'); await renderAdminPersonnel();
+                } catch (err) { console.error(err); showToast('Lỗi: ' + err.message, 'error'); } finally { hideLoader(); }
             }
-        
             else if (classList.contains('delete-department-btn')) {
-                const deptToDelete = dataset.name;
-                state.deleteTarget = { name: deptToDelete };
-                
-                const departments = await getDepartmentsList();
-                
-                const availableDepartments = departments.filter(d => d !== deptToDelete);
-        
-                if (availableDepartments.length === 0) {
-                    showToast('Không còn phòng ban nào khác để chuyển nhân sự. Vui lòng tạo thêm phòng ban trước.', 'error');
-                    return;
-                }
-        
-                const transferSelect = el('transfer-department-select');
-                transferSelect.innerHTML = '';
-                availableDepartments.forEach(dept => {
-                    const opt = document.createElement('option');
-                    opt.value = dept;
-                    opt.textContent = dept;
-                    transferSelect.appendChild(opt);
-                });
-        
-                el('delete-department-text').textContent = `Bạn đang xóa phòng ban: "${deptToDelete}"`;
-                el('delete-department-modal').classList.remove('hidden');
+                const deptToDelete = dataset.name; state.deleteTarget = { name: deptToDelete };
+                const departments = await getDepartmentsList(); const availableDepartments = departments.filter(d => d !== deptToDelete);
+                if (availableDepartments.length === 0) { showToast('Không còn phòng ban nào khác để chuyển nhân sự. Vui lòng tạo thêm phòng ban trước.', 'error'); return; }
+                const transferSelect = el('transfer-department-select'); transferSelect.innerHTML = '';
+                availableDepartments.forEach(dept => { const opt = document.createElement('option'); opt.value = dept; opt.textContent = dept; transferSelect.appendChild(opt); });
+                el('delete-department-text').textContent = `Bạn đang xóa phòng ban: "${deptToDelete}"`; el('delete-department-modal').classList.remove('hidden');
             }
-            
             else if (id === 'confirm-delete-department-btn') {
                 showLoader();
                 try {
-                    const oldName = state.deleteTarget.name;
-                    const newName = el('transfer-department-select').value;
-                    
-                    if (!newName) {
-                        showToast('Vui lòng chọn phòng ban để chuyển tới', 'error');
-                        hideLoader(); return;
-                    }
-        
-                    const deptDocRef = doc(db, "admin_list", "departments");
-                    let departments = await getDepartmentsList();
-        
-                    departments = departments.filter(d => d !== oldName);
-                    await updateDoc(deptDocRef, { list: departments });
-        
-                    const allStaff = await getDocument("staff_list", "staffs");
-                    const staffUpdates = {};
-                    let affectedUserKeys = [];
-        
-                    Object.entries(allStaff).forEach(([key, user]) => {
-                        if (user.depart === oldName) {
-                            staffUpdates[`${key}.depart`] = newName;
-                            affectedUserKeys.push(key);
-                        }
-                    });
-        
-                    if (affectedUserKeys.length > 0) {
-                        await updateDoc(doc(db, "staff_list", "staffs"), staffUpdates);
-                    }
-        
+                    const oldName = state.deleteTarget.name; const newName = el('transfer-department-select').value;
+                    if (!newName) { showToast('Vui lòng chọn phòng ban để chuyển tới', 'error'); hideLoader(); return; }
+                    const deptDocRef = doc(db, "admin_list", "departments"); let departments = await getDepartmentsList();
+                    departments = departments.filter(d => d !== oldName); await updateDoc(deptDocRef, { list: departments });
+                    const allStaff = await getDocument("staff_list", "staffs"); const staffUpdates = {}; let affectedUserKeys = [];
+                    Object.entries(allStaff).forEach(([key, user]) => { if (user.depart === oldName) { staffUpdates[`${key}.depart`] = newName; affectedUserKeys.push(key); } });
+                    if (affectedUserKeys.length > 0) { await updateDoc(doc(db, "staff_list", "staffs"), staffUpdates); }
                     if (affectedUserKeys.length > 0) {
                         const targetWeeks = getWeeksInMonth(new Date());
-                        
                         await Promise.all(targetWeeks.map(async (weekStr) => {
-                            const weekDocRef = doc(db, "order_list", weekStr);
-                            const weekDoc = await getDocument("order_list", weekStr);
-                            
+                            const weekDocRef = doc(db, "order_list", weekStr); const weekDoc = await getDocument("order_list", weekStr);
                             if (weekDoc) {
-                                const orderUpdates = {};
-                                let hasUpdate = false;
-                                
-                                Object.keys(weekDoc).forEach(userKey => {
-                                    if (weekDoc[userKey] && typeof weekDoc[userKey] === 'object') {
-                                        if (weekDoc[userKey].depart === oldName) {
-                                            orderUpdates[`${userKey}.depart`] = newName;
-                                            hasUpdate = true;
-                                        }
-                                    }
-                                });
-        
-                                if (hasUpdate) {
-                                    await updateDoc(weekDocRef, orderUpdates);
-                                }
+                                const orderUpdates = {}; let hasUpdate = false;
+                                Object.keys(weekDoc).forEach(userKey => { if (weekDoc[userKey] && typeof weekDoc[userKey] === 'object') { if (weekDoc[userKey].depart === oldName) { orderUpdates[`${userKey}.depart`] = newName; hasUpdate = true; } } });
+                                if (hasUpdate) { await updateDoc(weekDocRef, orderUpdates); }
                             }
                         }));
                     }
-        
                     showToast(`Đã xóa "${oldName}" và chuyển ${affectedUserKeys.length} nhân sự sang "${newName}".`);
-                    el('delete-department-modal').classList.add('hidden');
-                    await renderAdminPersonnel();
-        
-                } catch (err) { 
-                    console.error(err); 
-                    showToast('Lỗi: ' + err.message, 'error'); 
-                } finally { 
-                    hideLoader(); 
-                }
+                    el('delete-department-modal').classList.add('hidden'); await renderAdminPersonnel();
+                } catch (err) { console.error(err); showToast('Lỗi: ' + err.message, 'error'); } finally { hideLoader(); }
             }
             else if (target.closest('.toggle-card-header')) {
-                const header = target.closest('.toggle-card-header');
-                const targetId = header.dataset.target;
-                const listEl = el(targetId);
-                const icon = header.querySelector('.toggle-icon');
-                
-                if (listEl) {
-                    const isHidden = listEl.classList.toggle('hidden');
-                    if (icon) icon.classList.toggle('rotate');
-                    header.classList.toggle('collapsed', isHidden);
-                }
+                const header = target.closest('.toggle-card-header'); const targetId = header.dataset.target; const listEl = el(targetId); const icon = header.querySelector('.toggle-icon');
+                if (listEl) { const isHidden = listEl.classList.toggle('hidden'); if (icon) icon.classList.toggle('rotate'); header.classList.toggle('collapsed', isHidden); }
             } 
-            else if (id === 'skip-everyone-btn') {
-                await processSkip('Everyone');
-            }
-            else if (id === 'skip-specific-btn') {
-                const receiver = el('skip-receiver-input').value.trim();
-                if (!receiver) return showToast('Vui lòng nhập tên người nhận', 'error');
-                await processSkip(receiver);
-            }
-            else if (dataset.action === 'eaten') {
-                showLoader();
-                try {
-                    const weekString = getWeekString(new Date());
-                    const { day } = dataset;
-                    const userKey = emailToKey(state.currentUser.email);
-                    const weekDoc = await getDocument('order_list', weekString);
-                    const currentDishString = weekDoc[userKey][day];
-                    const { dish } = parseDishValue(currentDishString);
-                    
-                    await updateDoc(doc(db, 'order_list', weekString), { [`${userKey}.${day}`]: `eaten: ${dish}` });
-                    showToast(__('eatenSuccess')); await render();
-                } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); }
-            }
-            else if (classList.contains('mark-eaten-btn')) {
-                e.preventDefault(); e.stopPropagation(); showLoader();
-                try {
-                    const weekString = getWeekString(new Date());
-                    const { key: userKey, day } = dataset;
-                    const weekDoc = await getDocument('order_list', weekString);
-                    const { dish } = parseDishValue(weekDoc[userKey][day]);
-                    await updateDoc(doc(db, 'order_list', weekString), { [`${userKey}.${day}`]: `eaten: ${dish}` });
-                    showToast(__('eatenSuccess'));
-                    const updatedDoc = await getDocument('order_list', weekString);
-                    updateStaffListView(updatedDoc);
-                } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); }
-            }                
-            else if (id === 'menu-filter-btn') {
-                state.menuFilterMode = state.menuFilterMode === 'auto' ? 'all' : 'auto';
-                const weekDoc = await getDocument('order_list', getWeekString(new Date()));
-                if (weekDoc) updateStaffListView(weekDoc);
-            } 
+            else if (id === 'skip-everyone-btn') { await processSkip('Everyone'); }
+            else if (id === 'skip-specific-btn') { const receiver = el('skip-receiver-input').value.trim(); if (!receiver) return showToast('Vui lòng nhập tên người nhận', 'error'); await processSkip(receiver); }
+            else if (dataset.action === 'eaten') { showLoader(); try { const weekString = getWeekString(new Date()); const { day } = dataset; const userKey = emailToKey(state.currentUser.email); const weekDoc = await getDocument('order_list', weekString); const currentDishString = weekDoc[userKey][day]; const { dish } = parseDishValue(currentDishString); await updateDoc(doc(db, 'order_list', weekString), { [`${userKey}.${day}`]: `eaten: ${dish}` }); showToast(__('eatenSuccess')); await render(); } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); } }
+            else if (classList.contains('mark-eaten-btn')) { e.preventDefault(); e.stopPropagation(); showLoader(); try { const weekString = getWeekString(new Date()); const { key: userKey, day } = dataset; const weekDoc = await getDocument('order_list', weekString); const { dish } = parseDishValue(weekDoc[userKey][day]); await updateDoc(doc(db, 'order_list', weekString), { [`${userKey}.${day}`]: `eaten: ${dish}` }); showToast(__('eatenSuccess')); const updatedDoc = await getDocument('order_list', weekString); updateStaffListView(updatedDoc); } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); } }                
+            else if (id === 'menu-filter-btn') { state.menuFilterMode = state.menuFilterMode === 'auto' ? 'all' : 'auto'; const weekDoc = await getDocument('order_list', getWeekString(new Date())); if (weekDoc) updateStaffListView(weekDoc); } 
             else if (id === 'stats-today-btn') { state.statsViewDate = new Date(); el('stats-date-picker').value = state.statsViewDate.toISOString().split('T')[0]; await renderStatsContent(); } 
             else if (classList.contains('remove-menu-dish-btn')) { target.closest('div[style*="display:flex"]').remove(); } 
             else if (id === 'export-stats-btn') {
-                try {
-                    await loadXLSXLibrary();
-                    const wb = XLSX.utils.book_new(); const tables = el('stats-content').querySelectorAll('table');
-                    if (tables.length === 0) { showToast(__('noData'), 'error'); return; }
-                    tables.forEach((table, idx) => {
-                        const ws = XLSX.utils.table_to_sheet(table);
-                        const sheetName = state.statsViewMode === 'day' ? (idx === 0 ? __('morning') : __('evening')) : __('stats');
-                        XLSX.utils.book_append_sheet(wb, ws, sheetName);
-                    });
-                    XLSX.writeFile(wb, `stats_${state.statsViewDate.toISOString().split('T')[0]}.xlsx`);
-                } catch { showToast(__('error'), 'error'); }
+                try { await loadXLSXLibrary(); const wb = XLSX.utils.book_new(); const tables = el('stats-content').querySelectorAll('table'); if (tables.length === 0) { showToast(__('noData'), 'error'); return; } tables.forEach((table, idx) => { const ws = XLSX.utils.table_to_sheet(table); const sheetName = state.statsViewMode === 'day' ? (idx === 0 ? __('morning') : __('evening')) : __('stats'); XLSX.utils.book_append_sheet(wb, ws, sheetName); }); XLSX.writeFile(wb, `stats_${state.statsViewDate.toISOString().split('T')[0]}.xlsx`); } catch { showToast(__('error'), 'error'); }
             } 
             else if (id === 'export-personnel-btn') {
-                try {
-                    await loadXLSXLibrary();
-                    const allStaff = await getDocument("staff_list", "staffs");
-                    const data = Object.entries(allStaff).filter(([key]) => !key.startsWith('guest_')).map(([_, p]) => ({ [__('name')]: p.name, [__('email')]: p.email, [__('department')]: p.depart || '-' }));
-                    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), __('personnel'));
-                    XLSX.writeFile(wb, 'personnel.xlsx');
-                } catch { showToast(__('error'), 'error'); }
+                try { await loadXLSXLibrary(); const allStaff = await getDocument("staff_list", "staffs"); const data = Object.entries(allStaff).filter(([key]) => !key.startsWith('guest_')).map(([_, p]) => ({ [__('name')]: p.name, [__('email')]: p.email, [__('department')]: p.depart || '-' })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), __('personnel')); XLSX.writeFile(wb, 'personnel.xlsx'); } catch { showToast(__('error'), 'error'); }
             } 
-            else if (id === 'add-guest-order-btn') {
-                state.guestOrderSelection = {}; state.guestCurrentOrderDay = 'mon'; await renderGuestOrderDays('this');
-                el('guest-order-modal').classList.remove('hidden');
-            } 
-            else if (classList.contains('guest-order-tab-btn')) {
-                state.guestCurrentOrderDay = dataset.dayKey;
-                await renderGuestOrderDays(document.querySelector('input[name="guest-week"]:checked').value);
-            } 
-            else if (classList.contains('guest-dish-item')) {
-                state.guestOrderSelection[dataset.dayKey] = dataset.dish;
-                const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri'];
-                if (dayOrder.indexOf(dataset.dayKey) < 4) state.guestCurrentOrderDay = dayOrder[dayOrder.indexOf(dataset.dayKey) + 1];
-                await renderGuestOrderDays(document.querySelector('input[name="guest-week"]:checked').value);
-            } 
+            else if (id === 'add-guest-order-btn') { state.guestOrderSelection = {}; state.guestCurrentOrderDay = 'mon'; await renderGuestOrderDays('this'); el('guest-order-modal').classList.remove('hidden'); } 
+            else if (classList.contains('guest-order-tab-btn')) { state.guestCurrentOrderDay = dataset.dayKey; await renderGuestOrderDays(document.querySelector('input[name="guest-week"]:checked').value); } 
+            else if (classList.contains('guest-dish-item')) { state.guestOrderSelection[dataset.dayKey] = dataset.dish; const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri']; if (dayOrder.indexOf(dataset.dayKey) < 4) state.guestCurrentOrderDay = dayOrder[dayOrder.indexOf(dataset.dayKey) + 1]; await renderGuestOrderDays(document.querySelector('input[name="guest-week"]:checked').value); } 
             else if (id === 'save-guest-order-btn') {
-                showLoader();
-                try {
-                    const guestName = el('guest-name-input').value.trim();
-                    if (!guestName) { showToast('Vui lòng nhập tên khách.', 'error'); hideLoader(); return; }
-                    const targetWeek = document.querySelector('input[name="guest-week"]:checked').value === 'next' ? getWeekString(new Date(Date.now() + 7*864e5)) : getWeekString(new Date());
-                    const guestKey = `guest_${Date.now()}`;
-                    const payload = { [guestKey]: { name: guestName, depart: el('guest-depart-input').value.trim(), shift: state.guestShiftSelection, order: 'ordered' } };
-                    for (const day in state.guestOrderSelection) {
-                        const dishName = state.guestOrderSelection[day];
-                        const isNoOrder = dishName.toLowerCase().includes('không đặt cơm');
-                        const prefix = isNoOrder ? '[ignore] ' : 'not: ';
-                        payload[guestKey][day] = `${prefix}${dishName}`;
-                    }
-                    await setDoc(doc(db, 'order_list', targetWeek), payload, { merge: true });
-                    showToast(`${__('orderSuccess')} cho khách ${guestName}`);
-                    state.guestOrderSelection = {}; el('guest-order-modal').classList.add('hidden'); await renderAdmin();
-                } catch(err) { console.error(err); showToast(__('orderFailed'), 'error'); } finally { hideLoader(); }
+                showLoader(); try { const guestName = el('guest-name-input').value.trim(); if (!guestName) { showToast('Vui lòng nhập tên khách.', 'error'); hideLoader(); return; } const targetWeek = document.querySelector('input[name="guest-week"]:checked').value === 'next' ? getWeekString(new Date(Date.now() + 7*864e5)) : getWeekString(new Date()); const guestKey = `guest_${Date.now()}`; const payload = { [guestKey]: { name: guestName, depart: el('guest-depart-input').value.trim(), shift: state.guestShiftSelection, order: 'ordered' } }; for (const day in state.guestOrderSelection) { const dishName = state.guestOrderSelection[day]; const isNoOrder = dishName.toLowerCase().includes('không đặt cơm'); const prefix = isNoOrder ? '[ignore] ' : 'not: '; payload[guestKey][day] = `${prefix}${dishName}`; } await setDoc(doc(db, 'order_list', targetWeek), payload, { merge: true }); showToast(`${__('orderSuccess')} cho khách ${guestName}`); state.guestOrderSelection = {}; el('guest-order-modal').classList.add('hidden'); await renderAdmin(); } catch(err) { console.error(err); showToast(__('orderFailed'), 'error'); } finally { hideLoader(); }
             }
-            else if (classList.contains('reopen-order-btn')) {
-                 state.reopenTarget = { key: dataset.key, name: dataset.name };
-                 el('reopen-order-modal-title').textContent = `${__('reopenOrderFor')} ${dataset.name}?`;
-                 el('reopen-order-text').textContent = __('reopenConfirmText');
-                 el('reopen-order-modal').classList.remove('hidden');
-            } 
-            else if(id === 'confirm-reopen-order-btn'){
-                showLoader();
-                try {
-                    const weekString = getWeekString(new Date());
-                    await setDoc(doc(db, 'order_list', weekString), { 
-                        [state.reopenTarget.key]: { order: 'reopen', name: state.reopenTarget.name } 
-                    }, { merge: true });
-                    showToast(__('reopenSuccess')); el('reopen-order-modal').classList.add('hidden');
-                    if (state.reopenTarget.key === emailToKey(state.currentUser.email)) { state.orderSelection = {}; state.currentTab = 'today'; await render(); } else { await renderAdmin(); }
-                } catch { showToast(__('error'), 'error'); } finally { hideLoader(); }
-            } 
+            else if (classList.contains('reopen-order-btn')) { state.reopenTarget = { key: dataset.key, name: dataset.name }; el('reopen-order-modal-title').textContent = `${__('reopenOrderFor')} ${dataset.name}?`; el('reopen-order-text').textContent = __('reopenConfirmText'); el('reopen-order-modal').classList.remove('hidden'); } 
+            else if(id === 'confirm-reopen-order-btn'){ showLoader(); try { const weekString = getWeekString(new Date()); await setDoc(doc(db, 'order_list', weekString), { [state.reopenTarget.key]: { order: 'reopen', name: state.reopenTarget.name } }, { merge: true }); showToast(__('reopenSuccess')); el('reopen-order-modal').classList.add('hidden'); if (state.reopenTarget.key === emailToKey(state.currentUser.email)) { state.orderSelection = {}; state.currentTab = 'today'; await render(); } else { await renderAdmin(); } } catch { showToast(__('error'), 'error'); } finally { hideLoader(); } } 
             else if(dataset.modal) el(dataset.modal).classList.toggle('hidden');
-
-            else if (id === 'edit-menu-btn') {
-                state.isEditingMenu = true;
-                await renderAdminMenu();
-            }
-            else if (id === 'cancel-edit-menu-btn') {
-                state.isEditingMenu = false;
-                await renderAdminMenu();
-            }
+            else if (id === 'edit-menu-btn') { state.isEditingMenu = true; await renderAdminMenu(); }
+            else if (id === 'cancel-edit-menu-btn') { state.isEditingMenu = false; await renderAdminMenu(); }
             else if (id === 'save-menu-nextWeek') {
-                showLoader();
-                try {
-                    const weekStr = dataset.week;
-                    const weekKey = 'nextWeek';
-                    const weekDoc = await getDocument('order_list', weekStr) || {};
-                    const menuToSave = { ...(weekDoc.menu || {}) };
-                    
-                    let hasData = false;
-                    for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
-                        const container = el(`menu-dishes-${weekKey}-${day}`);
-                        if (container) {
-                            const newDishes = Array.from(container.querySelectorAll('.menu-dish-textarea')).map(t => t.value.trim()).filter(Boolean);
-                            const existingDishes = menuToSave[day] || [];
-                            const finalDishes = [...existingDishes, ...newDishes];
-                            
-                            if (finalDishes.length > 0) {
-                                hasData = true;
-                                if (!finalDishes.some(d => d.includes('Không đặt cơm'))) finalDishes.push('Không đặt cơm | No order');
-                            }
-                            menuToSave[day] = finalDishes;
-                        }
-                    }
-                    
-                    await setDoc(doc(db, 'order_list', weekStr), { menu: menuToSave }, { merge: true });
-                    showToast(__('menuSaved'));
-                    
-                    state.isEditingMenu = false; 
-                    await renderAdminMenu();
-                } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); }
+                showLoader(); try { const weekStr = dataset.week; const weekKey = 'nextWeek'; const weekDoc = await getDocument('order_list', weekStr) || {}; const menuToSave = { ...(weekDoc.menu || {}) }; let hasData = false; for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) { const container = el(`menu-dishes-${weekKey}-${day}`); if (container) { const newDishes = Array.from(container.querySelectorAll('.menu-dish-textarea')).map(t => t.value.trim()).filter(Boolean); const existingDishes = menuToSave[day] || []; const finalDishes = [...existingDishes, ...newDishes]; if (finalDishes.length > 0) { hasData = true; if (!finalDishes.some(d => d.includes('Không đặt cơm'))) finalDishes.push('Không đặt cơm | No order'); } menuToSave[day] = finalDishes; } } await setDoc(doc(db, 'order_list', weekStr), { menu: menuToSave }, { merge: true }); showToast(__('menuSaved')); state.isEditingMenu = false; await renderAdminMenu(); } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); }
             }
         });
 
