@@ -705,36 +705,49 @@
             const dayKey = getDayKey();
             const firstName = getFirstName(state.staffProfile.name);
             const userEmailKey = emailToKey(state.currentUser.email);
-            const currentWeekString = getWeekString(new Date());
             
-            const weekData = await getDocument('order_list', currentWeekString);
-            const userData = weekData ? weekData[userEmailKey] : null;
+            const today = new Date();
+            const currentWeekString = getWeekString(today);
+            const nextWeekString = getWeekString(new Date(today.getTime() + 7 * 86400000));
+            
+            const [weekData, nextWeekData] = await Promise.all([
+                getDocument('order_list', currentWeekString),
+                getDocument('order_list', nextWeekString)
+            ]);
 
+            const userData = weekData ? weekData[userEmailKey] : null;
+            const nextUserData = nextWeekData ? nextWeekData[userEmailKey] : null;
+
+            // Xử lý Logic Reopen
+            let reopenTargetWeek = null;
+            if (userData && userData.order === 'reopen') {
+                reopenTargetWeek = currentWeekString;
+            } else if (nextUserData && nextUserData.order === 'reopen') {
+                reopenTargetWeek = nextWeekString;
+            }
+            
+            if (reopenTargetWeek) {
+                const isNext = reopenTargetWeek === nextWeekString;
+                const heroHtml = `<div class="card hero-card"><div class="hero-content"><div class="hero-greeting">${__('hi')} ${firstName}</div><div class="hero-title">${__('orderExtra')}</div><div class="hero-subtitle">${isNext ? 'Đặt món cho Tuần sau (Mở lại)' : __('reopenConfirmText')}</div></div></div>`;
+                el('main-content').innerHTML = heroHtml + `<div id="order-section-container"></div>`;
+                await renderReopenOrderSection(el('order-section-container'), reopenTargetWeek);
+                return;
+            }
+
+            // ... Phần hiển thị quà tặng (giữ nguyên logic cũ) ...
             let giftHTML = '';
             if (weekData) {
                 const myName = state.staffProfile.name;
                 const gifters = [];
-                
                 Object.entries(weekData).forEach(([key, val]) => {
                     if (key === 'menu' || key === userEmailKey) return; 
-                    
                     const raw = val[dayKey];
                     if (!raw) return;
-
                     const { status, receiver, dish } = parseDishValue(raw);
-
-                    if (status === 'giveup') {
-                        if (receiver === myName) {
-                            gifters.push({ 
-                                key: key, 
-                                name: val.name, 
-                                dish: parseDish(raw),
-                                rawDish: dish
-                            });
-                        }
+                    if (status === 'giveup' && receiver === myName) {
+                        gifters.push({ key: key, name: val.name, dish: parseDish(raw), rawDish: dish });
                     }
                 });
-
                 if (gifters.length > 0) {
                     giftHTML = gifters.map(g => 
                         `<div class="gift-alert">
@@ -754,16 +767,7 @@
                 }
             }
             
-            let isReopenMode = false;
-            if (userData && userData.order === 'reopen') { isReopenMode = true; }
-            
-            if (isReopenMode) {
-                const heroHtml = `<div class="card hero-card"><div class="hero-content"><div class="hero-greeting">${__('hi')} ${firstName}</div><div class="hero-title">${__('orderExtra')}</div><div class="hero-subtitle">${__('reopenConfirmText')}</div></div></div>`;
-                el('main-content').innerHTML = heroHtml + `<div id="order-section-container"></div>`;
-                await renderReopenOrderSection(el('order-section-container'));
-                return;
-            }
-            
+            // ... Phần hiển thị Hero Card bình thường (giữ nguyên) ...
             let heroHtml = '';
             if (['sun', 'sat'].includes(dayKey)) {
                 heroHtml = `<div class="card hero-card"><div class="hero-content"><div class="hero-greeting">${__('hi')} ${firstName}</div><div class="hero-title">${__('weekend')}</div></div></div>`;
@@ -887,29 +891,65 @@
             container.innerHTML = htmlContent;
         }
         
-        async function renderReopenOrderSection(container) {
+        async function renderReopenOrderSection(container, targetWeekString = null) {
             const today = new Date();
-            const dayOfWeek = today.getDay();
-            const currentWeekString = getWeekString(today);
-            const dayOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-            const dayKeys = [];
+            
+            // Mặc định lấy tuần hiện tại nếu không truyền vào
+            if (!targetWeekString) {
+                targetWeekString = getWeekString(today);
+            }
+            
+            const currentWeekStr = getWeekString(today);
+            const isNextWeek = targetWeekString !== currentWeekStr; // Kiểm tra xem có phải đang reopen cho tuần sau không
+            
             const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
+            const allDayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
+            let dayKeys = [];
+
+            if (isNextWeek) {
+                // Nếu là tuần sau, hiển thị toàn bộ các ngày
+                dayKeys = [...allDayKeys];
+            } else {
+                // Nếu là tuần này, chỉ hiển thị từ hôm nay trở đi
+                const dayOfWeek = today.getDay(); // 0 (Sun) - 6 (Sat)
+                // Nếu là T7(6) hoặc CN(0) thì coi như hết tuần hoặc bắt đầu tuần mới tùy logic, 
+                // ở đây reopen tuần này thì nếu cuối tuần có thể cho hiện hết hoặc chặn. 
+                // Logic cũ: hiển thị từ ngày hiện tại.
+                
+                // Map dayOfWeek sang index của mảng allDayKeys (Mon=0, Tue=1...)
+                // dayOfWeek: 1(Mon) -> index 0. 
+                
+                let startIndex = 0;
+                if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+                    startIndex = dayOfWeek - 1;
+                } else if (dayOfWeek === 6 || dayOfWeek === 0) {
+                     // Cuối tuần thì hiển thị full tuần để xem lại hoặc coi như không đặt được
+                     startIndex = 0; 
+                }
+                
+                dayKeys = allDayKeys.slice(startIndex);
+            }
             
-            for (let d = dayOfWeek; d <= 5; d++) { if (d >= 1 && d <= 5) dayKeys.push(dayOrder[d]); }
-            
-            if (dayKeys.length === 0) { container.innerHTML = `<div class="card text-center" style="padding: 2rem;"><i class="fas fa-calendar-xmark" style="font-size: 48px; color: var(--text-muted); margin-bottom: 1rem;"></i><h3 style="color: var(--text); margin-bottom: 0.5rem;">${__('cannotOrder')}</h3><p class="text-muted" style="margin-bottom: 1.5rem;">${__('weekEnded')}</p></div>`; return; }
+            if (dayKeys.length === 0) { 
+                container.innerHTML = `<div class="card text-center" style="padding: 2rem;"><i class="fas fa-calendar-xmark" style="font-size: 48px; color: var(--text-muted); margin-bottom: 1rem;"></i><h3 style="color: var(--text); margin-bottom: 0.5rem;">${__('cannotOrder')}</h3><p class="text-muted" style="margin-bottom: 1.5rem;">${__('weekEnded')}</p></div>`; 
+                return; 
+            }
             
             if (!dayKeys.includes(state.currentOrderDay)) state.currentOrderDay = dayKeys[0];
             
+            // Kiểm tra đã chọn hết các món chưa
             const allSelected = dayKeys.every(day => state.orderSelection[day]);
+            
             if (allSelected) {
-                let summaryHTML = `<div class="card"><div style="background: var(--warning); color: white; padding: 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem; text-align: center;"><i class="fas fa-info-circle"></i> ${__('orderExtra')}</div><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${currentWeekString.split('_')[1]}</h2></div><ul class="staff-list">`;
+                let summaryHTML = `<div class="card"><div style="background: var(--warning); color: white; padding: 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem; text-align: center;"><i class="fas fa-info-circle"></i> ${isNextWeek ? 'Đặt bổ sung cho Tuần sau' : __('orderExtra')}</div><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${targetWeekString.split('_')[1]}</h2></div><ul class="staff-list">`;
                 for (const dayKey of dayKeys) { summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(state.orderSelection[dayKey])}</div></div></li>`; }
-                summaryHTML += `</ul><button id="submit-reopen-order-btn" class="btn btn-primary btn-block mt-3"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;
-                container.innerHTML = summaryHTML; return;
+                // Lưu ý: data-weekstr được thêm vào nút submit
+                summaryHTML += `</ul><button id="submit-reopen-order-btn" data-weekstr="${targetWeekString}" class="btn btn-primary btn-block mt-3"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;
+                container.innerHTML = summaryHTML; 
+                return;
             }
             
-            const weekDoc = await getDocument('order_list', currentWeekString);
+            const weekDoc = await getDocument('order_list', targetWeekString);
             const menu = weekDoc ? weekDoc.menu : null;
             if (!menu) { container.innerHTML = `<div class="card text-center"><p class="text-muted">${__('noMenu')}</p></div>`; return; }
             
@@ -928,7 +968,9 @@
                 daysContentHTML += `</div>`;
             }
             
-            container.innerHTML = `<div class="card"><div style="background: var(--warning); color: white; padding: 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem; text-align: center;"><i class="fas fa-info-circle"></i> ${__('orderFromTo')} ${dayNames[dayKeys[0]]} ${__('to')} ${dayNames[dayKeys[dayKeys.length - 1]]}</div><div class="card-header"><h2 class="card-title">${__('orderForWeek')} ${currentWeekString.split('_')[1]}</h2></div>${shiftToggleHTML}${tabsHTML}${daysContentHTML}</div>`;
+            const dateRangeText = isNextWeek ? 'Tuần sau' : `${dayNames[dayKeys[0]]} ${__('to')} ${dayNames[dayKeys[dayKeys.length - 1]]}`;
+
+            container.innerHTML = `<div class="card"><div style="background: var(--warning); color: white; padding: 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem; text-align: center;"><i class="fas fa-info-circle"></i> ${__('orderFromTo')} ${dateRangeText}</div><div class="card-header"><h2 class="card-title">${__('orderForWeek')} ${targetWeekString.split('_')[1]}</h2></div>${shiftToggleHTML}${tabsHTML}${daysContentHTML}</div>`;
         }
         
         async function renderMenu() {
@@ -1286,7 +1328,7 @@
                         const shift = (orderThis.shift || 'morning').toLowerCase();
                         statusThis = (shift.includes('evening') || shift === 'e') ? 'evening' : 'morning';
                     } else if (orderThis && orderThis.order === 'reopen') {
-                        statusThis = 'missing';
+                        statusThis = 'missing'; // Icon hiển thị
                     }
         
                     const orderNext = nextWeekDoc && nextWeekDoc[key] ? nextWeekDoc[key] : null;
@@ -1345,6 +1387,8 @@
         
                 const renderDetailBlock = (key, weekType, orderData, menuData, isPastWeek) => {
                     const currentShift = orderData ? orderData.shift : 'morning';
+                    const weekStringValue = weekType === 'this' ? thisWeekStr : nextWeekStr;
+                    const userName = allStaff[key] ? allStaff[key].name : '';
                     
                     let content = `<div id="detail-${weekType}-${key}" class="week-detail-container hidden" style="border:none; box-shadow:none; margin:0; border-radius:0;">`;
                     
@@ -1378,13 +1422,10 @@
                     });
                     content += `</div>`;
         
-                    const weekStringValue = weekType === 'this' ? thisWeekStr : nextWeekStr;
-                    const userName = allStaff[key] ? allStaff[key].name : '';
-                    
                     content += `<div class="admin-action-buttons">
                         <div class="btn-group-row">
                             <button class="btn btn-delete-order" data-key="${key}" data-weekstr="${weekStringValue}" data-weektype="${weekType}" style="flex: 1;"><i class="fas fa-trash"></i> Hủy đặt</button>
-                            <button class="btn btn-secondary reopen-order-btn" data-key="${key}" data-name="${userName}" style="flex: 1; border: 1px solid var(--warning); color: var(--warning);"><i class="fas fa-redo"></i> Reopen</button>
+                            <button class="btn btn-secondary reopen-order-btn" data-key="${key}" data-name="${userName}" data-weekstr="${weekStringValue}" data-weektype="${weekType}" style="flex: 1; border: 1px solid var(--warning); color: var(--warning);"><i class="fas fa-redo"></i> Reopen</button>
                         </div>
                         <button class="btn btn-primary admin-save-user-btn" data-key="${key}" data-weekstr="${weekStringValue}" data-weektype="${weekType}" style="width: 100%;"><i class="fas fa-save"></i> Lưu ${weekType === 'this' ? 'Tuần này' : 'Tuần sau'}</button>
                     </div>`;
@@ -2104,10 +2145,30 @@
             else if (classList.contains('order-day-tab-btn')) {
                 state.currentOrderDay = dataset.dayKey;
                 const userEmailKey = emailToKey(state.currentUser.email);
-                const weekDoc = await getDocument('order_list', getWeekString(new Date()));
-                if (weekDoc && weekDoc[userEmailKey] && weekDoc[userEmailKey].order === 'reopen') await renderReopenOrderSection(el('order-section-container'));
-                else await renderOrderSection(el('order-section-container'));
-            } 
+                
+                // Cần xác định xem đang ở mode reopen tuần nào
+                // Cách đơn giản nhất là check Hero subtitle hoặc check lại DB, 
+                // nhưng để nhanh ta check lại order status của tuần này và tuần sau
+                const today = new Date();
+                const currentWeekStr = getWeekString(today);
+                const nextWeekStr = getWeekString(new Date(today.getTime() + 7 * 86400000));
+                
+                const [curDoc, nextDoc] = await Promise.all([
+                   getDocument('order_list', currentWeekStr),
+                   getDocument('order_list', nextWeekStr)
+                ]);
+                
+                const curOrder = curDoc?.[userEmailKey]?.order;
+                const nextOrder = nextDoc?.[userEmailKey]?.order;
+
+                if (curOrder === 'reopen') {
+                     await renderReopenOrderSection(el('order-section-container'), currentWeekStr);
+                } else if (nextOrder === 'reopen') {
+                     await renderReopenOrderSection(el('order-section-container'), nextWeekStr);
+                } else {
+                     await renderOrderSection(el('order-section-container'));
+                }
+            }
             else if (classList.contains('support-row')) {
                 const targetId = dataset.target;
                 const detailRow = el(targetId);
@@ -2172,7 +2233,9 @@
                     let targetWeek;
                     
                     if (isReopen) { 
-                        targetWeek = getWeekString(today); 
+                        // Nếu là reopen, ưu tiên lấy tuần từ data-weekstr của nút bấm
+                        // Nếu không có (fallback logic cũ), lấy tuần hiện tại
+                        targetWeek = dataset.weekstr || getWeekString(today); 
                     } else {
                         const dayOfWeek = today.getDay(); 
                         const hour = today.getHours();
@@ -2182,7 +2245,11 @@
                     
                     const userKey = emailToKey(state.currentUser.email);
                     
-                    const requiredDays = isReopen 
+                    // Logic xác định ngày cần thiết
+                    // Nếu là reopen tuần sau (future), cần chọn full ngày
+                    const isNextWeekReopen = targetWeek !== getWeekString(today);
+                    
+                    const requiredDays = (isReopen && !isNextWeekReopen)
                         ? Object.keys(state.orderSelection).filter(day => state.orderSelection[day])
                         : ['mon', 'tue', 'wed', 'thu', 'fri'];
                     
@@ -2207,6 +2274,7 @@
                         } 
                     };
                     
+                    // Giữ lại các món đã ăn (eaten)
                     for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
                         const oldDishString = oldUserData[day] || '';
                         if (oldDishString && oldDishString.includes('eaten:')) {
@@ -2486,8 +2554,38 @@
             else if (id === 'save-guest-order-btn') {
                 showLoader(); try { const guestName = el('guest-name-input').value.trim(); if (!guestName) { showToast('Vui lòng nhập tên khách.', 'error'); hideLoader(); return; } const targetWeek = document.querySelector('input[name="guest-week"]:checked').value === 'next' ? getWeekString(new Date(Date.now() + 7*864e5)) : getWeekString(new Date()); const guestKey = `guest_${Date.now()}`; const payload = { [guestKey]: { name: guestName, depart: el('guest-depart-input').value.trim(), shift: state.guestShiftSelection, order: 'ordered' } }; for (const day in state.guestOrderSelection) { const dishName = state.guestOrderSelection[day]; const isNoOrder = dishName.toLowerCase().includes('không đặt cơm'); const prefix = isNoOrder ? '[ignore] ' : 'not: '; payload[guestKey][day] = `${prefix}${dishName}`; } await setDoc(doc(db, 'order_list', targetWeek), payload, { merge: true }); showToast(`${__('orderSuccess')} cho khách ${guestName}`); state.guestOrderSelection = {}; el('guest-order-modal').classList.add('hidden'); await renderAdmin(); } catch(err) { console.error(err); showToast(__('orderFailed'), 'error'); } finally { hideLoader(); }
             }
-            else if (classList.contains('reopen-order-btn')) { state.reopenTarget = { key: dataset.key, name: dataset.name }; el('reopen-order-modal-title').textContent = `${__('reopenOrderFor')} ${dataset.name}?`; el('reopen-order-text').textContent = __('reopenConfirmText'); el('reopen-order-modal').classList.remove('hidden'); } 
-            else if(id === 'confirm-reopen-order-btn'){ showLoader(); try { const weekString = getWeekString(new Date()); await setDoc(doc(db, 'order_list', weekString), { [state.reopenTarget.key]: { order: 'reopen', name: state.reopenTarget.name } }, { merge: true }); showToast(__('reopenSuccess')); el('reopen-order-modal').classList.add('hidden'); if (state.reopenTarget.key === emailToKey(state.currentUser.email)) { state.orderSelection = {}; state.currentTab = 'today'; await render(); } else { await renderAdmin(); } } catch { showToast(__('error'), 'error'); } finally { hideLoader(); } } 
+            else if (classList.contains('reopen-order-btn')) { 
+                state.reopenTarget = { 
+                    key: dataset.key, 
+                    name: dataset.name,
+                    weekStr: dataset.weekstr // Lấy thêm tuần
+                }; 
+                const weekLabel = dataset.weektype === 'this' ? 'Tuần này' : 'Tuần sau';
+                el('reopen-order-modal-title').textContent = `${__('reopenOrderFor')} ${dataset.name} (${weekLabel})?`; 
+                el('reopen-order-text').textContent = __('reopenConfirmText'); 
+                el('reopen-order-modal').classList.remove('hidden'); 
+            } 
+            else if(id === 'confirm-reopen-order-btn'){ 
+                showLoader(); 
+                try { 
+                    // Dùng weekStr đã lưu thay vì mặc định tuần hiện tại
+                    const weekString = state.reopenTarget.weekStr || getWeekString(new Date()); 
+                    await setDoc(doc(db, 'order_list', weekString), { 
+                        [state.reopenTarget.key]: { order: 'reopen', name: state.reopenTarget.name } 
+                    }, { merge: true }); 
+                    
+                    showToast(__('reopenSuccess')); 
+                    el('reopen-order-modal').classList.add('hidden'); 
+                    
+                    if (state.reopenTarget.key === emailToKey(state.currentUser.email)) { 
+                        state.orderSelection = {}; 
+                        state.currentTab = 'today'; 
+                        await render(); 
+                    } else { 
+                        await renderAdmin(); 
+                    } 
+                } catch { showToast(__('error'), 'error'); } finally { hideLoader(); } 
+            }
             else if(dataset.modal) el(dataset.modal).classList.toggle('hidden');
             else if (id === 'edit-menu-btn') { state.isEditingMenu = true; await renderAdminMenu(); }
             else if (id === 'cancel-edit-menu-btn') { state.isEditingMenu = false; await renderAdminMenu(); }
