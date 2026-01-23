@@ -2145,17 +2145,25 @@
                 state.statsViewDate = d;
                 await renderAdminStats();
             }
-
             else if (classList.contains('order-dish-item') && !classList.contains('guest-dish-item')) {
                 const { dayKey, dish } = dataset;
                 state.orderSelection[dayKey] = dish;
+                
                 const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri'];
                 const currentIndex = dayOrder.indexOf(dayKey);
-                if (currentIndex < dayOrder.length - 1) state.currentOrderDay = dayOrder[currentIndex + 1];
-                const weekDoc = await getDocument('order_list', getWeekString(new Date()));
-                if (weekDoc && weekDoc[emailToKey(state.currentUser.email)]?.order === 'reopen') await renderReopenOrderSection(el('order-section-container'));
-                else await renderOrderSection(el('order-section-container'));
-            } 
+                if (currentIndex < dayOrder.length - 1) {
+                    state.currentOrderDay = dayOrder[currentIndex + 1];
+                }
+                
+                const isReopenMode = state.currentTab === 'today' && 
+                                    document.querySelector('.hero-subtitle')?.textContent.includes('reopen');
+                
+                if (isReopenMode) {
+                    renderReopenOrderSection(el('order-section-container'));
+                } else {
+                    renderOrderSection(el('order-section-container'));
+                }
+            }
             else if (id === 'submit-order-btn' || id === 'submit-reopen-order-btn') {
                 showLoader();
                 try {
@@ -2163,8 +2171,9 @@
                     const isReopen = id === 'submit-reopen-order-btn';
                     let targetWeek;
                     
-                    if (isReopen) { targetWeek = getWeekString(today); } 
-                    else {
+                    if (isReopen) { 
+                        targetWeek = getWeekString(today); 
+                    } else {
                         const dayOfWeek = today.getDay(); 
                         const hour = today.getHours();
                         const canOrderNextWeek = (dayOfWeek === 4 && hour >= 15) || dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0;
@@ -2173,31 +2182,50 @@
                     
                     const userKey = emailToKey(state.currentUser.email);
                     
+                    const requiredDays = isReopen 
+                        ? Object.keys(state.orderSelection).filter(day => state.orderSelection[day])
+                        : ['mon', 'tue', 'wed', 'thu', 'fri'];
+                    
+                    const selectedDays = Object.keys(state.orderSelection).filter(day => state.orderSelection[day]);
+                    
+                    if (selectedDays.length === 0) {
+                        showToast('Vui lòng chọn ít nhất 1 món', 'error');
+                        hideLoader();
+                        return;
+                    }
+                    
                     const currentWeekDoc = await getDocument('order_list', targetWeek);
-                    const oldUserData = currentWeekDoc ? currentWeekDoc[userKey] : {};
-
+                    const oldUserData = (currentWeekDoc && currentWeekDoc[userKey]) ? currentWeekDoc[userKey] : {};
+            
                     const payload = { 
                         [userKey]: { 
                             name: state.staffProfile.name, 
                             email: state.currentUser.email, 
-                            depart: state.staffProfile.depart, 
+                            depart: state.staffProfile.depart || 'Unknown', 
                             shift: state.userShiftSelection, 
                             order: 'ordered' 
                         } 
                     };
                     
                     for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
+                        const oldDishString = oldUserData[day] || '';
+                        if (oldDishString && oldDishString.includes('eaten:')) {
+                            payload[userKey][day] = oldDishString;
+                        }
+                    }
+                    
+                    for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
                         if (state.orderSelection[day]) {
                             const newDish = state.orderSelection[day];
                             const oldDishString = oldUserData[day] || '';
                             
-                            if (oldDishString.includes('eaten:')) {
-                                payload[userKey][day] = oldDishString; 
-                            } else {
-                                const isNoOrder = newDish.toLowerCase().includes('không đặt cơm') || newDish.toLowerCase().includes('no order');
-                                const prefix = isNoOrder ? '[ignore] ' : 'not: ';
-                                payload[userKey][day] = `${prefix}${newDish}`;
+                            if (oldDishString && oldDishString.includes('eaten:')) {
+                                continue;
                             }
+                            
+                            const isNoOrder = newDish.toLowerCase().includes('không đặt cơm') || newDish.toLowerCase().includes('no order');
+                            const prefix = isNoOrder ? '[ignore] ' : 'not: ';
+                            payload[userKey][day] = `${prefix}${newDish}`;
                         }
                     }
                     
@@ -2210,8 +2238,8 @@
                     await checkOrderNotification();
             
                 } catch (e) { 
-                    console.error(e); 
-                    showToast(__('orderFailed'), 'error'); 
+                    console.error('Order error:', e); 
+                    showToast(__('orderFailed') + ': ' + e.message, 'error'); 
                 } finally { 
                     hideLoader(); 
                 }
