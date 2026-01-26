@@ -706,9 +706,32 @@
             const firstName = getFirstName(state.staffProfile.name);
             const userEmailKey = emailToKey(state.currentUser.email);
             const currentWeekString = getWeekString(new Date());
+            const nextWeekString = getWeekString(new Date(new Date().getTime() + 7 * 86400000)); // Thêm dòng này
+
+            const [weekData, nextWeekData] = await Promise.all([
+                getDocument('order_list', currentWeekString),
+                getDocument('order_list', nextWeekString)
+            ]);
             
             const weekData = await getDocument('order_list', currentWeekString);
             const userData = weekData ? weekData[userEmailKey] : null;
+            const nextUserData = nextWeekData ? nextWeekData[userEmailKey] : null;
+
+            let reopenTargetWeek = null;
+            if (userData && userData.order === 'reopen') { 
+                reopenTargetWeek = currentWeekString; 
+            } else if (nextUserData && nextUserData.order === 'reopen') {
+                reopenTargetWeek = nextWeekString;
+            }
+            
+            if (reopenTargetWeek) {
+                // Render HTML Hero
+                const heroHtml = `<div class="card hero-card"><div class="hero-content"><div class="hero-greeting">${__('hi')} ${firstName}</div><div class="hero-title">${__('orderExtra')}</div><div class="hero-subtitle">${__('reopenConfirmText')}</div></div></div>`;
+                el('main-content').innerHTML = heroHtml + `<div id="order-section-container"></div>`;
+                
+                await renderReopenOrderSection(el('order-section-container'), reopenTargetWeek);
+                return;
+            }
 
             let giftHTML = '';
             if (weekData) {
@@ -887,48 +910,100 @@
             container.innerHTML = htmlContent;
         }
         
-        async function renderReopenOrderSection(container) {
+        async function renderReopenOrderSection(container, targetWeekStr) {
             const today = new Date();
-            const dayOfWeek = today.getDay();
             const currentWeekString = getWeekString(today);
-            const dayOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-            const dayKeys = [];
+            
+            // Nếu không truyền vào (trường hợp cũ), mặc định là tuần này
+            if (!targetWeekStr) targetWeekStr = currentWeekString;
+        
+            const isTargetingCurrentWeek = targetWeekStr === currentWeekString;
+            
+            const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri'];
             const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
             
-            for (let d = dayOfWeek; d <= 5; d++) { if (d >= 1 && d <= 5) dayKeys.push(dayOrder[d]); }
+            let dayKeys = [];
+        
+            if (isTargetingCurrentWeek) {
+                // Nếu là tuần hiện tại: Chỉ hiển thị các ngày còn lại trong tuần (từ hôm nay trở đi)
+                // Hoặc logic cũ của bạn: từ hôm nay đến thứ 6
+                const dayOfWeek = today.getDay(); // 0 là CN, 1 là T2...
+                // Map getDay() sang index của mảng dayOrder (T2=0, T6=4)
+                // CN(0)-> bỏ qua, T7(6)-> bỏ qua. 
+                // Nếu T2(1) -> index 0.
+                let startIdx = 0;
+                if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+                    startIdx = dayOfWeek - 1; // Bắt đầu từ hôm nay
+                } else if (dayOfWeek === 6 || dayOfWeek === 0) {
+                    // Cuối tuần thì không còn ngày nào của tuần này để đặt (trừ khi cho phép đặt bù quá khứ - tuỳ bạn)
+                    // Giả sử Reopen nghĩa là cho phép đặt lại cả những ngày đã qua hoặc chỉ ngày còn lại. 
+                    // Logic cũ của bạn: for (let d = dayOfWeek; d <= 5; d++) -> Nếu T7, CN thì vòng lặp không chạy.
+                    startIdx = 5; // Hết ngày
+                }
+                
+                // Logic Reopen thường là: Cho phép đặt lại TẤT CẢ các ngày trong tuần đó (để bù data)
+                // Hoặc chỉ những ngày tương lai. 
+                // Dựa trên code cũ của bạn có vẻ bạn muốn đặt từ hôm nay trở đi.
+                // NHƯNG nếu Reopen để bù công, thường sẽ mở full tuần.
+                // -> SỬA: Để an toàn và Reopen có ý nghĩa "nhập bù", ta cho hiện Full tuần (Mon-Fri)
+                // Nếu bạn muốn giữ logic "chỉ từ hôm nay", hãy giữ logic cũ. 
+                // Dưới đây tôi để logic: Reopen = Mở Full tuần để sửa.
+                dayKeys = dayOrder; 
+            } else {
+                // Nếu là tuần sau (hoặc tuần khác): Luôn hiển thị full tuần
+                dayKeys = dayOrder;
+            }
             
-            if (dayKeys.length === 0) { container.innerHTML = `<div class="card text-center" style="padding: 2rem;"><i class="fas fa-calendar-xmark" style="font-size: 48px; color: var(--text-muted); margin-bottom: 1rem;"></i><h3 style="color: var(--text); margin-bottom: 0.5rem;">${__('cannotOrder')}</h3><p class="text-muted" style="margin-bottom: 1.5rem;">${__('weekEnded')}</p></div>`; return; }
+            if (dayKeys.length === 0) { 
+                container.innerHTML = `<div class="card text-center" style="padding: 2rem;"><h3 style="color: var(--text);">${__('cannotOrder')}</h3><p class="text-muted">${__('weekEnded')}</p></div>`; 
+                return; 
+            }
             
             if (!dayKeys.includes(state.currentOrderDay)) state.currentOrderDay = dayKeys[0];
             
-            const allSelected = dayKeys.every(day => state.orderSelection[day]);
-            if (allSelected) {
-                let summaryHTML = `<div class="card"><div style="background: var(--warning); color: white; padding: 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem; text-align: center;"><i class="fas fa-info-circle"></i> ${__('orderExtra')}</div><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${currentWeekString.split('_')[1]}</h2></div><ul class="staff-list">`;
-                for (const dayKey of dayKeys) { summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(state.orderSelection[dayKey])}</div></div></li>`; }
-                summaryHTML += `</ul><button id="submit-reopen-order-btn" class="btn btn-primary btn-block mt-3"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;
-                container.innerHTML = summaryHTML; return;
-            }
-            
-            const weekDoc = await getDocument('order_list', currentWeekString);
+            // Kiểm tra menu
+            const weekDoc = await getDocument('order_list', targetWeekStr);
             const menu = weekDoc ? weekDoc.menu : null;
             if (!menu) { container.innerHTML = `<div class="card text-center"><p class="text-muted">${__('noMenu')}</p></div>`; return; }
             
+            // Render UI (giống cũ nhưng data dynamic)
+            const allSelected = dayKeys.every(day => state.orderSelection[day]);
+        
+            // ... Logic hiển thị confirm khi đã chọn hết ...
+            if (allSelected) {
+                let summaryHTML = `<div class="card"><div style="background: var(--warning); color: white; padding: 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem; text-align: center;"><i class="fas fa-info-circle"></i> ${__('orderExtra')}</div><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${targetWeekStr.split('_')[1]}</h2></div><ul class="staff-list">`;
+                for (const dayKey of dayKeys) { summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(state.orderSelection[dayKey])}</div></div></li>`; }
+                // QUAN TRỌNG: Lưu targetWeekStr vào nút submit để biết lưu vào tuần nào
+                summaryHTML += `</ul><button id="submit-reopen-order-btn" class="btn btn-primary btn-block mt-3" data-target-week="${targetWeekStr}"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;
+                container.innerHTML = summaryHTML; return;
+            }
+            
+            // Render Form chọn món
             const shiftToggleHTML = `<div class="form-group"><label class="form-label">${__('shift')}</label><div class="shift-toggle"><input type="radio" id="user-shift-m" name="user-shift" value="morning" ${state.userShiftSelection === 'morning' ? 'checked' : ''}><label for="user-shift-m">${__('morning')}</label><input type="radio" id="user-shift-e" name="user-shift" value="evening" ${state.userShiftSelection === 'evening' ? 'checked' : ''}><label for="user-shift-e">${__('evening')}</label></div></div>`;
             
             let tabsHTML = `<div class="tabs">`;
-            for (const dayKey of dayKeys) { tabsHTML += `<button class="tab-btn order-day-tab-btn ${state.currentOrderDay === dayKey ? 'active' : ''}" data-day-key="${dayKey}">${dayNames[dayKey]}</button>`; }
+            for (const dayKey of dayKeys) { 
+                // Check xem ngày này đã chọn chưa để highlight
+                const hasOrder = state.orderSelection[dayKey];
+                tabsHTML += `<button class="tab-btn order-day-tab-btn ${state.currentOrderDay === dayKey ? 'active' : ''} ${hasOrder ? 'has-order' : ''}" data-day-key="${dayKey}">${dayNames[dayKey]}</button>`; 
+            }
             tabsHTML += `</div>`;
             
             let daysContentHTML = '';
             for (const dayKey of dayKeys) {
                 const dishes = menu[dayKey] || [];
                 daysContentHTML += `<div id="order-day-${dayKey}" class="${state.currentOrderDay === dayKey ? '' : 'hidden'}">`;
-                if (Array.isArray(dishes) && dishes.length > 0) { daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item" data-dish="${dish}" data-day-key="${dayKey}"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`; } 
+                if (Array.isArray(dishes) && dishes.length > 0) { 
+                    daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => {
+                        const isSelected = dish === state.orderSelection[dayKey];
+                        return `<div class="order-dish-item ${isSelected ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}"><div class="order-dish-name">${parseDish(dish)}</div></div>`;
+                    }).join('')}</div>`; 
+                } 
                 else { daysContentHTML += `<p class="text-center text-muted p-3">${__('noDishes')}</p><div class="order-dish-list"><div class="order-dish-item" data-dish="Nghỉ" data-day-key="${dayKey}"><div class="order-dish-name">${__('rest')}</div></div></div>`; }
                 daysContentHTML += `</div>`;
             }
             
-            container.innerHTML = `<div class="card"><div style="background: var(--warning); color: white; padding: 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem; text-align: center;"><i class="fas fa-info-circle"></i> ${__('orderFromTo')} ${dayNames[dayKeys[0]]} ${__('to')} ${dayNames[dayKeys[dayKeys.length - 1]]}</div><div class="card-header"><h2 class="card-title">${__('orderForWeek')} ${currentWeekString.split('_')[1]}</h2></div>${shiftToggleHTML}${tabsHTML}${daysContentHTML}</div>`;
+            container.innerHTML = `<div class="card"><div style="background: var(--warning); color: white; padding: 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem; text-align: center;"><i class="fas fa-info-circle"></i> Đang đặt lại cho Tuần: ${targetWeekStr.split('_')[1]}</div><div class="card-header"><h2 class="card-title">${__('orderForWeek')} ${targetWeekStr.split('_')[1]}</h2></div>${shiftToggleHTML}${tabsHTML}${daysContentHTML}</div>`;
         }
         
         async function renderMenu() {
@@ -1384,7 +1459,7 @@
                     content += `<div class="admin-action-buttons">
                         <div class="btn-group-row">
                             <button class="btn btn-delete-order" data-key="${key}" data-weekstr="${weekStringValue}" data-weektype="${weekType}" style="flex: 1;"><i class="fas fa-trash"></i> Hủy đặt</button>
-                            <button class="btn btn-secondary reopen-order-btn" data-key="${key}" data-name="${userName}" style="flex: 1; border: 1px solid var(--warning); color: var(--warning);"><i class="fas fa-redo"></i> Reopen</button>
+                            <button class="btn btn-secondary reopen-order-btn" data-key="${key}" data-name="${userName}" data-weekstr="${weekStringValue}" style="flex: 1; border: 1px solid var(--warning); color: var(--warning);"><i class="fas fa-redo"></i> Reopen</button>
                         </div>
                         <button class="btn btn-primary admin-save-user-btn" data-key="${key}" data-weekstr="${weekStringValue}" data-weektype="${weekType}" style="width: 100%;"><i class="fas fa-save"></i> Lưu ${weekType === 'this' ? 'Tuần này' : 'Tuần sau'}</button>
                     </div>`;
@@ -2101,13 +2176,37 @@
                     header.classList.toggle('collapsed', isHidden);
                 }
             } 
+            // TÌM ĐOẠN: else if (classList.contains('order-day-tab-btn'))
             else if (classList.contains('order-day-tab-btn')) {
                 state.currentOrderDay = dataset.dayKey;
                 const userEmailKey = emailToKey(state.currentUser.email);
-                const weekDoc = await getDocument('order_list', getWeekString(new Date()));
-                if (weekDoc && weekDoc[userEmailKey] && weekDoc[userEmailKey].order === 'reopen') await renderReopenOrderSection(el('order-section-container'));
-                else await renderOrderSection(el('order-section-container'));
-            } 
+                
+                // Cần check lại xem user đang reopen ở tuần nào để render lại cho đúng
+                const currentWeekString = getWeekString(new Date());
+                const nextWeekString = getWeekString(new Date(new Date().getTime() + 7 * 86400000));
+                
+                // Lấy nhanh dữ liệu (có thể tối ưu bằng cách lưu vào state global nhưng cách này an toàn hơn)
+                // Lưu ý: getDocument có cache nhẹ, nhưng tốt nhất nên lưu reopenTargetWeek vào state global 
+                // ở hàm renderToday để tái sử dụng.
+                // Tuy nhiên, để sửa nhanh và ít ảnh hưởng, ta có thể check trong DOM hoặc gọi lại logic detect.
+                
+                // Gợi ý: Sửa hàm renderToday để lưu state.reopenTargetWeek = ...
+                // Nhưng nếu không muốn đổi state global, ta check lại:
+                
+                const weekDoc = await getDocument('order_list', currentWeekString);
+                const nextWeekDoc = await getDocument('order_list', nextWeekString);
+                
+                const isReopenCurrent = weekDoc && weekDoc[userEmailKey] && weekDoc[userEmailKey].order === 'reopen';
+                const isReopenNext = nextWeekDoc && nextWeekDoc[userEmailKey] && nextWeekDoc[userEmailKey].order === 'reopen';
+            
+                if (isReopenCurrent) {
+                    await renderReopenOrderSection(el('order-section-container'), currentWeekString);
+                } else if (isReopenNext) {
+                    await renderReopenOrderSection(el('order-section-container'), nextWeekString);
+                } else {
+                    await renderOrderSection(el('order-section-container'));
+                }
+            }
             else if (classList.contains('support-row')) {
                 const targetId = dataset.target;
                 const detailRow = el(targetId);
@@ -2156,10 +2255,32 @@
                 }
                 
                 const isReopenMode = state.currentTab === 'today' && 
-                                    document.querySelector('.hero-subtitle')?.textContent.includes('reopen');
+                                    document.querySelector('.hero-subtitle')?.textContent.includes('reopen'); // Cách check cũ hơi rủi ro text
+
+                // Cách fix tốt hơn:
+                // Kiểm tra xem container đang chứa Reopen UI không (thông qua nút submit có data-target-week hay không)
+                const submitReopenBtn = document.getElementById('submit-reopen-order-btn'); // Nút này chỉ xuất hiện khi Reopen ở bước All Selected
+                // Hoặc check Hero text như cũ cũng được, nhưng cần truyền tuần vào.
                 
                 if (isReopenMode) {
-                    renderReopenOrderSection(el('order-section-container'));
+                    // Cần tìm ra tuần đang reopen.
+                    // Cách hack nhanh: Lấy từ text header hoặc lưu state.
+                    // Tốt nhất: Check lại DB như bước click tab ở trên.
+                    
+                    const currentWeekString = getWeekString(new Date());
+                    const nextWeekString = getWeekString(new Date(new Date().getTime() + 7 * 86400000));
+                    
+                    // Đoạn này nên tách ra 1 hàm getReopenStatus() thì code sẽ gọn hơn, nhưng viết inline:
+                    const weekDoc = await getDocument('order_list', currentWeekString);
+                    const nextWeekDoc = await getDocument('order_list', nextWeekString);
+                    const userKey = emailToKey(state.currentUser.email);
+                    
+                    let targetWeek = currentWeekString;
+                    if (nextWeekDoc && nextWeekDoc[userKey] && nextWeekDoc[userKey].order === 'reopen') {
+                        targetWeek = nextWeekString;
+                    }
+                    
+                    renderReopenOrderSection(el('order-section-container'), targetWeek);
                 } else {
                     renderOrderSection(el('order-section-container'));
                 }
@@ -2172,8 +2293,11 @@
                     let targetWeek;
                     
                     if (isReopen) { 
-                        targetWeek = getWeekString(today); 
+                        // SỬA: Lấy tuần từ dataset của nút (đã thêm ở Bước 3)
+                        // Nếu không có (fallback), mới lấy tuần hiện tại
+                        targetWeek = dataset.targetWeek || getWeekString(today); 
                     } else {
+                        // Logic đặt hàng bình thường giữ nguyên
                         const dayOfWeek = today.getDay(); 
                         const hour = today.getHours();
                         const canOrderNextWeek = (dayOfWeek === 4 && hour >= 15) || dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0;
@@ -2486,9 +2610,43 @@
             else if (id === 'save-guest-order-btn') {
                 showLoader(); try { const guestName = el('guest-name-input').value.trim(); if (!guestName) { showToast('Vui lòng nhập tên khách.', 'error'); hideLoader(); return; } const targetWeek = document.querySelector('input[name="guest-week"]:checked').value === 'next' ? getWeekString(new Date(Date.now() + 7*864e5)) : getWeekString(new Date()); const guestKey = `guest_${Date.now()}`; const payload = { [guestKey]: { name: guestName, depart: el('guest-depart-input').value.trim(), shift: state.guestShiftSelection, order: 'ordered' } }; for (const day in state.guestOrderSelection) { const dishName = state.guestOrderSelection[day]; const isNoOrder = dishName.toLowerCase().includes('không đặt cơm'); const prefix = isNoOrder ? '[ignore] ' : 'not: '; payload[guestKey][day] = `${prefix}${dishName}`; } await setDoc(doc(db, 'order_list', targetWeek), payload, { merge: true }); showToast(`${__('orderSuccess')} cho khách ${guestName}`); state.guestOrderSelection = {}; el('guest-order-modal').classList.add('hidden'); await renderAdmin(); } catch(err) { console.error(err); showToast(__('orderFailed'), 'error'); } finally { hideLoader(); }
             }
-            else if (classList.contains('reopen-order-btn')) { state.reopenTarget = { key: dataset.key, name: dataset.name }; el('reopen-order-modal-title').textContent = `${__('reopenOrderFor')} ${dataset.name}?`; el('reopen-order-text').textContent = __('reopenConfirmText'); el('reopen-order-modal').classList.remove('hidden'); } 
-            else if(id === 'confirm-reopen-order-btn'){ showLoader(); try { const weekString = getWeekString(new Date()); await setDoc(doc(db, 'order_list', weekString), { [state.reopenTarget.key]: { order: 'reopen', name: state.reopenTarget.name } }, { merge: true }); showToast(__('reopenSuccess')); el('reopen-order-modal').classList.add('hidden'); if (state.reopenTarget.key === emailToKey(state.currentUser.email)) { state.orderSelection = {}; state.currentTab = 'today'; await render(); } else { await renderAdmin(); } } catch { showToast(__('error'), 'error'); } finally { hideLoader(); } } 
-            else if(dataset.modal) el(dataset.modal).classList.toggle('hidden');
+            else if (classList.contains('reopen-order-btn')) { 
+                // Thêm weekStr vào state
+                state.reopenTarget = { key: dataset.key, name: dataset.name, weekStr: dataset.weekstr }; 
+                el('reopen-order-modal-title').textContent = `${__('reopenOrderFor')} ${dataset.name}?`; 
+                // Hiển thị rõ đang mở cho tuần nào để debug dễ hơn (tuỳ chọn)
+                const weekDisplay = dataset.weekstr.split('_')[1];
+                el('reopen-order-text').innerHTML = `${__('reopenConfirmText')}<br><strong style="color:var(--primary)">Tuần: ${weekDisplay}</strong>`; 
+                el('reopen-order-modal').classList.remove('hidden'); 
+            }             
+            else if(id === 'confirm-reopen-order-btn'){ 
+                showLoader(); 
+                try { 
+                    // SỬA: Dùng state.reopenTarget.weekStr thay vì getWeekString(new Date())
+                    const targetWeek = state.reopenTarget.weekStr || getWeekString(new Date());
+                    
+                    await setDoc(doc(db, 'order_list', targetWeek), { 
+                        [state.reopenTarget.key]: { order: 'reopen', name: state.reopenTarget.name } 
+                    }, { merge: true }); 
+                    
+                    showToast(__('reopenSuccess')); 
+                    el('reopen-order-modal').classList.add('hidden'); 
+                    
+                    // Refresh lại giao diện đúng
+                    if (state.reopenTarget.key === emailToKey(state.currentUser.email)) { 
+                        state.orderSelection = {}; 
+                        state.currentTab = 'today'; 
+                        await render(); 
+                    } else { 
+                        await renderAdmin(); 
+                    } 
+                } catch (e) { 
+                    console.error(e); // Log lỗi ra console để dễ kiểm tra
+                    showToast(__('error'), 'error'); 
+                } finally { 
+                    hideLoader(); 
+                } 
+            }            else if(dataset.modal) el(dataset.modal).classList.toggle('hidden');
             else if (id === 'edit-menu-btn') { state.isEditingMenu = true; await renderAdminMenu(); }
             else if (id === 'cancel-edit-menu-btn') { state.isEditingMenu = false; await renderAdminMenu(); }
             else if (id === 'save-menu-nextWeek') {
