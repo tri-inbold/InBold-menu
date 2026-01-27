@@ -4,8 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inbold Menu - Public Monitor</title>
+    
+    <!-- Firebase SDK -->
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js">
+    
+    <!-- SheetJS (Thư viện xử lý Excel) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
     <link rel="icon" href="data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3e%3cpath fill='%23f97316' d='M63.9 14.4C63.1 6.2 56.2 0 48 0s-15.1 6.2-16 14.3L17.9 149.7c-1.3 6-1.9 12.1-1.9 18.2 0 45.9 35.1 83.6 80 87.7L96 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-224.4c44.9-4.1 80-41.8 80-87.7 0-6.1-.6-12.2-1.9-18.2L223.9 14.3C223.1 6.2 216.2 0 208 0s-15.1 6.2-15.9 14.4L178.5 149.9c-.6 5.7-5.4 10.1-11.1 10.1-5.8 0-10.6-4.4-11.2-10.2L143.9 14.6C143.2 6.3 136.3 0 128 0s-15.2 6.3-15.9 14.6L99.8 149.8c-.5 5.8-5.4 10.2-11.2 10.2-5.8 0-10.6-4.4-11.1-10.1L63.9 14.4zM448 0C432 0 320 32 320 176l0 112c0 35.3 28.7 64 64 64l32 0 0 128c0 17.7 14.3 32 32 32s32-14.3 32-32l0-448c0-17.7-14.3-32-32-32z'/%3e%3c/svg%3e">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
     <style>
@@ -22,7 +28,7 @@
             --bg-card: #ffffff;
             --bg-input: #f9fafb;
             --bg-hover: #fff7ed;
-            --border: #cbd5e1; /* Darker border for light mode visibility */
+            --border: #cbd5e1;
             --text: #334155;
             --text-muted: #64748b;
             --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -56,7 +62,7 @@
         body { font-family: 'Montserrat', sans-serif; background: var(--bg-body); color: var(--text); line-height: 1.5; font-size: 14px; transition: background-color 0.3s, color 0.3s; }
         #app { max-width: 900px; margin: 0 auto; min-height: 100vh; padding: 1.5rem; display: flex; flex-direction: column; position: relative; }
         
-        /* --- NEW NAV BAR DESIGN (Unified Bar) --- */
+        /* --- NAV BAR DESIGN --- */
         .nav-container { 
             display: flex; 
             align-items: center; 
@@ -109,11 +115,8 @@
             font-size: 18px;
         }
 
-        /* --- END NAV BAR DESIGN --- */
-
         .card { background: var(--bg-card); border-radius: var(--radius-md); padding: 1.5rem; margin-bottom: 1rem; border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: background-color 0.3s, border-color 0.3s; }
         
-        /* Date Controls Styling */
         .date-controls-wrapper { margin-bottom: 1rem; background: var(--bg-card); padding: 10px; border-radius: 12px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
         .date-nav { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: center; }
         .date-display { font-size: 15px; font-weight: 700; min-width: 140px; text-align: center; color: var(--primary); }
@@ -164,6 +167,9 @@
         [data-theme="dark"] .badge-morning { background: rgba(66, 153, 225, 0.2); color: #63b3ed; }
         [data-theme="dark"] .badge-evening { background: rgba(128, 90, 213, 0.2); color: #b794f4; }
         
+        .live-indicator { color: #ffffff; font-size: 8px; animation: pulse 2s infinite; margin-left: 6px; vertical-align: middle; position:relative; top:-1px;}
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+        
         .section-title { color: var(--text); border-bottom: 2px solid var(--primary); padding-bottom:5px; margin-bottom:15px; font-size: 18px; }
 
         @media (max-width: 768px) {
@@ -184,8 +190,9 @@
         <!-- Unified Nav Bar -->
         <div class="nav-container">
             <div class="nav-bar">
-                <button class="nav-btn active" data-tab="list">Danh sách đặt</button>
-                <button class="nav-btn" data-tab="stats">Hôm nay</button>
+                <!-- Đảo nội dung: Hôm nay = List (Chi tiết), Danh sách đặt = Stats (Tổng hợp) -->
+                <button class="nav-btn active" data-tab="list">Hôm nay <i class="fas fa-circle live-indicator"></i></button>
+                <button class="nav-btn" data-tab="stats">Danh sách đặt</button>
                 <button id="theme-btn" class="nav-btn theme-toggle-btn" title="Đổi giao diện Sáng/Tối">
                     <i class="fas fa-moon"></i>
                 </button>
@@ -294,12 +301,12 @@
             }
         }
 
-        // --- Export Excel (CSV) ---
-        function exportToCSV(data, date) {
+        // --- Export Excel (.xlsx) using SheetJS ---
+        function exportToExcel(data, date) {
             const dayKey = getDayKey(date);
             const dateStr = date.toLocaleDateString('vi-VN').replace(/\//g, '-');
-            let csvContent = "\uFEFFTên,Món ăn,Ca làm việc,Trạng thái\n";
-
+            
+            // Lọc dữ liệu
             const orders = Object.entries(data).filter(([key, val]) => {
                 return key !== 'menu' && val[dayKey] && val.order !== 'reopen';
             });
@@ -309,10 +316,12 @@
                 return;
             }
 
-            orders.forEach(([key, val]) => {
+            // Tạo cấu trúc dữ liệu cho Excel
+            const excelData = orders.map(([key, val]) => {
                 const rawDish = val[dayKey];
                 const { status, dish } = parseDishValue(rawDish);
-                if (status === 'ignore') return;
+                
+                if (status === 'ignore') return null;
 
                 let statusText = 'Chưa ăn';
                 if (status === 'eaten') statusText = 'Đã ăn';
@@ -321,17 +330,36 @@
                 const shift = (val.shift === 'evening' || val.shift === 'E') ? 'Chiều' : 'Sáng';
                 const dishName = parseDish(rawDish).replace(/,/g, ''); 
                 
-                csvContent += `${val.name},${dishName},${shift},${statusText}\n`;
-            });
+                return {
+                    "Tên nhân viên": val.name,
+                    "Món ăn": dishName,
+                    "Ca làm việc": shift,
+                    "Trạng thái": statusText
+                };
+            }).filter(item => item !== null);
 
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", `Danh_sach_dat_com_${dateStr}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            if (excelData.length === 0) {
+                alert("Không có dữ liệu hợp lệ!");
+                return;
+            }
+
+            // Tạo Workbook và Worksheet
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            const workbook = XLSX.utils.book_new();
+            
+            // Tự động chỉnh độ rộng cột
+            const wscols = [
+                {wch: 25}, // Tên
+                {wch: 30}, // Món
+                {wch: 10}, // Ca
+                {wch: 15}  // Trạng thái
+            ];
+            worksheet['!cols'] = wscols;
+
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Danh sách đặt cơm");
+            
+            // Xuất file
+            XLSX.writeFile(workbook, `Danh_sach_dat_com_${dateStr}.xlsx`);
         }
 
         // --- Common Components ---
@@ -340,8 +368,9 @@
             const dayNames = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
             const dayName = dayNames[state.viewDate.getDay()];
             
+            // Excel button only in List View (Hôm nay)
             const excelButton = isListTab ? 
-                `<button class="mini-btn excel-btn" id="export-btn" title="Tải Excel"><i class="fas fa-file-excel"></i></button>` : '';
+                `<button class="mini-btn excel-btn" id="export-btn" title="Tải Excel (.xlsx)"><i class="fas fa-file-excel"></i></button>` : '';
 
             container.innerHTML = `
                 <div class="date-controls-wrapper">
@@ -378,7 +407,7 @@
             
             if(isListTab && window.currentWeekData) {
                 el('export-btn').addEventListener('click', () => {
-                    exportToCSV(window.currentWeekData, state.viewDate);
+                    exportToExcel(window.currentWeekData, state.viewDate);
                 });
             }
         }
@@ -396,7 +425,7 @@
             }
         }
 
-        // --- Tab: Danh sách đặt ---
+        // --- Tab: Hôm nay (Hiển thị chi tiết + Tìm kiếm + Export) ---
         function renderList(container) {
             const dayKey = getDayKey(state.viewDate);
             const weekString = getWeekString(state.viewDate);
@@ -452,7 +481,7 @@
                 window.currentWeekData = weekData; 
                 const exportBtn = el('export-btn');
                 if(exportBtn) {
-                     exportBtn.onclick = () => exportToCSV(weekData, state.viewDate);
+                     exportBtn.onclick = () => exportToExcel(weekData, state.viewDate);
                 }
 
                 updateListView(weekData, dayKey, state.lastSearchTerm);
@@ -577,7 +606,7 @@
             }
         }
 
-        // --- Tab: Hôm nay ---
+        // --- Tab: Danh sách đặt (Hiển thị thống kê tổng hợp) ---
         function renderStats(container) {
             const dayKey = getDayKey(state.viewDate);
             const weekString = getWeekString(state.viewDate);
