@@ -40,7 +40,7 @@
             --nav-bg: #ffffff;
         }
 
-        /* --- DARK MODE (ORIGINAL PURPLE THEME) --- */
+        /* --- DARK MODE --- */
         [data-theme="dark"] {
             --primary: #667eea;
             --primary-light: #7f9cf5;
@@ -117,6 +117,7 @@
 
         .card { background: var(--bg-card); border-radius: var(--radius-md); padding: 1.5rem; margin-bottom: 1rem; border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: background-color 0.3s, border-color 0.3s; }
         
+        /* Date Controls Styling */
         .date-controls-wrapper { margin-bottom: 1rem; background: var(--bg-card); padding: 10px; border-radius: 12px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
         .date-nav { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: center; }
         .date-display { font-size: 15px; font-weight: 700; min-width: 140px; text-align: center; color: var(--primary); }
@@ -190,7 +191,6 @@
         <!-- Unified Nav Bar -->
         <div class="nav-container">
             <div class="nav-bar">
-                <!-- Đảo nội dung: Hôm nay = List (Chi tiết), Danh sách đặt = Stats (Tổng hợp) -->
                 <button class="nav-btn active" data-tab="list">Hôm nay <i class="fas fa-circle live-indicator"></i></button>
                 <button class="nav-btn" data-tab="stats">Danh sách đặt</button>
                 <button id="theme-btn" class="nav-btn theme-toggle-btn" title="Đổi giao diện Sáng/Tối">
@@ -363,13 +363,13 @@
         }
 
         // --- Common Components ---
-        function renderDateControls(container, isListTab = false) {
+        function renderDateControls(container, showExcel = false) {
             const dateStr = toLocalISOString(state.viewDate);
             const dayNames = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
             const dayName = dayNames[state.viewDate.getDay()];
             
-            // Excel button only in List View (Hôm nay)
-            const excelButton = isListTab ? 
+            // Show Excel button if requested (now in Stats/Danh sách đặt tab)
+            const excelButton = showExcel ? 
                 `<button class="mini-btn excel-btn" id="export-btn" title="Tải Excel (.xlsx)"><i class="fas fa-file-excel"></i></button>` : '';
 
             container.innerHTML = `
@@ -405,11 +405,8 @@
                 render();
             });
             
-            if(isListTab && window.currentWeekData) {
-                el('export-btn').addEventListener('click', () => {
-                    exportToExcel(window.currentWeekData, state.viewDate);
-                });
-            }
+            // Note: Event listener for export-btn is attached later in the main render function
+            // because it needs the 'weekData' variable which is available only after fetching.
         }
 
         async function render() {
@@ -425,13 +422,15 @@
             }
         }
 
-        // --- Tab: Hôm nay (Hiển thị chi tiết + Tìm kiếm + Export) ---
+        // --- Tab: Hôm nay (Hiển thị chi tiết nhân viên, KHÔNG có lịch) ---
         function renderList(container) {
+            // Force viewDate to today when in this tab
+            state.viewDate = new Date();
             const dayKey = getDayKey(state.viewDate);
             const weekString = getWeekString(state.viewDate);
             
             const headerHtml = `
-                <div id="date-controls-container"></div>
+                <!-- No Date Controls here -->
                 <div class="search-bar">
                     <div class="search-wrapper">
                         <i class="fas fa-search search-icon"></i>
@@ -444,8 +443,6 @@
                 <div id="list-container"></div>
             `;
             container.innerHTML = headerHtml;
-
-            renderDateControls(el('date-controls-container'), true);
 
             el('search-input').addEventListener('input', (e) => {
                 state.lastSearchTerm = e.target.value;
@@ -479,11 +476,7 @@
                 
                 const weekData = docSnap.data();
                 window.currentWeekData = weekData; 
-                const exportBtn = el('export-btn');
-                if(exportBtn) {
-                     exportBtn.onclick = () => exportToExcel(weekData, state.viewDate);
-                }
-
+                // No Export button in this tab
                 updateListView(weekData, dayKey, state.lastSearchTerm);
             }, (error) => {
                 hideLoader();
@@ -494,6 +487,7 @@
 
         function updateListView(weekData, dayKey, searchTerm) {
             const container = el('list-container');
+            const hour = new Date().getHours();
             
             const orders = Object.entries(weekData)
                 .filter(([key, val]) => {
@@ -584,7 +578,6 @@
             });
 
             let contentHtml = '';
-            const hour = new Date().getHours();
             
             if (state.filterMode === 'all') {
                 contentHtml += generateSection(morningShift, '<i class="fas fa-sun" style="color:#f6e05e"></i> Ca Sáng');
@@ -606,7 +599,7 @@
             }
         }
 
-        // --- Tab: Danh sách đặt (Hiển thị thống kê tổng hợp) ---
+        // --- Tab: Danh sách đặt (Hiển thị thống kê tổng hợp + CÓ lịch + CÓ Excel) ---
         function renderStats(container) {
             const dayKey = getDayKey(state.viewDate);
             const weekString = getWeekString(state.viewDate);
@@ -614,7 +607,8 @@
             const controlsHtml = `<div id="stats-controls"></div><div id="stats-table-container"></div>`;
             container.innerHTML = controlsHtml;
 
-            renderDateControls(el('stats-controls'), false);
+            // Render controls WITH Excel button (true)
+            renderDateControls(el('stats-controls'), true);
 
             const docRef = doc(db, 'order_list', weekString);
             const statsContainer = el('stats-table-container');
@@ -626,6 +620,13 @@
                     return;
                 }
                 const weekDoc = docSnap.data();
+                
+                // Bind Excel export now that we have data
+                const exportBtn = el('export-btn');
+                if(exportBtn) {
+                     exportBtn.onclick = () => exportToExcel(weekDoc, state.viewDate);
+                }
+
                 updateStatsView(weekDoc, dayKey, statsContainer);
             }, (error) => {
                 hideLoader();
