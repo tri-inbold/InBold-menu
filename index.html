@@ -768,31 +768,49 @@
             if (['sun', 'sat'].includes(dayKey)) {
                 heroHtml = `<div class="card hero-card"><div class="hero-content"><div class="hero-greeting">${__('hi')} ${firstName}</div><div class="hero-title">${__('weekend')}</div></div></div>`;
             } else {
-                const rawDishString = userData ? userData[dayKey] : null;
-                if (rawDishString) {
-                    const { status, dish } = parseDishValue(rawDishString);
-                    const isSkipped = status === 'giveup';
-                    const isEaten = status === 'eaten';
-                    const isPlaceholder = status === 'ignore' || status === 'placeholder';
+				const rawDishString = userData ? userData[dayKey] : null;
+				const hasOrdered = userData && userData.order === 'ordered'; // ✅ Check đã đặt món chưa
+				
+				if (rawDishString) {
+					const { status, dish } = parseDishValue(rawDishString);
+					const isSkipped = status === 'giveup';
+					const isEaten = status === 'eaten';
+					const isPlaceholder = status === 'ignore' || status === 'placeholder';
 
-                    heroHtml = `<div class="card hero-card">
-                        <div class="hero-content">
-                            <div class="hero-greeting">${__('hi')} ${firstName}</div>
-                            <div class="hero-title">${parseDish(rawDishString)}</div>
-                            ${!isPlaceholder ? `<div class="action-buttons-hero">
-                                <button class="btn btn-skip ${isSkipped ? 'active' : ''}" data-action="skip-modal" data-dish="${dish}" data-day="${dayKey}" ${isSkipped || isEaten ? 'disabled' : ''}>
-                                    <i class="fas fa-ban"></i> ${__('skip')}
-                                </button>
-                                <button class="btn btn-eaten ${isEaten ? 'active' : ''}" data-action="eaten" data-day="${dayKey}" ${isEaten ? 'disabled' : ''}>
-                                    <i class="fas fa-check"></i> ${__('eaten')}
-                                </button>
-                            </div>` : ''}
-                        </div>
-                    </div>`;
-                } else {
-                    heroHtml = `<div class="card hero-card"><div class="hero-content"><div class="hero-greeting">${__('hi')} ${firstName}</div><div class="hero-title">${__('notOrdered')}</div><div class="hero-subtitle">${__('notOrderedDesc')}</div></div></div>`;
-                }
-            }
+					heroHtml = `<div class="card hero-card">
+						<div class="hero-content">
+							<div class="hero-greeting">${__('hi')} ${firstName}</div>
+							<div class="hero-title">${parseDish(rawDishString)}</div>
+							${!isPlaceholder ? `<div class="action-buttons-hero">
+								<button class="btn btn-skip ${isSkipped ? 'active' : ''}" data-action="skip-modal" data-dish="${dish}" data-day="${dayKey}" ${isSkipped || isEaten ? 'disabled' : ''}>
+									<i class="fas fa-ban"></i> ${__('skip')}
+								</button>
+								<button class="btn btn-eaten ${isEaten ? 'active' : ''}" data-action="eaten" data-day="${dayKey}" ${isEaten ? 'disabled' : ''}>
+									<i class="fas fa-check"></i> ${__('eaten')}
+								</button>
+							</div>` : ''}
+						</div>
+					</div>`;
+				} else if (hasOrdered) {
+					// ✅ Đã đặt món nhưng hôm nay nghỉ/không có món
+					heroHtml = `<div class="card hero-card">
+						<div class="hero-content">
+							<div class="hero-greeting">${__('hi')} ${firstName}</div>
+							<div class="hero-title">${__('rest')}</div>
+							<div class="hero-subtitle">Hôm nay bạn không có món</div>
+						</div>
+					</div>`;
+				} else {
+					// ✅ Chưa đặt món cho tuần này
+					heroHtml = `<div class="card hero-card">
+						<div class="hero-content">
+							<div class="hero-greeting">${__('hi')} ${firstName}</div>
+							<div class="hero-title">${__('notOrdered')}</div>
+							<div class="hero-subtitle">${__('notOrderedDesc')}</div>
+						</div>
+					</div>`;
+				}
+			}
             el('main-content').innerHTML = heroHtml + giftHTML + `<div id="order-section-container"></div>`;
             await renderOrderSection(el('order-section-container'));
         }
@@ -827,10 +845,10 @@
                     else summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish text-muted">${__('notOrdered')}</div></div></li>`;
                 }
                 htmlContent += summaryHTML + `</ul></div>`;
-            } else if (isCurrentWeekPeriod) {
-                htmlContent += `<div class="card text-center" style="padding: 2rem;"><i class="fas fa-calendar-xmark" style="font-size: 48px; color: var(--text-muted); margin-bottom: 1rem;"></i><h3 style="color: var(--text); margin-bottom: 0.5rem;">${__('notOrderedThisWeek')}</h3><p class="text-muted" style="margin-bottom: 1.5rem;">${__('contactSupport')}</p><a href="mailto:${SUPPORT_EMAIL}" class="btn btn-primary" style="text-decoration: none;"><i class="fas fa-headset"></i> ${__('support')}</a></div>`;
-            }
-
+			} else if (isCurrentWeekPeriod && !hasOrderedCurrentWeek) {
+				// ✅ CHỈ hiện thông báo khi: Đang trong thời gian đặt món + Chưa đặt
+				htmlContent += `<div class="card text-center" style="padding: 2rem;"><i class="fas fa-calendar-xmark" style="font-size: 48px; color: var(--text-muted); margin-bottom: 1rem;"></i><h3 style="color: var(--text); margin-bottom: 0.5rem;">${__('notOrderedThisWeek')}</h3><p class="text-muted" style="margin-bottom: 1.5rem;">${__('contactSupport')}</p><a href="mailto:${SUPPORT_EMAIL}" class="btn btn-primary" style="text-decoration: none;"><i class="fas fa-headset"></i> ${__('support')}</a></div>`;
+			}
             if (!isCurrentWeekPeriod) {
                 const userDataNext = nextWeekDoc ? nextWeekDoc[userEmailKey] : null;
                 const hasOrderedNextWeek = userDataNext && userDataNext.order === 'ordered';
