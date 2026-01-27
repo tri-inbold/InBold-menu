@@ -1,59 +1,79 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inbold Menu - Public Monitor</title>
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
-    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js">
     <link rel="icon" href="data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3e%3cpath fill='%23667eea' d='M63.9 14.4C63.1 6.2 56.2 0 48 0s-15.1 6.2-16 14.3L17.9 149.7c-1.3 6-1.9 12.1-1.9 18.2 0 45.9 35.1 83.6 80 87.7L96 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-224.4c44.9-4.1 80-41.8 80-87.7 0-6.1-.6-12.2-1.9-18.2L223.9 14.3C223.1 6.2 216.2 0 208 0s-15.1 6.2-15.9 14.4L178.5 149.9c-.6 5.7-5.4 10.1-11.1 10.1-5.8 0-10.6-4.4-11.2-10.2L143.9 14.6C143.2 6.3 136.3 0 128 0s-15.2 6.3-15.9 14.6L99.8 149.8c-.5 5.8-5.4 10.2-11.2 10.2-5.8 0-10.6-4.4-11.1-10.1L63.9 14.4zM448 0C432 0 320 32 320 176l0 112c0 35.3 28.7 64 64 64l32 0 0 128c0 17.7 14.3 32 32 32s32-14.3 32-32l0-448c0-17.7-14.3-32-32-32z'/%3e%3c/svg%3e">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
         
         :root { 
+            /* Light Mode Variables (Default) */
             --primary: #667eea;
-            --primary-dark: #5a67d8;
-            --secondary: #4299e1;
-            --success: #48bb78;
-            --warning: #ed8936;
-            --error: #f56565;
-            --dark-bg: #0f172a;
-            --card-bg: #1e293b;
-            --card-hover: #334155;
+            --primary-light: #5a67d8;
+            --bg-body: #f3f4f6;
+            --bg-card: #ffffff;
+            --bg-input: #f9fafb;
+            --bg-hover: #f1f5f9;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+            
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --radius-md: 12px;
+        }
+
+        /* Dark Mode Variables */
+        [data-theme="dark"] {
+            --bg-body: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: rgba(15, 23, 42, 0.5);
+            --bg-hover: #334155;
             --border: #334155;
             --text: #f1f5f9;
             --text-muted: #94a3b8;
-            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
-            --radius-md: 12px;
+            --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
         
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Montserrat', sans-serif; background: var(--dark-bg); color: var(--text); line-height: 1.5; font-size: 14px; }
-        #app { max-width: 900px; margin: 0 auto; min-height: 100vh; padding: 1.5rem; display: flex; flex-direction: column; }
+        body { font-family: 'Montserrat', sans-serif; background: var(--bg-body); color: var(--text); line-height: 1.5; font-size: 14px; transition: background-color 0.3s, color 0.3s; }
+        #app { max-width: 900px; margin: 0 auto; min-height: 100vh; padding: 1.5rem; display: flex; flex-direction: column; position: relative; }
         
-        .card { background: var(--card-bg); border-radius: var(--radius-md); padding: 1.5rem; margin-bottom: 1rem; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+        .header-controls { display: flex; justify-content: flex-end; margin-bottom: 1rem; }
+        .theme-toggle { background: var(--bg-card); border: 1px solid var(--border); color: var(--text); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; box-shadow: var(--shadow-sm); }
+        .theme-toggle:hover { background: var(--bg-hover); transform: rotate(15deg); }
+
+        .card { background: var(--bg-card); border-radius: var(--radius-md); padding: 1.5rem; margin-bottom: 1rem; border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: background-color 0.3s, border-color 0.3s; }
         
         .tabs { display: flex; gap: 8px; margin-bottom: 1.5rem; justify-content: center; }
-        .tab-btn { padding: 14px 32px; border-radius: 50px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; transition: all 0.2s ease; font-weight: 600; font-size: 16px; }
-        .tab-btn:hover { background: var(--card-hover); color: var(--text); }
+        .tab-btn { padding: 12px 28px; border-radius: 50px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; transition: all 0.2s ease; font-weight: 600; font-size: 15px; box-shadow: var(--shadow-sm); }
+        .tab-btn:hover { background: var(--bg-hover); color: var(--text); }
         .tab-btn.active { background: var(--gradient-1); border-color: transparent; color: white; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); }
         
         .search-bar { display: flex; gap: 8px; margin-bottom: 1rem; }
         .search-wrapper { position: relative; flex: 1; }
-        .search-input { width: 100%; padding: 12px 12px 12px 40px; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: inherit; }
+        .search-input { width: 100%; padding: 12px 12px 12px 40px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: inherit; transition: all 0.2s; }
+        .search-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
         .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
-        .icon-btn { width: 42px; height: 42px; border-radius: 8px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        
+        .icon-btn { width: 42px; height: 42px; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+        .icon-btn:hover { background: var(--bg-hover); }
+
         .department-group { margin-bottom: 1.5rem; }
-        .department-header { color: var(--primary-light); padding: 0.5rem 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid rgba(102, 126, 234, 0.2); margin-bottom: 0.5rem; }
+        .department-header { color: var(--primary); padding: 0.5rem 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); margin-bottom: 0.5rem; }
         
         .staff-list { list-style: none; }
-        .staff-item { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: rgba(30, 41, 59, 0.6); border-radius: 8px; margin-bottom: 6px; border: 1px solid transparent; transition: all 0.2s; }
-        .staff-item:hover { background: rgba(30, 41, 59, 1); border-color: rgba(102, 126, 234, 0.3); }
-        .staff-item.eaten { opacity: 0.5; background: rgba(30, 41, 59, 0.3); }
-        .staff-item.skipped { border-left: 3px solid var(--warning); background: rgba(237, 137, 54, 0.05); }
+        .staff-item { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: var(--bg-card); border-radius: 8px; margin-bottom: 6px; border: 1px solid var(--border); transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .staff-item:hover { transform: translateY(-1px); border-color: var(--primary); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .staff-item.eaten { opacity: 0.6; background: var(--bg-input); box-shadow: none; }
+        .staff-item.skipped { border-left: 3px solid var(--warning); background: rgba(245, 158, 11, 0.05); }
         
         .staff-name { font-weight: 600; font-size: 14px; color: var(--text); margin-bottom: 3px; }
         .staff-dish { font-size: 14px; color: var(--text-muted); }
@@ -61,11 +81,11 @@
         .status-eaten { color: var(--success); }
         .status-skip { color: var(--warning); }
         
-        .table-wrapper { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 1rem; }
+        .table-wrapper { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 1rem; background: var(--bg-card); }
         table { width: 100%; border-collapse: collapse; }
         thead { background: rgba(102, 126, 234, 0.1); }
-        th, td { padding: 12px 15px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border); }
-        th { font-weight: 600; color: var(--primary-light); text-transform: uppercase; font-size: 12px; }
+        th, td { padding: 12px 15px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--text); }
+        th { font-weight: 600; color: var(--primary); text-transform: uppercase; font-size: 12px; }
         tr:last-child td { border-bottom: none; }
         .stats-date-controls { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 1.5rem; }
         .date-display { font-size: 16px; font-weight: 600; min-width: 150px; text-align: center; }
@@ -73,30 +93,43 @@
         .hidden { display: none !important; }
         .text-center { text-align: center; }
         .text-muted { color: var(--text-muted); }
-        #loader { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #0f172a; display: flex; align-items: center; justify-content: center; z-index: 9999; }
-        .static-logo { width: 150px; height: auto; }
+        .text-error { color: var(--error); }
+        #loader { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-body); display: flex; align-items: center; justify-content: center; z-index: 9999; transition: background-color 0.3s; }
         
         .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; margin-left: 6px; }
-        .badge-morning { background: rgba(66, 153, 225, 0.2); color: #63b3ed; }
-        .badge-evening { background: rgba(128, 90, 213, 0.2); color: #b794f4; }
+        .badge-morning { background: rgba(66, 153, 225, 0.15); color: #3182ce; }
+        .badge-evening { background: rgba(128, 90, 213, 0.15); color: #805ad5; }
+        [data-theme="dark"] .badge-morning { background: rgba(66, 153, 225, 0.2); color: #63b3ed; }
+        [data-theme="dark"] .badge-evening { background: rgba(128, 90, 213, 0.2); color: #b794f4; }
+
+        .live-indicator { color: var(--success); font-size: 10px; animation: pulse 2s infinite; margin-left: 5px; vertical-align: middle; }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+        
+        .section-title { color: var(--text); border-bottom: 2px solid var(--primary); padding-bottom:5px; margin-bottom:15px; font-size: 18px; }
 
         @media (max-width: 768px) {
             #app { padding: 1rem; }
-            .tab-btn { padding: 8px 16px; font-size: 13px; }
+            .tab-btn { padding: 10px 20px; font-size: 13px; }
         }
     </style>
 </head>
 <body>
     <div id="loader">
-        <div class="static-logo" style="color:white; font-size: 24px; font-weight:bold; display:flex; align-items:center; gap:10px;">
-            <i class="fas fa-circle-notch fa-spin"></i> Loading...
+        <div style="color:var(--text); font-size: 24px; font-weight:bold; display:flex; align-items:center; gap:10px;">
+            <i class="fas fa-circle-notch fa-spin" style="color:var(--primary)"></i> Loading...
         </div>
     </div>
 
     <div id="app">
+        <div class="header-controls">
+            <button id="theme-btn" class="theme-toggle" title="Đổi giao diện Sáng/Tối">
+                <i class="fas fa-moon"></i>
+            </button>
+        </div>
+
         <div class="tabs">
-            <button class="tab-btn active" data-tab="list">Hôm nay</button>
-            <button class="tab-btn" data-tab="stats">Danh sách đặt</button>
+            <button class="tab-btn active" data-tab="list">Danh sách đặt <i class="fas fa-circle live-indicator"></i></button>
+            <button class="tab-btn" data-tab="stats">Hôm nay</button>
         </div>
 
         <main id="main-content"></main>
@@ -104,7 +137,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js";
+        import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCDrCaGUyr9xLkT-xOqzFd9grp6tN2u7Zo",
@@ -119,12 +152,37 @@
         const db = getFirestore(app);
 
         const state = {
-            currentTab: 'list',
+            currentTab: 'list', // Mặc định là Danh sách đặt
             statsViewDate: new Date(), 
-            filterMode: 'auto'
+            filterMode: 'auto',
+            lastSearchTerm: '',
+            theme: localStorage.getItem('theme') || 'light' // Mặc định là Light
         };
 
+        let unsubscribe = null;
         const el = (id) => document.getElementById(id);
+
+        // --- Theme Logic ---
+        const updateThemeUI = () => {
+            document.documentElement.setAttribute('data-theme', state.theme);
+            const icon = el('theme-btn').querySelector('i');
+            if (state.theme === 'light') {
+                icon.className = 'fas fa-moon'; // Icon trăng cho nút (bấm để vào tối)
+            } else {
+                icon.className = 'fas fa-sun'; // Icon trời cho nút (bấm để vào sáng)
+            }
+        };
+
+        el('theme-btn').addEventListener('click', () => {
+            state.theme = state.theme === 'light' ? 'dark' : 'light';
+            localStorage.setItem('theme', state.theme);
+            updateThemeUI();
+        });
+        
+        // Init theme immediately
+        updateThemeUI();
+        // -------------------
+
         const showLoader = () => el('loader').classList.remove('hidden');
         const hideLoader = () => el('loader').classList.add('hidden');
 
@@ -141,8 +199,7 @@
         
         const toLocalISOString = (date) => {
             const offset = date.getTimezoneOffset() * 60000;
-            const localISOTime = (new Date(date - offset)).toISOString().slice(0, 10);
-            return localISOTime;
+            return (new Date(date - offset)).toISOString().slice(0, 10);
         };
 
         const parseDishValue = (rawString) => {
@@ -172,31 +229,28 @@
             return parts[0].trim();
         };
 
-        async function getDocument(collection, documentId) {
-            try {
-                const docRef = doc(db, collection, documentId);
-                const docSnap = await getDoc(docRef);
-                return docSnap.exists() ? docSnap.data() : null;
-            } catch (error) {
-                console.error("Lỗi đọc dữ liệu:", error);
-                return null;
+        function clearListener() {
+            if (unsubscribe) {
+                unsubscribe();
+                unsubscribe = null;
             }
         }
 
         async function render() {
+            clearListener(); 
             showLoader();
             const mainContent = el('main-content');
             mainContent.innerHTML = ''; 
 
             if (state.currentTab === 'list') {
-                await renderList(mainContent);
+                renderList(mainContent);
             } else {
-                await renderStats(mainContent);
+                renderStats(mainContent);
             }
-            hideLoader();
         }
 
-        async function renderList(container) {
+        // --- Tab: Danh sách đặt (Chi tiết nhân viên) ---
+        function renderList(container) {
             const today = new Date();
             const dayKey = getDayKey(today);
             const weekString = getWeekString(today);
@@ -205,34 +259,54 @@
                 <div class="search-bar">
                     <div class="search-wrapper">
                         <i class="fas fa-search search-icon"></i>
-                        <input type="text" id="search-input" class="search-input" placeholder="Tìm kiếm tên nhân viên...">
+                        <input type="text" id="search-input" class="search-input" placeholder="Tìm kiếm tên nhân viên..." value="${state.lastSearchTerm}">
                     </div>
-                    <button id="toggle-filter-btn" class="icon-btn" title="Chuyển chế độ xem">
+                    <button id="toggle-filter-btn" class="icon-btn" title="Lọc ca làm việc">
                         <i class="fas ${state.filterMode === 'all' ? 'fa-list' : (today.getHours() < 14 ? 'fa-sun' : 'fa-moon')}"></i>
-                    </button>
-                    <button id="reload-btn" class="icon-btn" title="Làm mới">
-                        <i class="fas fa-sync-alt"></i>
                     </button>
                 </div>
                 <div id="list-container"></div>
             `;
             container.innerHTML = headerHtml;
 
-            const weekData = await getDocument('order_list', weekString);
-            
-            if (!weekData) {
-                el('list-container').innerHTML = `<div class="card text-center text-muted">Chưa có dữ liệu cho tuần này.</div>`;
-                return;
-            }
-
-            el('search-input').addEventListener('input', (e) => updateListView(weekData, dayKey, e.target.value));
-            el('reload-btn').addEventListener('click', () => render());
-            el('toggle-filter-btn').addEventListener('click', () => {
-                state.filterMode = state.filterMode === 'auto' ? 'all' : 'auto';
-                renderList(container); 
+            el('search-input').addEventListener('input', (e) => {
+                state.lastSearchTerm = e.target.value;
+                if (window.currentWeekData) {
+                    updateListView(window.currentWeekData, dayKey, state.lastSearchTerm);
+                }
             });
 
-            updateListView(weekData, dayKey, '');
+            el('toggle-filter-btn').addEventListener('click', () => {
+                state.filterMode = state.filterMode === 'auto' ? 'all' : 'auto';
+                const btnIcon = el('toggle-filter-btn').querySelector('i');
+                const hour = new Date().getHours();
+                if (state.filterMode === 'all') {
+                    btnIcon.className = 'fas fa-list';
+                } else {
+                    btnIcon.className = `fas ${hour < 14 ? 'fa-sun' : 'fa-moon'}`;
+                }
+                if (window.currentWeekData) {
+                    updateListView(window.currentWeekData, dayKey, state.lastSearchTerm);
+                }
+            });
+
+            const docRef = doc(db, 'order_list', weekString);
+            unsubscribe = onSnapshot(docRef, (docSnap) => {
+                hideLoader();
+                if (!docSnap.exists()) {
+                    el('list-container').innerHTML = `<div class="card text-center text-muted">Chưa có dữ liệu cho tuần này.</div>`;
+                    window.currentWeekData = null;
+                    return;
+                }
+                
+                const weekData = docSnap.data();
+                window.currentWeekData = weekData; 
+                updateListView(weekData, dayKey, state.lastSearchTerm);
+            }, (error) => {
+                hideLoader();
+                console.error(error);
+                el('list-container').innerHTML = `<div class="card text-center text-error">Lỗi kết nối.</div>`;
+            });
         }
 
         function updateListView(weekData, dayKey, searchTerm) {
@@ -270,7 +344,7 @@
                 });
 
                 let html = `<div style="margin-bottom: 2rem;">
-                    <h3 style="color:white; border-bottom: 2px solid var(--primary); padding-bottom:5px; margin-bottom:15px;">${title} (${list.length})</h3>`;
+                    <h3 class="section-title">${title} <small class="text-muted" style="font-size:14px; font-weight:normal;">(${list.length})</small></h3>`;
                 
                 const renderGroup = (groupList, groupTitle) => {
                     if (groupList.length === 0) return '';
@@ -279,7 +353,6 @@
                     
                     sorted.forEach(order => {
                         const { status, receiver } = parseDishValue(order.rawDish);
-
                         let statusClass = '';
                         let icon = '';
                         let extra = '';
@@ -314,7 +387,6 @@
                 renderGroup(giveupList, 'Nhượng');
                 renderGroup(notEatenList, 'Chưa ăn');
                 renderGroup(eatenList, 'Đã ăn');
-                
                 html += `</div>`;
                 return html;
             };
@@ -332,26 +404,27 @@
             let contentHtml = '';
             
             if (state.filterMode === 'all') {
-                contentHtml += generateSection(morningShift, '<i class="fas fa-sun"></i> Ca Sáng');
-                contentHtml += generateSection(eveningShift, '<i class="fas fa-moon"></i> Ca Chiều');
+                contentHtml += generateSection(morningShift, '<i class="fas fa-sun" style="color:#f6e05e"></i> Ca Sáng');
+                contentHtml += generateSection(eveningShift, '<i class="fas fa-moon" style="color:#805ad5"></i> Ca Chiều');
             } else {
                 if (hour < 14) {
-                    contentHtml += generateSection(morningShift, '<i class="fas fa-sun"></i> Ca Sáng');
+                    contentHtml += generateSection(morningShift, '<i class="fas fa-sun" style="color:#f6e05e"></i> Ca Sáng');
                     if (eveningShift.length > 0) contentHtml += `<div class="text-center text-muted" style="margin-top:20px"><small>Ca chiều sẽ hiển thị tự động sau 14:00</small></div>`;
                 } else {
-                    contentHtml += generateSection(eveningShift, '<i class="fas fa-moon"></i> Ca Chiều');
+                    contentHtml += generateSection(eveningShift, '<i class="fas fa-moon" style="color:#805ad5"></i> Ca Chiều');
                     if (morningShift.length > 0) contentHtml += `<div class="text-center text-muted" style="margin-top:20px"><small>Xem ca sáng bằng cách bấm nút lọc phía trên</small></div>`;
                 }
             }
 
             if (!contentHtml.trim()) {
-                container.innerHTML = `<div class="card text-center text-muted">Không tìm thấy nhân viên nào đặt món hôm nay.</div>`;
+                container.innerHTML = `<div class="card text-center text-muted">Không tìm thấy nhân viên nào đặt món.</div>`;
             } else {
                 container.innerHTML = contentHtml;
             }
         }
 
-        async function renderStats(container) {
+        // --- Tab: Hôm nay (Thống kê) ---
+        function renderStats(container) {
             const dateStr = toLocalISOString(state.statsViewDate);
             const dayKey = getDayKey(state.statsViewDate);
             const weekStr = getWeekString(state.statsViewDate);
@@ -363,7 +436,7 @@
                 <div style="margin-bottom: 1.5rem;">
                     <div class="stats-date-controls">
                         <button class="icon-btn" id="prev-day"><i class="fas fa-chevron-left"></i></button>
-                        <button class="icon-btn" id="today-btn" title="Hôm nay" style="background:var(--primary); color:white;"><i class="fas fa-calendar-day"></i></button>
+                        <button class="icon-btn" id="today-btn" title="Hôm nay" style="background:var(--primary); color:white; border-color:var(--primary);"><i class="fas fa-calendar-day"></i></button>
                         <div style="position:relative;">
                             <div class="date-display">${dayName}, ${state.statsViewDate.toLocaleDateString('vi-VN')}</div>
                             <input type="date" id="date-picker" value="${dateStr}" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;">
@@ -378,29 +451,39 @@
             el('date-picker').addEventListener('change', (e) => {
                 const parts = e.target.value.split('-');
                 state.statsViewDate = new Date(parts[0], parts[1] - 1, parts[2]);
-                renderStats(container);
+                render(); 
             });
             el('prev-day').addEventListener('click', () => {
                 state.statsViewDate.setDate(state.statsViewDate.getDate() - 1);
-                renderStats(container);
+                render();
             });
             el('next-day').addEventListener('click', () => {
                 state.statsViewDate.setDate(state.statsViewDate.getDate() + 1);
-                renderStats(container);
+                render();
             });
             el('today-btn').addEventListener('click', () => {
                 state.statsViewDate = new Date();
-                renderStats(container);
+                render();
             });
 
-            const weekDoc = await getDocument('order_list', weekStr);
+            const docRef = doc(db, 'order_list', weekStr);
             const statsContainer = el('stats-table-container');
 
-            if (!weekDoc) {
-                statsContainer.innerHTML = `<p class="text-center text-muted">Chưa có dữ liệu cho ngày này.</p>`;
-                return;
-            }
+            unsubscribe = onSnapshot(docRef, (docSnap) => {
+                hideLoader();
+                if (!docSnap.exists()) {
+                    statsContainer.innerHTML = `<p class="text-center text-muted">Chưa có dữ liệu cho ngày này.</p>`;
+                    return;
+                }
+                const weekDoc = docSnap.data();
+                updateStatsView(weekDoc, dayKey, statsContainer);
+            }, (error) => {
+                hideLoader();
+                console.error(error);
+            });
+        }
 
+        function updateStatsView(weekDoc, dayKey, statsContainer) {
             const stats = { morning: {}, evening: {} };
             let hasData = false;
 
@@ -409,7 +492,6 @@
                 if (val.order === 'reopen' || !val[dayKey]) return;
 
                 const { status } = parseDishValue(val[dayKey]);
-                
                 if (status === 'ignore' || status === 'placeholder') return;
 
                 const dish = parseDish(val[dayKey]);
@@ -445,7 +527,7 @@
                                 <thead>
                                     <tr>
                                         <th>Món ăn</th>
-                                        <th class="text-center" style="width: 80px;" title="Tổng đặt"><i class="fas fa-list-ul"></i></th>
+                                        <th class="text-center" style="width: 80px;"><i class="fas fa-list-ul"></i></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -455,7 +537,7 @@
                                             <td class="text-center"><b>${d.ordered}</b></td>
                                         </tr>
                                     `).join('')}
-                                    <tr style="background:rgba(102,126,234,0.1); font-weight:700;">
+                                    <tr style="background:var(--bg-hover); font-weight:700;">
                                         <td>TỔNG CỘNG</td>
                                         <td class="text-center">${totalOrdered}</td>
                                     </tr>
