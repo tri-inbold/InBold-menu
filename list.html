@@ -12,9 +12,11 @@
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
         
         :root { 
+            /* --- LIGHT MODE (ORANGE) --- */
             --primary: #f97316;
             --primary-light: #fb923c;
             --primary-dark: #ea580c;
+            --primary-bg-light: rgba(249, 115, 22, 0.1);
             
             --bg-body: #f3f4f6;
             --bg-card: #ffffff;
@@ -30,9 +32,16 @@
             --error: #ef4444;
             --gradient-1: linear-gradient(135deg, #f97316 0%, #c2410c 100%);
             --radius-md: 12px;
+            --nav-height: 50px; /* Chiều cao chung cho tabs */
         }
 
+        /* --- DARK MODE (ORIGINAL PURPLE) --- */
         [data-theme="dark"] {
+            --primary: #667eea;
+            --primary-light: #7f9cf5;
+            --primary-dark: #5a67d8;
+            --primary-bg-light: rgba(102, 126, 234, 0.15);
+
             --bg-body: #0f172a;
             --bg-card: #1e293b;
             --bg-input: rgba(15, 23, 42, 0.5);
@@ -40,31 +49,51 @@
             --border: #334155;
             --text: #f1f5f9;
             --text-muted: #94a3b8;
-            --primary: #fb923c;
-            --gradient-1: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
+            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
         
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Montserrat', sans-serif; background: var(--bg-body); color: var(--text); line-height: 1.5; font-size: 14px; transition: background-color 0.3s, color 0.3s; }
         #app { max-width: 900px; margin: 0 auto; min-height: 100vh; padding: 1.5rem; display: flex; flex-direction: column; position: relative; }
         
-        .nav-container { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        /* --- NAV CONTAINER (Tabs + Theme Btn) --- */
+        .nav-container { display: flex; align-items: stretch; justify-content: center; gap: 10px; margin-bottom: 1.5rem; flex-wrap: wrap; }
         
-        .tabs { display: flex; gap: 8px; }
-        .tab-btn { padding: 12px 24px; border-radius: 50px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; transition: all 0.2s ease; font-weight: 600; font-size: 15px; box-shadow: var(--shadow-sm); }
-        .tab-btn:hover { background: var(--bg-hover); color: var(--primary); border-color: var(--primary-light); }
-        .tab-btn.active { background: var(--gradient-1); border-color: transparent; color: white; box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3); }
+        .tabs { display: flex; gap: 10px; flex: 1; max-width: 600px; }
         
-        .theme-toggle { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted); width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; box-shadow: var(--shadow-sm); }
-        .theme-toggle:hover { background: var(--bg-hover); color: var(--primary); border-color: var(--primary-light); transform: rotate(15deg); }
-        .theme-toggle i { font-size: 18px; }
+        .nav-btn {
+            height: var(--nav-height);
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 50px;
+            background: var(--bg-card); border: 1px solid var(--border);
+            color: var(--text-muted); cursor: pointer;
+            transition: all 0.2s ease; font-weight: 600; font-size: 15px;
+            box-shadow: var(--shadow-sm);
+        }
+        .nav-btn:hover { background: var(--bg-hover); color: var(--primary); border-color: var(--primary-light); }
+        
+        .tab-btn { flex: 1; padding: 0 20px; }
+        .tab-btn.active { background: var(--gradient-1); border-color: transparent; color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        
+        .theme-toggle { width: var(--nav-height); border-radius: 50%; padding: 0; flex-shrink: 0; }
+        .theme-toggle i { font-size: 20px; }
 
         .card { background: var(--bg-card); border-radius: var(--radius-md); padding: 1.5rem; margin-bottom: 1rem; border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: background-color 0.3s, border-color 0.3s; }
         
+        /* Date Controls Styling */
+        .date-controls-wrapper { margin-bottom: 1rem; background: var(--bg-card); padding: 10px; border-radius: 12px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .date-nav { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: center; }
+        .date-display { font-size: 15px; font-weight: 700; min-width: 140px; text-align: center; color: var(--primary); }
+        .mini-btn { width: 36px; height: 36px; border-radius: 8px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+        .mini-btn:hover { background: var(--primary); color: white; border-color: transparent; }
+        .excel-btn { background: #10b981; color: white; border: none; margin-left: 10px; }
+        .excel-btn:hover { background: #059669; }
+
         .search-bar { display: flex; gap: 8px; margin-bottom: 1rem; }
         .search-wrapper { position: relative; flex: 1; }
         .search-input { width: 100%; padding: 12px 12px 12px 40px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: inherit; transition: all 0.2s; }
-        .search-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1); }
+        .search-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-bg-light); }
         .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
         .icon-btn { width: 42px; height: 42px; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
         .icon-btn:hover { background: var(--bg-hover); color: var(--primary); }
@@ -86,12 +115,10 @@
         
         .table-wrapper { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 1rem; background: var(--bg-card); }
         table { width: 100%; border-collapse: collapse; }
-        thead { background: rgba(249, 115, 22, 0.1); }
+        thead { background: var(--primary-bg-light); }
         th, td { padding: 12px 15px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--text); }
         th { font-weight: 600; color: var(--primary); text-transform: uppercase; font-size: 12px; }
         tr:last-child td { border-bottom: none; }
-        .stats-date-controls { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 1.5rem; }
-        .date-display { font-size: 16px; font-weight: 600; min-width: 150px; text-align: center; }
         
         .hidden { display: none !important; }
         .text-center { text-align: center; }
@@ -112,7 +139,9 @@
 
         @media (max-width: 768px) {
             #app { padding: 1rem; }
-            .tab-btn { padding: 10px 20px; font-size: 13px; }
+            .nav-container { gap: 8px; }
+            .tab-btn { padding: 0 15px; font-size: 13px; }
+            .date-display { min-width: 100px; font-size: 14px; }
         }
     </style>
 </head>
@@ -126,10 +155,10 @@
     <div id="app">
         <div class="nav-container">
             <div class="tabs">
-                <button class="tab-btn active" data-tab="list">Danh sách đặt <i class="fas fa-circle live-indicator"></i></button>
-                <button class="tab-btn" data-tab="stats">Hôm nay</button>
+                <button class="nav-btn tab-btn active" data-tab="list">Danh sách đặt <i class="fas fa-circle live-indicator"></i></button>
+                <button class="nav-btn tab-btn" data-tab="stats">Hôm nay</button>
             </div>
-            <button id="theme-btn" class="theme-toggle" title="Đổi giao diện Sáng/Tối">
+            <button id="theme-btn" class="nav-btn theme-toggle" title="Đổi giao diện Sáng/Tối">
                 <i class="fas fa-moon"></i>
             </button>
         </div>
@@ -155,7 +184,7 @@
 
         const state = {
             currentTab: 'list', 
-            statsViewDate: new Date(), 
+            viewDate: new Date(), 
             filterMode: 'auto',
             lastSearchTerm: '',
             theme: localStorage.getItem('theme') || 'light'
@@ -164,6 +193,7 @@
         let unsubscribe = null;
         const el = (id) => document.getElementById(id);
 
+        // --- Theme Logic ---
         const updateThemeUI = () => {
             document.documentElement.setAttribute('data-theme', state.theme);
             const icon = el('theme-btn').querySelector('i');
@@ -179,8 +209,8 @@
             localStorage.setItem('theme', state.theme);
             updateThemeUI();
         });
-        
         updateThemeUI();
+        // -------------------
 
         const showLoader = () => el('loader').classList.remove('hidden');
         const hideLoader = () => el('loader').classList.add('hidden');
@@ -235,6 +265,95 @@
             }
         }
 
+        // --- Export Excel (CSV) ---
+        function exportToCSV(data, date) {
+            const dayKey = getDayKey(date);
+            const dateStr = date.toLocaleDateString('vi-VN').replace(/\//g, '-');
+            let csvContent = "\uFEFFTên,Món ăn,Ca làm việc,Trạng thái\n"; // BOM for UTF-8
+
+            const orders = Object.entries(data).filter(([key, val]) => {
+                return key !== 'menu' && val[dayKey] && val.order !== 'reopen';
+            });
+
+            if (orders.length === 0) {
+                alert("Không có dữ liệu để tải xuống!");
+                return;
+            }
+
+            orders.forEach(([key, val]) => {
+                const rawDish = val[dayKey];
+                const { status, dish } = parseDishValue(rawDish);
+                if (status === 'ignore') return;
+
+                let statusText = 'Chưa ăn';
+                if (status === 'eaten') statusText = 'Đã ăn';
+                if (status === 'giveup') statusText = 'Đã nhượng';
+
+                const shift = (val.shift === 'evening' || val.shift === 'E') ? 'Chiều' : 'Sáng';
+                const dishName = parseDish(rawDish).replace(/,/g, ''); // Xóa dấu phẩy để tránh lỗi CSV
+                
+                csvContent += `${val.name},${dishName},${shift},${statusText}\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Danh_sach_dat_com_${dateStr}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // --- Common Components ---
+        function renderDateControls(container, isListTab = false) {
+            const dateStr = toLocalISOString(state.viewDate);
+            const dayNames = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
+            const dayName = dayNames[state.viewDate.getDay()];
+            
+            const excelButton = isListTab ? 
+                `<button class="mini-btn excel-btn" id="export-btn" title="Tải Excel"><i class="fas fa-file-excel"></i></button>` : '';
+
+            container.innerHTML = `
+                <div class="date-controls-wrapper">
+                    <div class="date-nav">
+                        <button class="mini-btn" id="prev-day"><i class="fas fa-chevron-left"></i></button>
+                        <button class="mini-btn" id="today-btn" title="Hôm nay" style="color:var(--primary); font-weight:bold;"><i class="fas fa-calendar-day"></i></button>
+                        <div style="position:relative;">
+                            <div class="date-display">${dayName}, ${state.viewDate.toLocaleDateString('vi-VN')}</div>
+                            <input type="date" id="date-picker" value="${dateStr}" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;">
+                        </div>
+                        <button class="mini-btn" id="next-day"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    ${excelButton}
+                </div>
+            `;
+
+            el('date-picker').addEventListener('change', (e) => {
+                const parts = e.target.value.split('-');
+                state.viewDate = new Date(parts[0], parts[1] - 1, parts[2]);
+                render(); 
+            });
+            el('prev-day').addEventListener('click', () => {
+                state.viewDate.setDate(state.viewDate.getDate() - 1);
+                render();
+            });
+            el('next-day').addEventListener('click', () => {
+                state.viewDate.setDate(state.viewDate.getDate() + 1);
+                render();
+            });
+            el('today-btn').addEventListener('click', () => {
+                state.viewDate = new Date();
+                render();
+            });
+            
+            if(isListTab && window.currentWeekData) {
+                el('export-btn').addEventListener('click', () => {
+                    exportToCSV(window.currentWeekData, state.viewDate);
+                });
+            }
+        }
+
         async function render() {
             clearListener(); 
             showLoader();
@@ -250,23 +369,27 @@
 
         // --- Tab: Danh sách đặt ---
         function renderList(container) {
-            const today = new Date();
-            const dayKey = getDayKey(today);
-            const weekString = getWeekString(today);
+            const dayKey = getDayKey(state.viewDate);
+            const weekString = getWeekString(state.viewDate);
             
+            // Header HTML structure
             const headerHtml = `
+                <div id="date-controls-container"></div>
                 <div class="search-bar">
                     <div class="search-wrapper">
                         <i class="fas fa-search search-icon"></i>
                         <input type="text" id="search-input" class="search-input" placeholder="Tìm kiếm tên nhân viên..." value="${state.lastSearchTerm}">
                     </div>
                     <button id="toggle-filter-btn" class="icon-btn" title="Lọc ca làm việc">
-                        <i class="fas ${state.filterMode === 'all' ? 'fa-list' : (today.getHours() < 14 ? 'fa-sun' : 'fa-moon')}"></i>
+                        <i class="fas ${state.filterMode === 'all' ? 'fa-list' : (new Date().getHours() < 14 ? 'fa-sun' : 'fa-moon')}"></i>
                     </button>
                 </div>
                 <div id="list-container"></div>
             `;
             container.innerHTML = headerHtml;
+
+            // Render date controls with Excel button
+            renderDateControls(el('date-controls-container'), true);
 
             el('search-input').addEventListener('input', (e) => {
                 state.lastSearchTerm = e.target.value;
@@ -300,6 +423,12 @@
                 
                 const weekData = docSnap.data();
                 window.currentWeekData = weekData; 
+                // Re-bind export event since data is loaded
+                const exportBtn = el('export-btn');
+                if(exportBtn) {
+                     exportBtn.onclick = () => exportToCSV(weekData, state.viewDate);
+                }
+
                 updateListView(weekData, dayKey, state.lastSearchTerm);
             }, (error) => {
                 hideLoader();
@@ -310,7 +439,6 @@
 
         function updateListView(weekData, dayKey, searchTerm) {
             const container = el('list-container');
-            const hour = new Date().getHours();
             
             const orders = Object.entries(weekData)
                 .filter(([key, val]) => {
@@ -401,6 +529,7 @@
             });
 
             let contentHtml = '';
+            const hour = new Date().getHours();
             
             if (state.filterMode === 'all') {
                 contentHtml += generateSection(morningShift, '<i class="fas fa-sun" style="color:#f6e05e"></i> Ca Sáng');
@@ -424,48 +553,15 @@
 
         // --- Tab: Hôm nay ---
         function renderStats(container) {
-            const dateStr = toLocalISOString(state.statsViewDate);
-            const dayKey = getDayKey(state.statsViewDate);
-            const weekStr = getWeekString(state.statsViewDate);
+            const dayKey = getDayKey(state.viewDate);
+            const weekString = getWeekString(state.viewDate);
             
-            const dayNames = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
-            const dayName = dayNames[state.statsViewDate.getDay()];
-
-            const controlsHtml = `
-                <div style="margin-bottom: 1.5rem;">
-                    <div class="stats-date-controls">
-                        <button class="icon-btn" id="prev-day"><i class="fas fa-chevron-left"></i></button>
-                        <button class="icon-btn" id="today-btn" title="Hôm nay" style="background:var(--primary); color:white; border-color:var(--primary);"><i class="fas fa-calendar-day"></i></button>
-                        <div style="position:relative;">
-                            <div class="date-display">${dayName}, ${state.statsViewDate.toLocaleDateString('vi-VN')}</div>
-                            <input type="date" id="date-picker" value="${dateStr}" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;">
-                        </div>
-                        <button class="icon-btn" id="next-day"><i class="fas fa-chevron-right"></i></button>
-                    </div>
-                </div>
-                <div id="stats-table-container"></div>
-            `;
+            const controlsHtml = `<div id="stats-controls"></div><div id="stats-table-container"></div>`;
             container.innerHTML = controlsHtml;
 
-            el('date-picker').addEventListener('change', (e) => {
-                const parts = e.target.value.split('-');
-                state.statsViewDate = new Date(parts[0], parts[1] - 1, parts[2]);
-                render(); 
-            });
-            el('prev-day').addEventListener('click', () => {
-                state.statsViewDate.setDate(state.statsViewDate.getDate() - 1);
-                render();
-            });
-            el('next-day').addEventListener('click', () => {
-                state.statsViewDate.setDate(state.statsViewDate.getDate() + 1);
-                render();
-            });
-            el('today-btn').addEventListener('click', () => {
-                state.statsViewDate = new Date();
-                render();
-            });
+            renderDateControls(el('stats-controls'), false);
 
-            const docRef = doc(db, 'order_list', weekStr);
+            const docRef = doc(db, 'order_list', weekString);
             const statsContainer = el('stats-table-container');
 
             unsubscribe = onSnapshot(docRef, (docSnap) => {
