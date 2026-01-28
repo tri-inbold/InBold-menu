@@ -18,6 +18,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
         
         :root { 
+            /* --- LIGHT MODE (ORANGE THEME) --- */
             --primary: #f97316;
             --primary-light: #fb923c;
             --primary-dark: #ea580c;
@@ -113,7 +114,6 @@
             justify-content: center;
         }
         
-        /* UPDATED: Theme Icon Size */
         .theme-toggle-btn i {
             font-size: 14px; 
         }
@@ -122,17 +122,17 @@
         
         /* Date Controls Styling */
         .date-controls-wrapper { margin-bottom: 1rem; background: var(--bg-card); padding: 10px; border-radius: 12px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        .date-nav { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-start; } /* Changed to flex-start for left align */
+        .date-nav { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-start; }
         
         .date-display-wrapper { position:relative; cursor: pointer; transition: color 0.2s; }
         .date-display-wrapper:hover .date-display { color: var(--primary-dark); }
         .date-display { font-size: 15px; font-weight: 700; min-width: 140px; text-align: center; color: var(--primary); padding: 0 10px; }
         
-        /* UPDATED: Responsive Button Styles */
+        /* Button Styles */
         .mini-btn { 
             height: 36px; 
-            min-width: 36px; /* Ensure square on mobile */
-            padding: 0;      /* Remove padding for centering icon */
+            min-width: 36px;
+            padding: 0;
             border-radius: 8px; 
             background: var(--bg-input); 
             border: 1px solid var(--border); 
@@ -197,17 +197,14 @@
         
         .section-title { color: var(--text); border-bottom: 2px solid var(--primary); padding-bottom:5px; margin-bottom:15px; font-size: 18px; }
 
-        /* UPDATED: Desktop Specific Styles */
         @media (min-width: 768px) {
             #app { padding: 1rem; }
             .nav-btn { padding: 8px 16px; font-size: 13px; }
             .date-display { min-width: 100px; font-size: 14px; }
             
-            /* Show text on desktop */
             .btn-text { display: inline; }
-            /* Expand buttons on desktop to fit text */
             .mini-btn { width: auto; padding: 0 16px; }
-            .date-nav { justify-content: center; } /* Center align on desktop */
+            .date-nav { justify-content: center; }
         }
     </style>
 </head>
@@ -219,7 +216,6 @@
     </div>
 
     <div id="app">
-        <!-- Unified Nav Bar -->
         <div class="nav-container">
             <div class="nav-bar">
                 <button class="nav-btn active" data-tab="list">Hôm nay <i class="fas fa-circle live-indicator"></i></button>
@@ -332,54 +328,81 @@
             }
         }
 
-        // --- Export Excel (.xlsx) using SheetJS ---
+        // --- Export Excel (.xlsx) Summary Format ---
         function exportToExcel(data, date) {
             const dayKey = getDayKey(date);
             const dateStr = date.toLocaleDateString('vi-VN').replace(/\//g, '-');
             
-            const orders = Object.entries(data).filter(([key, val]) => {
-                return key !== 'menu' && val[dayKey] && val.order !== 'reopen';
+            // 1. Tổng hợp dữ liệu (Aggregation)
+            const stats = { morning: {}, evening: {} };
+            let hasData = false;
+
+            Object.entries(data).forEach(([key, val]) => {
+                if (key === 'menu' || typeof val !== 'object' || !val) return;
+                if (val.order === 'reopen' || !val[dayKey]) return;
+
+                const { status } = parseDishValue(val[dayKey]);
+                if (status === 'ignore' || status === 'placeholder') return;
+
+                const dish = parseDish(val[dayKey]);
+                if (!dish) return;
+
+                const rawShift = String(val.shift || 'morning').toLowerCase().trim();
+                const shiftKey = (rawShift.includes('e') || rawShift === 'evening') ? 'evening' : 'morning';
+
+                if (!stats[shiftKey][dish]) {
+                    stats[shiftKey][dish] = { ordered: 0 };
+                }
+
+                hasData = true;
+                stats[shiftKey][dish].ordered++;
             });
 
-            if (orders.length === 0) {
+            if (!hasData) {
                 alert("Không có dữ liệu để tải xuống!");
                 return;
             }
 
-            const excelData = orders.map(([key, val]) => {
-                const rawDish = val[dayKey];
-                const { status, dish } = parseDishValue(rawDish);
+            // 2. Chuyển đổi dữ liệu thống kê thành mảng để in vào Excel (Array of Arrays)
+            const ws_data = [];
+
+            const processShiftData = (title, shiftStats) => {
+                const list = Object.entries(shiftStats)
+                    .map(([dish, info]) => ({ dish, count: info.ordered }))
+                    .sort((a, b) => a.dish.localeCompare(b.dish));
                 
-                if (status === 'ignore') return null;
+                if (list.length > 0) {
+                    ws_data.push([title.toUpperCase()]); // Tiêu đề Ca
+                    ws_data.push(["Món ăn", "Số lượng"]); // Header cột
+                    
+                    let total = 0;
+                    list.forEach(item => {
+                        ws_data.push([item.dish, item.count]);
+                        total += item.count;
+                    });
+                    
+                    ws_data.push(["TỔNG CỘNG", total]); // Tổng
+                    ws_data.push([]); // Dòng trống ngăn cách
+                }
+            };
 
-                let statusText = 'Chưa ăn';
-                if (status === 'eaten') statusText = 'Đã ăn';
-                if (status === 'giveup') statusText = 'Đã nhượng';
+            processShiftData("Ca Sáng", stats.morning);
+            processShiftData("Ca Chiều", stats.evening);
 
-                const shift = (val.shift === 'evening' || val.shift === 'E') ? 'Chiều' : 'Sáng';
-                const dishName = parseDish(rawDish).replace(/,/g, ''); 
-                
-                return {
-                    "Tên nhân viên": val.name,
-                    "Món ăn": dishName,
-                    "Ca làm việc": shift,
-                    "Trạng thái": statusText
-                };
-            }).filter(item => item !== null);
-
-            if (excelData.length === 0) {
+            if (ws_data.length === 0) {
                 alert("Không có dữ liệu hợp lệ!");
                 return;
             }
 
-            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            // 3. Tạo Sheet
+            const worksheet = XLSX.utils.aoa_to_sheet(ws_data);
             const workbook = XLSX.utils.book_new();
             
-            const wscols = [{wch: 25}, {wch: 30}, {wch: 10}, {wch: 15}];
-            worksheet['!cols'] = wscols;
+            // Chỉnh độ rộng cột
+            worksheet['!cols'] = [{wch: 30}, {wch: 10}];
 
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Danh sách đặt cơm");
-            XLSX.writeFile(workbook, `Danh_sach_dat_com_${dateStr}.xlsx`);
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Tổng hợp đặt cơm");
+            XLSX.writeFile(workbook, `Tong_hop_dat_com_${dateStr}.xlsx`);
         }
 
         // --- Common Components ---
@@ -394,7 +417,6 @@
                     <span class="btn-text">Tải excel</span>
                 </button>` : '';
 
-            // UPDATED: Reordered buttons (Today left), Added Text Spans, Added Wrapper Click for Desktop
             container.innerHTML = `
                 <div class="date-controls-wrapper">
                     <div class="date-nav">
@@ -415,16 +437,13 @@
                 </div>
             `;
 
-            // EVENTS
             el('date-picker').addEventListener('change', (e) => {
                 const parts = e.target.value.split('-');
                 state.viewDate = new Date(parts[0], parts[1] - 1, parts[2]);
                 render(); 
             });
 
-            // UPDATED: Fix for Desktop date picker opening
             el('date-wrapper').addEventListener('click', (e) => {
-                // Try to use modern showPicker if available, otherwise native click should work via z-index
                 const input = el('date-picker');
                 if (input.showPicker) {
                     input.showPicker();
