@@ -18,7 +18,6 @@
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
         
         :root { 
-            /* --- LIGHT MODE (ORANGE THEME) --- */
             --primary: #f97316;
             --primary-light: #fb923c;
             --primary-dark: #ea580c;
@@ -112,19 +111,44 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
+        }
+        
+        /* UPDATED: Theme Icon Size */
+        .theme-toggle-btn i {
+            font-size: 14px; 
         }
 
         .card { background: var(--bg-card); border-radius: var(--radius-md); padding: 1.5rem; margin-bottom: 1rem; border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: background-color 0.3s, border-color 0.3s; }
         
         /* Date Controls Styling */
         .date-controls-wrapper { margin-bottom: 1rem; background: var(--bg-card); padding: 10px; border-radius: 12px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        .date-nav { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: center; }
-        .date-display { font-size: 15px; font-weight: 700; min-width: 140px; text-align: center; color: var(--primary); }
-        .mini-btn { width: 36px; height: 36px; border-radius: 8px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+        .date-nav { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-start; } /* Changed to flex-start for left align */
+        
+        .date-display-wrapper { position:relative; cursor: pointer; transition: color 0.2s; }
+        .date-display-wrapper:hover .date-display { color: var(--primary-dark); }
+        .date-display { font-size: 15px; font-weight: 700; min-width: 140px; text-align: center; color: var(--primary); padding: 0 10px; }
+        
+        /* UPDATED: Responsive Button Styles */
+        .mini-btn { 
+            height: 36px; 
+            min-width: 36px; /* Ensure square on mobile */
+            padding: 0;      /* Remove padding for centering icon */
+            border-radius: 8px; 
+            background: var(--bg-input); 
+            border: 1px solid var(--border); 
+            color: var(--text); 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            cursor: pointer; 
+            transition: all 0.2s; 
+        }
         .mini-btn:hover { background: var(--primary); color: white; border-color: transparent; }
+        
         .excel-btn { background: #10b981; color: white; border: none; margin-left: 10px; }
         .excel-btn:hover { background: #059669; }
+
+        .btn-text { display: none; font-weight: 600; font-size: 13px; margin-left: 6px; }
 
         .search-bar { display: flex; gap: 8px; margin-bottom: 1rem; }
         .search-wrapper { position: relative; flex: 1; }
@@ -173,10 +197,17 @@
         
         .section-title { color: var(--text); border-bottom: 2px solid var(--primary); padding-bottom:5px; margin-bottom:15px; font-size: 18px; }
 
-        @media (max-width: 768px) {
+        /* UPDATED: Desktop Specific Styles */
+        @media (min-width: 768px) {
             #app { padding: 1rem; }
             .nav-btn { padding: 8px 16px; font-size: 13px; }
             .date-display { min-width: 100px; font-size: 14px; }
+            
+            /* Show text on desktop */
+            .btn-text { display: inline; }
+            /* Expand buttons on desktop to fit text */
+            .mini-btn { width: auto; padding: 0 16px; }
+            .date-nav { justify-content: center; } /* Center align on desktop */
         }
     </style>
 </head>
@@ -306,7 +337,6 @@
             const dayKey = getDayKey(date);
             const dateStr = date.toLocaleDateString('vi-VN').replace(/\//g, '-');
             
-            // Lọc dữ liệu
             const orders = Object.entries(data).filter(([key, val]) => {
                 return key !== 'menu' && val[dayKey] && val.order !== 'reopen';
             });
@@ -316,7 +346,6 @@
                 return;
             }
 
-            // Tạo cấu trúc dữ liệu cho Excel
             const excelData = orders.map(([key, val]) => {
                 const rawDish = val[dayKey];
                 const { status, dish } = parseDishValue(rawDish);
@@ -343,22 +372,13 @@
                 return;
             }
 
-            // Tạo Workbook và Worksheet
             const worksheet = XLSX.utils.json_to_sheet(excelData);
             const workbook = XLSX.utils.book_new();
             
-            // Tự động chỉnh độ rộng cột
-            const wscols = [
-                {wch: 25}, // Tên
-                {wch: 30}, // Món
-                {wch: 10}, // Ca
-                {wch: 15}  // Trạng thái
-            ];
+            const wscols = [{wch: 25}, {wch: 30}, {wch: 10}, {wch: 15}];
             worksheet['!cols'] = wscols;
 
             XLSX.utils.book_append_sheet(workbook, worksheet, "Danh sách đặt cơm");
-            
-            // Xuất file
             XLSX.writeFile(workbook, `Danh_sach_dat_com_${dateStr}.xlsx`);
         }
 
@@ -368,30 +388,49 @@
             const dayNames = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
             const dayName = dayNames[state.viewDate.getDay()];
             
-            // Show Excel button if requested (now in Stats/Danh sách đặt tab)
             const excelButton = showExcel ? 
-                `<button class="mini-btn excel-btn" id="export-btn" title="Tải Excel (.xlsx)"><i class="fas fa-file-excel"></i></button>` : '';
+                `<button class="mini-btn excel-btn" id="export-btn" title="Tải Excel (.xlsx)">
+                    <i class="fas fa-file-excel"></i>
+                    <span class="btn-text">Tải excel</span>
+                </button>` : '';
 
+            // UPDATED: Reordered buttons (Today left), Added Text Spans, Added Wrapper Click for Desktop
             container.innerHTML = `
                 <div class="date-controls-wrapper">
                     <div class="date-nav">
+                        <button class="mini-btn" id="today-btn" title="Hôm nay" style="color:var(--primary); font-weight:bold; margin-right:5px;">
+                            <i class="fas fa-calendar-day"></i>
+                            <span class="btn-text">Hôm nay</span>
+                        </button>
                         <button class="mini-btn" id="prev-day"><i class="fas fa-chevron-left"></i></button>
-                        <button class="mini-btn" id="today-btn" title="Hôm nay" style="color:var(--primary); font-weight:bold;"><i class="fas fa-calendar-day"></i></button>
-                        <div style="position:relative;">
+                        
+                        <div class="date-display-wrapper" id="date-wrapper">
                             <div class="date-display">${dayName}, ${state.viewDate.toLocaleDateString('vi-VN')}</div>
-                            <input type="date" id="date-picker" value="${dateStr}" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;">
+                            <input type="date" id="date-picker" value="${dateStr}" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:10;">
                         </div>
+
                         <button class="mini-btn" id="next-day"><i class="fas fa-chevron-right"></i></button>
                     </div>
                     ${excelButton}
                 </div>
             `;
 
+            // EVENTS
             el('date-picker').addEventListener('change', (e) => {
                 const parts = e.target.value.split('-');
                 state.viewDate = new Date(parts[0], parts[1] - 1, parts[2]);
                 render(); 
             });
+
+            // UPDATED: Fix for Desktop date picker opening
+            el('date-wrapper').addEventListener('click', (e) => {
+                // Try to use modern showPicker if available, otherwise native click should work via z-index
+                const input = el('date-picker');
+                if (input.showPicker) {
+                    input.showPicker();
+                } 
+            });
+
             el('prev-day').addEventListener('click', () => {
                 state.viewDate.setDate(state.viewDate.getDate() - 1);
                 render();
@@ -404,9 +443,6 @@
                 state.viewDate = new Date();
                 render();
             });
-            
-            // Note: Event listener for export-btn is attached later in the main render function
-            // because it needs the 'weekData' variable which is available only after fetching.
         }
 
         async function render() {
@@ -422,15 +458,12 @@
             }
         }
 
-        // --- Tab: Hôm nay (Hiển thị chi tiết nhân viên, KHÔNG có lịch) ---
         function renderList(container) {
-            // Force viewDate to today when in this tab
             state.viewDate = new Date();
             const dayKey = getDayKey(state.viewDate);
             const weekString = getWeekString(state.viewDate);
             
             const headerHtml = `
-                <!-- No Date Controls here -->
                 <div class="search-bar">
                     <div class="search-wrapper">
                         <i class="fas fa-search search-icon"></i>
@@ -476,7 +509,6 @@
                 
                 const weekData = docSnap.data();
                 window.currentWeekData = weekData; 
-                // No Export button in this tab
                 updateListView(weekData, dayKey, state.lastSearchTerm);
             }, (error) => {
                 hideLoader();
@@ -599,7 +631,6 @@
             }
         }
 
-        // --- Tab: Danh sách đặt (Hiển thị thống kê tổng hợp + CÓ lịch + CÓ Excel) ---
         function renderStats(container) {
             const dayKey = getDayKey(state.viewDate);
             const weekString = getWeekString(state.viewDate);
@@ -607,7 +638,6 @@
             const controlsHtml = `<div id="stats-controls"></div><div id="stats-table-container"></div>`;
             container.innerHTML = controlsHtml;
 
-            // Render controls WITH Excel button (true)
             renderDateControls(el('stats-controls'), true);
 
             const docRef = doc(db, 'order_list', weekString);
@@ -621,7 +651,6 @@
                 }
                 const weekDoc = docSnap.data();
                 
-                // Bind Excel export now that we have data
                 const exportBtn = el('export-btn');
                 if(exportBtn) {
                      exportBtn.onclick = () => exportToExcel(weekDoc, state.viewDate);
