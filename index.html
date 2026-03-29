@@ -96,7 +96,6 @@
         [data-theme="light"] .toggle-option.active { background: var(--primary) !important; color: #ffffff !important; box-shadow: 0 4px 10px rgba(249, 115, 22, 0.4);font-weight: 700;}        
         [data-theme="light"] .toggle-group { background: #e2e8f0; }
         [data-theme="light"] #toast-notification { box-shadow: 0 10px 30px rgba(0,0,0,0.15); background: #ffffff; }
-        [data-theme="light"] .shift-pick-btn, [data-theme="light"] .guest-shift-pick-btn { border-color: #cbd5e1 !important; }
         
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Montserrat', sans-serif; background: var(--dark-bg); color: var(--text); line-height: 1.5; font-size: 14px; }
@@ -217,11 +216,12 @@
         .btn-block { width: 100%; }
 
         .status-icon { display: inline-flex; justify-content: center; align-items: center; width: 28px; height: 28px; border-radius: 50%; font-size: 13px; border: 1px solid transparent; transition: all 0.2s ease; }
-        .status-icon-btn { display: inline-flex; justify-content: center; align-items: center; width: 32px; height: 32px; border-radius: 50%; font-size: 14px; border: 1px solid transparent; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease;}
+        .status-icon-btn { display: inline-flex; justify-content: center; align-items: center; width: 26px; height: 26px; border-radius: 50%; font-size: 11px; border: 1px solid transparent; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease;}
         .status-icon-btn:hover { transform: scale(1.1); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         
         .status-sun { color: var(--primary); background: rgba(102, 126, 234, 0.1); border-color: rgba(102, 126, 234, 0.2); }
         .status-moon { color: var(--text); background: rgba(128, 128, 128, 0.1); border-color: var(--border); }
+        .status-both { color: var(--accent); background: rgba(237, 100, 166, 0.1); border-color: rgba(237, 100, 166, 0.3); }
         .status-missing { background: var(--warning); color: #fff; border-color: var(--warning); box-shadow: 0 2px 5px rgba(237, 137, 54, 0.3); }
         
         .support-row { cursor: default; } 
@@ -408,7 +408,18 @@
             </div>
         </div>
         
-        <div id="skip-option-modal" class="modal hidden">
+        <div id="history-cal-modal" class="modal hidden">
+            <div class="modal-content" style="max-width:500px;">
+                <div class="modal-header">
+                    <h2 id="history-cal-title" class="modal-title"></h2>
+                    <button class="close-btn" data-modal="history-cal-modal"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="form-group" style="display:flex;gap:8px;align-items:center;">
+                    <input type="month" id="history-cal-month" class="form-input" style="flex:1;">
+                </div>
+                <div id="history-cal-content" style="margin-top:0.5rem;"></div>
+            </div>
+        </div>
             <div class="modal-content">
                 <div class="modal-header"><h2 class="modal-title">Nhường suất ăn</h2><button class="close-btn" data-modal="skip-option-modal"><i class="fas fa-times"></i></button></div>
                 <p class="text-muted mb-3">Bạn muốn nhường phần ăn này cho ai?</p>
@@ -862,9 +873,12 @@
                 for (const key of dayKeys) {
                     const rawM = userDataCurrent[key + '_M'];
                     const rawE = userDataCurrent[key + '_E'];
-                    if (rawM || rawE) {
-                        if (rawM) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish"><span style="color:var(--primary);font-weight:700;margin-right:6px;">[M]</span>${parseDish(rawM)}</div></div></li>`;
-                        if (rawE) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${rawM ? '' : dayNames[key]}</div><div class="staff-dish"><span style="color:var(--text-muted);font-weight:700;margin-right:6px;">[E]</span>${parseDish(rawE)}</div></div></li>`;
+                    if (rawM && rawE) {
+                        summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish" style="display:flex;flex-direction:column;gap:2px;"><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">Sáng</span>${parseDish(rawM)}</span><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">Chiều</span>${parseDish(rawE)}</span></div></div></li>`;
+                    } else if (rawM) {
+                        summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish">${parseDish(rawM)}</div></div></li>`;
+                    } else if (rawE) {
+                        summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish">${parseDish(rawE)}</div></div></li>`;
                     } else {
                         summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish text-muted">${__('notOrdered')}</div></div></li>`;
                     }
@@ -883,9 +897,12 @@
                     for (const key of dayKeys) {
                         const rawM = userDataNext[key + '_M'];
                         const rawE = userDataNext[key + '_E'];
-                        if (rawM || rawE) {
-                            if (rawM) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish"><span style="color:var(--primary);font-weight:700;margin-right:6px;">[M]</span>${parseDish(rawM)}</div></div></li>`;
-                            if (rawE) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${rawM ? '' : dayNames[key]}</div><div class="staff-dish"><span style="color:var(--text-muted);font-weight:700;margin-right:6px;">[E]</span>${parseDish(rawE)}</div></div></li>`;
+                        if (rawM && rawE) {
+                            summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish" style="display:flex;flex-direction:column;gap:2px;"><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">Sáng</span>${parseDish(rawM)}</span><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">Chiều</span>${parseDish(rawE)}</span></div></div></li>`;
+                        } else if (rawM) {
+                            summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish">${parseDish(rawM)}</div></div></li>`;
+                        } else if (rawE) {
+                            summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish">${parseDish(rawE)}</div></div></li>`;
                         } else {
                             summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish text-muted">${__('rest')}</div></div></li>`;
                         }
@@ -904,8 +921,13 @@
                         for (const dayKey of dayKeys) {
                             const rawM = state.orderSelection[dayKey + '_M'];
                             const rawE = state.orderSelection[dayKey + '_E'];
-                            if (rawM) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish"><span style="color:var(--primary);font-weight:700;margin-right:6px;">[M]</span>${parseDish(rawM)}</div></div></li>`;
-                            if (rawE) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${rawM ? '' : dayNames[dayKey]}</div><div class="staff-dish"><span style="color:var(--text-muted);font-weight:700;margin-right:6px;">[E]</span>${parseDish(rawE)}</div></div></li>`;
+                            if (rawM && rawE) {
+                                summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish" style="display:flex;flex-direction:column;gap:2px;"><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">Sáng</span>${parseDish(rawM)}</span><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">Chiều</span>${parseDish(rawE)}</span></div></div></li>`;
+                            } else if (rawM) {
+                                summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(rawM)}</div></div></li>`;
+                            } else if (rawE) {
+                                summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(rawE)}</div></div></li>`;
+                            }
                         }
                         htmlContent += summaryHTML + `</ul><button id="submit-order-btn" class="btn btn-primary btn-block mt-3"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;
                     } else {
@@ -922,14 +944,15 @@
             container.innerHTML = htmlContent;
         }
 
-        function buildShiftPickerHTML(dayKey) {
+        function buildShiftPickerHTML(dayKey, prefix = 'user') {
             const sh = state.orderShiftSelection[dayKey] || 'M';
-            return `<div class="shift-picker" style="display:flex;gap:6px;margin-bottom:10px;">
-                <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="M" style="flex:1;padding:7px 4px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid var(--border);cursor:pointer;background:${sh==='M'?'var(--primary)':'var(--card-bg)'};color:${sh==='M'?'white':'var(--text-muted)'};">🌅 Ca Sáng</button>
-                <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="E" style="flex:1;padding:7px 4px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid var(--border);cursor:pointer;background:${sh==='E'?'#475569':'var(--card-bg)'};color:${sh==='E'?'white':'var(--text-muted)'};">🌙 Ca Chiều</button>
-                <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="both" style="flex:1;padding:7px 4px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid var(--border);cursor:pointer;background:${sh==='both'?'var(--accent)':'var(--card-bg)'};color:${sh==='both'?'white':'var(--text-muted)'};">☀️🌙 Cả 2</button>
+            return `<div style="display:flex; gap:6px; margin-bottom:12px; background:var(--card-bg); padding:4px; border-radius:8px; border:1px solid var(--border);">
+                <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="M" style="flex:1;padding:8px 4px;border-radius:6px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${sh==='M'?'var(--primary)':'transparent'};color:${sh==='M'?'white':'var(--text-muted)'};">Ca Sáng</button>
+                <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="E" style="flex:1;padding:8px 4px;border-radius:6px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${sh==='E'?'var(--primary)':'transparent'};color:${sh==='E'?'white':'var(--text-muted)'};">Ca Chiều</button>
+                <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="both" style="flex:1;padding:8px 4px;border-radius:6px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${sh==='both'?'var(--primary)':'transparent'};color:${sh==='both'?'white':'var(--text-muted)'};">Hai ca</button>
             </div>`;
         }
+
 
         function buildOrderFormHTML(menu, targetWeekString, isReopen, currentDayIndex = 0, existingUserOrder = {}) {
             const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
@@ -952,26 +975,35 @@
                 const isPast = isReopen && (dayMap[dayKey] < currentDayIndex);
                 const dishes = menu[dayKey] || [];
                 const sh = state.orderShiftSelection[dayKey] || 'M';
+                const selM = state.orderSelection[dayKey + '_M'];
+                const selE = state.orderSelection[dayKey + '_E'];
 
                 daysContentHTML += `<div id="order-day-${dayKey}" class="${state.currentOrderDay === dayKey ? '' : 'hidden'}">`;
 
                 if (isPast) {
                     const oldM = existingUserOrder[dayKey + '_M'] ? parseDish(existingUserOrder[dayKey + '_M']) : '';
                     const oldE = existingUserOrder[dayKey + '_E'] ? parseDish(existingUserOrder[dayKey + '_E']) : '';
-                    const oldDish = [oldM ? `[M] ${oldM}` : '', oldE ? `[E] ${oldE}` : ''].filter(Boolean).join(' | ') || 'Chưa đặt';
+                    const oldDish = [oldM ? `Ca Sáng: ${oldM}` : '', oldE ? `Ca Chiều: ${oldE}` : ''].filter(Boolean).join(' | ') || 'Chưa đặt';
                     daysContentHTML += `<div class="text-center p-3" style="color:var(--text-muted);"><i class="fas fa-lock"></i> Ngày này đã qua.<br>Món đã chọn: <strong>${oldDish}</strong></div>`;
                 } else {
                     daysContentHTML += buildShiftPickerHTML(dayKey);
                     if (Array.isArray(dishes) && dishes.length > 0) {
-                        if (sh === 'M' || sh === 'both') {
-                            const selM = state.orderSelection[dayKey + '_M'];
-                            daysContentHTML += `<div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:6px;padding-top:4px;">🌅 CA SÁNG</div>`;
-                            daysContentHTML += `<div class="order-dish-list" style="margin-bottom:${sh==='both'?'1rem':'0'};">${dishes.map(dish => `<div class="order-dish-item ${dish === selM ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="M"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
-                        }
-                        if (sh === 'E' || sh === 'both') {
-                            const selE = state.orderSelection[dayKey + '_E'];
-                            daysContentHTML += `<div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px;padding-top:4px;">🌙 CA CHIỀU</div>`;
-                            daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item ${dish === selE ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="E"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
+                        if (sh === 'M' || sh === 'E') {
+                            const sel = sh === 'M' ? selM : selE;
+                            daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item ${dish === sel ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="${sh}"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
+                        } else {
+                            // Hai ca: show morning first. After morning chosen, show confirmed + evening list
+                            if (!selM) {
+                                daysContentHTML += `<div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">Ca Sáng</div>`;
+                                daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="M"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
+                            } else {
+                                daysContentHTML += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(102,126,234,0.08);border-radius:8px;margin-bottom:10px;border:1px solid rgba(102,126,234,0.2);">
+                                    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:2px;">Ca Sáng</span><span style="font-size:14px;font-weight:500;">${parseDish(selM)}</span></div>
+                                    <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="both" data-clear-m="1" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;">Đổi</button>
+                                </div>`;
+                                daysContentHTML += `<div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">Ca Chiều</div>`;
+                                daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item ${dish === selE ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="E"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
+                            }
                         }
                     } else {
                         daysContentHTML += `<p class="text-center text-muted p-3">${__('noDishes')}</p><div class="order-dish-list"><div class="order-dish-item" data-dish="Nghỉ" data-day-key="${dayKey}" data-shift-key="${sh === 'E' ? 'E' : 'M'}"><div class="order-dish-name">${__('rest')}</div></div></div>`;
@@ -982,7 +1014,7 @@
 
             const weekNum = targetWeekString.split('_')[1];
             const title = isReopen ? `Đặt lại món (Tuần ${weekNum})` : `${__('orderForWeek')} ${weekNum}`;
-            const warningBanner = isReopen ? `<div style="background:var(--warning);color:white;padding:0.75rem;border-radius:var(--radius-sm);margin-bottom:1rem;text-align:center;"><i class="fas fa-info-circle"></i> Đặt lại: ${__('mon')} → ${__('fri')} (Tuần ${weekNum})</div>` : '';
+            const warningBanner = isReopen ? `<div style="background:var(--warning);color:white;padding:0.75rem;border-radius:var(--radius-sm);margin-bottom:1rem;text-align:center;">Đặt lại: ${__('mon')} → ${__('fri')} (Tuần ${weekNum})</div>` : '';
             return `<div class="card">${warningBanner}<div class="card-header"><h2 class="card-title">${title}</h2></div>${tabsHTML}${daysContentHTML}</div>`;
         }
         
@@ -1018,19 +1050,17 @@
             });
 
             if (allRequiredSelected) {
-                let summaryHTML = `<div class="card"><div style="background:var(--warning);color:white;padding:0.75rem;border-radius:var(--radius-sm);margin-bottom:1rem;text-align:center;"><i class="fas fa-info-circle"></i> Xác nhận lại các món</div><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${targetWeekString.split('_')[1]}</h2></div><ul class="staff-list">`;
+                let summaryHTML = `<div class="card"><div style="background:var(--warning);color:white;padding:0.75rem;border-radius:var(--radius-sm);margin-bottom:1rem;text-align:center;">Xác nhận lại các món</div><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${targetWeekString.split('_')[1]}</h2></div><ul class="staff-list">`;
                 for (const dayKey of dayKeys) {
                     const isPast = isCurrentWeek && (dayMap[dayKey] < currentDayIndex);
-                    if (isPast) {
-                        const oldM = existingUserOrder[dayKey + '_M'] ? parseDish(existingUserOrder[dayKey + '_M']) : '';
-                        const oldE = existingUserOrder[dayKey + '_E'] ? parseDish(existingUserOrder[dayKey + '_E']) : '';
-                        if (oldM) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish"><span style="color:var(--primary);font-weight:700;margin-right:6px;">[M]</span>${oldM}</div></div></li>`;
-                        if (oldE) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${oldM ? '' : dayNames[dayKey]}</div><div class="staff-dish"><span style="color:var(--text-muted);font-weight:700;margin-right:6px;">[E]</span>${oldE}</div></div></li>`;
-                    } else {
-                        const newM = state.orderSelection[dayKey + '_M'];
-                        const newE = state.orderSelection[dayKey + '_E'];
-                        if (newM) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish"><span style="color:var(--primary);font-weight:700;margin-right:6px;">[M]</span>${parseDish(newM)}</div></div></li>`;
-                        if (newE) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${newM ? '' : dayNames[dayKey]}</div><div class="staff-dish"><span style="color:var(--text-muted);font-weight:700;margin-right:6px;">[E]</span>${parseDish(newE)}</div></div></li>`;
+                    const m = isPast ? (existingUserOrder[dayKey + '_M'] ? parseDish(existingUserOrder[dayKey + '_M']) : '') : (state.orderSelection[dayKey + '_M'] ? parseDish(state.orderSelection[dayKey + '_M']) : '');
+                    const e = isPast ? (existingUserOrder[dayKey + '_E'] ? parseDish(existingUserOrder[dayKey + '_E']) : '') : (state.orderSelection[dayKey + '_E'] ? parseDish(state.orderSelection[dayKey + '_E']) : '');
+                    if (m && e) {
+                        summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish" style="display:flex;flex-direction:column;gap:2px;"><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">Sáng</span>${m}</span><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">Chiều</span>${e}</span></div></div></li>`;
+                    } else if (m) {
+                        summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${m}</div></div></li>`;
+                    } else if (e) {
+                        summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${e}</div></div></li>`;
                     }
                 }
                 summaryHTML += `</ul><button id="submit-reopen-order-btn" class="btn btn-primary btn-block mt-3"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;
@@ -1440,8 +1470,9 @@
                 html += `<div class="table-wrapper"><table>
                     <thead>
                         <tr>
-                            <th style="width: 50px; text-align: center;">Tuần này</th>
-                            <th style="width: 50px; text-align: center;">Tuần sau</th>
+                            <th style="width: 36px; text-align: center; padding: 8px 4px;">Chọn ngày</th>
+                            <th style="width: 36px; text-align: center; padding: 8px 4px;">Tuần này</th>
+                            <th style="width: 36px; text-align: center; padding: 8px 4px;">Tuần sau</th>
                             <th>${__('name')}</th>
                             <th class="hide-mobile">${__('department')}</th>
                         </tr>
@@ -1453,10 +1484,10 @@
         
                 const renderIcon = (status, key, weekType) => {
                     let iconClass = 'status-missing';
-                    let iconContent = '<i class="fas fa-times"></i>';
+                    let iconContent = '<i class="fas fa-times" style="font-size:10px;"></i>';
                     if (status === 'morning') { iconClass = 'status-sun'; iconContent = '<i class="fas fa-sun"></i>'; }
                     else if (status === 'evening') { iconClass = 'status-moon'; iconContent = '<i class="fas fa-moon"></i>'; }
-                    else if (status === 'both') { iconClass = 'status-sun'; iconContent = '<i class="fas fa-sun"></i><i class="fas fa-moon" style="font-size:10px;margin-left:2px;"></i>'; }
+                    else if (status === 'both') { iconClass = 'status-both'; iconContent = '<i class="fas fa-circle-half-stroke"></i>'; }
                     return `<div class="status-icon-btn ${iconClass}" data-key="${key}" data-weektype="${weekType}">${iconContent}</div>`;
                 };
         
@@ -1471,27 +1502,41 @@
                         const dishes = menuData[dKey] || [];
                         const curM = orderData ? (parseDishValue(orderData[dKey + '_M']).dish || '') : '';
                         const curE = orderData ? (parseDishValue(orderData[dKey + '_E']).dish || '') : '';
-
+                        // Determine current admin-selected shift mode for this cell
+                        const adminShiftKey = `admin-shift-${weekType}-${key}-${dKey}`;
+                        const hasBoth = curM && curE;
+                        const defShift = hasBoth ? 'both' : (curE ? 'E' : 'M');
+                        // We embed selected shift in data- so JS can toggle
                         content += `<div class="day-block" style="border-bottom:1px dashed var(--border);padding-bottom:8px;margin-bottom:8px;">
                             <span class="day-label ${isPast ? 'past' : ''}" style="display:flex;justify-content:space-between;"><span>${dayNames[dKey]}</span>${isPast ? '<span style="font-size:10px;">(Đã qua)</span>' : ''}</span>`;
 
-                        if (dishes.length > 0) {
-                            ['M','E'].forEach(shiftTag => {
-                                const label = shiftTag === 'M' ? '🌅 Ca Sáng' : '🌙 Ca Chiều';
-                                const cur = shiftTag === 'M' ? curM : curE;
-                                content += `<div style="font-size:11px;font-weight:700;color:${shiftTag==='M'?'var(--primary)':'var(--text-muted)'};margin:6px 0 4px;">${label}</div>`;
-                                content += `<div class="mini-dish-list">`;
-                                dishes.forEach(dish => {
-                                    const isSelected = dish === cur;
-                                    const disabledClass = isPast ? 'disabled' : '';
-                                    content += `<div class="mini-dish-item ${isSelected ? 'selected' : ''} ${disabledClass}" data-dish="${dish}" data-day="${dKey}" data-shift="${shiftTag}" ${isPast ? '' : 'onclick="selectAdminDish(this)"'}>${parseDish(dish)}</div>`;
-                                });
-                                content += `</div>`;
-                            });
+                        if (dishes.length > 0 && !isPast) {
+                            // 3-option shift toggle inline
+                            content += `<div class="admin-shift-toggle" data-uid="${key}" data-wt="${weekType}" data-day="${dKey}" data-cur="${defShift}" style="display:flex;gap:4px;margin:6px 0 8px;background:var(--card-bg);padding:3px;border-radius:7px;border:1px solid var(--border);">
+                                <button onclick="adminToggleShift(this,'M')" class="ast-btn ${defShift==='M'?'ast-active':''}" style="flex:1;padding:4px;border-radius:5px;font-size:11px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${defShift==='M'?'var(--primary)':'transparent'};color:${defShift==='M'?'white':'var(--text-muted)'};">Ca Sáng</button>
+                                <button onclick="adminToggleShift(this,'E')" class="ast-btn ${defShift==='E'?'ast-active':''}" style="flex:1;padding:4px;border-radius:5px;font-size:11px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${defShift==='E'?'var(--primary)':'transparent'};color:${defShift==='E'?'white':'var(--text-muted)'};">Ca Chiều</button>
+                                <button onclick="adminToggleShift(this,'both')" class="ast-btn ${defShift==='both'?'ast-active':''}" style="flex:1;padding:4px;border-radius:5px;font-size:11px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${defShift==='both'?'var(--primary)':'transparent'};color:${defShift==='both'?'white':'var(--text-muted)'};">Hai ca</button>
+                            </div>`;
+                            // Ca Sáng list (show if M or both)
+                            content += `<div class="admin-shift-section admin-shift-M-${key}-${dKey}" style="display:${defShift==='E'?'none':'block'}">`;
+                            if (defShift !== 'E') content += `<div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Ca Sáng</div>`;
+                            content += `<div class="mini-dish-list">`;
+                            dishes.forEach(dish => { content += `<div class="mini-dish-item ${dish===curM?'selected':''}" data-dish="${dish}" data-day="${dKey}" data-shift="M" onclick="selectAdminDish(this)">${parseDish(dish)}</div>`; });
+                            content += `</div></div>`;
+                            // Ca Chiều list (show if E or both)
+                            content += `<div class="admin-shift-section admin-shift-E-${key}-${dKey}" style="display:${defShift==='M'?'none':'block'};${defShift==='both'?'margin-top:8px;':''}">`;
+                            if (defShift !== 'M') content += `<div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Ca Chiều</div>`;
+                            content += `<div class="mini-dish-list">`;
+                            dishes.forEach(dish => { content += `<div class="mini-dish-item ${dish===curE?'selected':''}" data-dish="${dish}" data-day="${dKey}" data-shift="E" onclick="selectAdminDish(this)">${parseDish(dish)}</div>`; });
+                            content += `</div></div>`;
+                        } else if (dishes.length > 0 && isPast) {
+                            // Past day - read only
+                            if (curM) content += `<div style="font-size:12px;padding:4px 0;"><span style="font-size:10px;color:var(--text-muted);">Sáng: </span>${curM}</div>`;
+                            if (curE) content += `<div style="font-size:12px;padding:4px 0;"><span style="font-size:10px;color:var(--text-muted);">Chiều: </span>${curE}</div>`;
+                            if (!curM && !curE) content += `<span class="text-muted" style="font-size:12px;">Chưa đặt</span>`;
                         } else {
                             content += `<span class="text-muted" style="font-size:12px;">${__('rest')}</span>`;
                         }
-
                         content += `</div>`;
                     });
                     content += `</div>`;
@@ -1515,12 +1560,13 @@
                     const { key, profile, orderThis, statusThis, orderNext, statusNext, showNext } = item;
         
                     html += `<tr class="support-row">
-                        <td style="text-align: center;">${renderIcon(statusThis, key, 'this')}</td>
-                        <td style="text-align: center;">${showNext ? renderIcon(statusNext, key, 'next') : '<span class="text-muted">-</span>'}</td>
+                        <td style="text-align: center; padding: 8px 4px;"><button class="icon-btn history-cal-btn" data-key="${key}" data-name="${profile.name}" title="Xem lịch sử" style="width:28px;height:28px;border-radius:6px;font-size:12px;"><i class="fas fa-calendar-days"></i></button></td>
+                        <td style="text-align: center; padding: 8px 4px;">${renderIcon(statusThis, key, 'this')}</td>
+                        <td style="text-align: center; padding: 8px 4px;">${showNext ? renderIcon(statusNext, key, 'next') : '<span class="text-muted" style="font-size:11px;">-</span>'}</td>
                         <td style="font-weight: 500;">${profile.name}</td>
                         <td class="hide-mobile">${profile.depart || '-'}</td>
                     </tr>`;
-                    html += `<tr id="row-detail-${key}" class="detail-row hidden"><td colspan="4"><div class="detail-content">
+                    html += `<tr id="row-detail-${key}" class="detail-row hidden"><td colspan="5"><div class="detail-content">
                         ${renderDetailBlock(key, 'this', orderThis, menuThisWeek, false)}
                         ${showNext ? renderDetailBlock(key, 'next', orderNext, menuNextWeek, false) : ''}
                     </div></td></tr>`;
@@ -1543,9 +1589,40 @@
         }
         
         window.selectAdminDish = (elem) => {
-            const parent = elem.parentElement;
-            parent.querySelectorAll('.mini-dish-item').forEach(el => el.classList.remove('selected'));
+            // Only deselect within same shift section (same day + same shift)
+            const shiftSection = elem.closest('.mini-dish-list');
+            if (shiftSection) shiftSection.querySelectorAll('.mini-dish-item').forEach(e => e.classList.remove('selected'));
             elem.classList.add('selected');
+        };
+
+        window.adminToggleShift = (btn, newShift) => {
+            const toggle = btn.closest('.admin-shift-toggle');
+            if (!toggle) return;
+            const { uid, wt, day } = toggle.dataset;
+            toggle.dataset.cur = newShift;
+            // Update button styles
+            toggle.querySelectorAll('.ast-btn').forEach(b => {
+                const active = b.getAttribute('onclick').includes(`'${newShift}'`);
+                b.style.background = active ? 'var(--primary)' : 'transparent';
+                b.style.color = active ? 'white' : 'var(--text-muted)';
+            });
+            // Show/hide M and E sections
+            const secM = document.querySelector(`.admin-shift-M-${uid}-${day}`);
+            const secE = document.querySelector(`.admin-shift-E-${uid}-${day}`);
+            if (secM) {
+                secM.style.display = (newShift === 'M' || newShift === 'both') ? 'block' : 'none';
+                const labelM = secM.querySelector('div[style*="font-size:10px"]');
+                if (labelM) labelM.style.display = newShift === 'both' ? 'block' : 'none';
+            }
+            if (secE) {
+                secE.style.display = (newShift === 'E' || newShift === 'both') ? 'block' : 'none';
+                if (newShift === 'both') secE.style.marginTop = '8px';
+                const labelE = secE.querySelector('div[style*="font-size:10px"]');
+                if (labelE) labelE.style.display = newShift === 'both' ? 'block' : 'none';
+            }
+            // If switching away from a shift, clear its selection
+            if (newShift === 'M' && secE) secE.querySelectorAll('.mini-dish-item.selected').forEach(e => e.classList.remove('selected'));
+            if (newShift === 'E' && secM) secM.querySelectorAll('.mini-dish-item.selected').forEach(e => e.classList.remove('selected'));
         };
         async function renderStatsContent() {
             const statsContent = el('stats-content');
@@ -1635,71 +1712,86 @@
             const thisWeek = getWeekString(today);
             const nextWeek = getWeekString(new Date(today.getTime() + 7 * 86400000));
             const [thisWeekDoc, nextWeekDoc] = await Promise.all([getDocument('order_list', thisWeek), getDocument('order_list', nextWeek)]);
-            const thisWeekMenu = thisWeekDoc ? thisWeekDoc.menu : {};
-            const nextWeekMenu = nextWeekDoc ? nextWeekDoc.menu : {};
+            const thisWeekMenu = (thisWeekDoc && thisWeekDoc.menu) ? thisWeekDoc.menu : {};
+            const nextWeekMenu = (nextWeekDoc && nextWeekDoc.menu) ? nextWeekDoc.menu : {};
 
-            const hasNextWeekData = nextWeekMenu && Object.values(nextWeekMenu).some(d => d && d.length > 0);
+            const hasNextWeekData = Object.values(nextWeekMenu).some(d => d && d.length > 0);
         
-            const renderReadOnlyMenuSection = (menuData, title) => {
-                let html = ``;
+            const renderReadOnlyMenuSection = (menuData) => {
+                let html = '';
                 for (const [dayKey, dayName] of Object.entries({ mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') })) {
                     const dishes = menuData[dayKey] || [];
                     html += `<div class="form-group"><label class="form-label">${dayName}</label><ul class="staff-list">`;
-                    if (dishes.length > 0) dishes.forEach(dish => html += `<li class="staff-item"><div class="staff-details"><div class="staff-dish">${parseDish(dish)}</div></div></li>`);
+                    if (dishes.length > 0) dishes.forEach(d => html += `<li class="staff-item"><div class="staff-details"><div class="staff-dish">${parseDish(d)}</div></div></li>`);
                     else html += `<li class="staff-item"><div class="staff-details"><div class="staff-dish text-muted">${__('noDishYet')}</div></div></li>`;
                     html += `</ul></div>`;
                 }
                 return html;
             };
         
+            // Full editable section: show existing dishes as editable rows + add new textarea
             const renderEditableMenuSection = (weekKey, menuData) => {
-                let html = `<div style="margin-bottom:1.5rem;">`;
-                
-                html += `<button onclick="document.getElementById('menu-file-input').click()" class="btn btn-secondary" style="width:100%; justify-content:center; padding:12px; font-size:14px; border: 1px dashed var(--border);">
-                            <i class="fas fa-file-excel" style="color:#16a34a; font-size:18px; margin-right:8px;"></i> 
-                            <span style="font-weight:600; color: var(--text-muted);">Tải lên Excel (Menu tuần sau)</span>
-                         </button>
-                         <input type="file" id="menu-file-input" class="hidden" accept=".xlsx, .xls, .csv">`;
-                html += `</div>`;
+                let html = `<div style="margin-bottom:1rem;">
+                    <button onclick="document.getElementById('menu-file-input').click()" class="btn btn-secondary" style="width:100%;justify-content:center;padding:10px;font-size:13px;border:1px dashed var(--border);">
+                        <i class="fas fa-file-excel" style="color:#16a34a;margin-right:8px;"></i>
+                        <span style="font-weight:600;color:var(--text-muted);">Tải lên Excel</span>
+                    </button>
+                    <input type="file" id="menu-file-input" class="hidden" accept=".xlsx,.xls,.csv">
+                </div>`;
 
                 for (const [dayKey, dayName] of Object.entries({ mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') })) {
-                    const dishes = menuData[dayKey] || [];
-                    html += `<div class="form-group"><label class="form-label">${dayName}</label>`;
-                    if (dishes.length > 0) { html += `<ul class="staff-list">`; dishes.forEach(dish => html += `<li class="staff-item"><div class="staff-details"><div class="staff-dish">${parseDish(dish)}</div></div></li>`); html += `</ul>`; }
-                    html += `<div id="menu-dishes-${weekKey}-${dayKey}" style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.5rem;"><div style="display:flex;gap:0.5rem;align-items:center;"><textarea class="form-textarea menu-dish-textarea" data-week="${weekKey}" data-day="${dayKey}" data-index="${dishes.length}" placeholder="${__('oneDishPerLine')}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;"></textarea><button class="icon-btn remove-menu-dish-btn hidden" data-week="${weekKey}" data-day="${dayKey}" data-index="${dishes.length}"><i class="fas fa-times"></i></button></div></div></div>`;
+                    const dishes = (menuData[dayKey] || []).filter(d => !d.toLowerCase().includes('không đặt cơm') && !d.toLowerCase().includes('no order'));
+                    html += `<div class="form-group">
+                        <label class="form-label">${dayName}</label>
+                        <div id="menu-existing-${weekKey}-${dayKey}" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;">`;
+                    dishes.forEach((dish, idx) => {
+                        html += `<div style="display:flex;gap:6px;align-items:center;">
+                            <input type="text" class="form-input menu-existing-dish" data-week="${weekKey}" data-day="${dayKey}" data-index="${idx}" value="${dish.replace(/"/g,'&quot;')}" style="flex:1;padding:8px 10px;font-size:13px;">
+                            <button class="icon-btn remove-existing-dish-btn" data-week="${weekKey}" data-day="${dayKey}" data-dish="${dish.replace(/"/g,'&quot;')}" style="flex-shrink:0;color:var(--error);border-color:var(--error);"><i class="fas fa-times"></i></button>
+                        </div>`;
+                    });
+                    html += `</div>
+                        <div id="menu-dishes-${weekKey}-${dayKey}" style="display:flex;flex-direction:column;gap:0.5rem;">
+                            <div style="display:flex;gap:0.5rem;align-items:center;">
+                                <textarea class="form-textarea menu-dish-textarea" data-week="${weekKey}" data-day="${dayKey}" data-index="${dishes.length}" placeholder="Thêm món mới..." style="flex:1;min-height:38px;padding-bottom:8px;overflow:hidden;"></textarea>
+                                <button class="icon-btn remove-menu-dish-btn hidden" data-week="${weekKey}" data-day="${dayKey}"><i class="fas fa-times"></i></button>
+                            </div>
+                        </div>
+                    </div>`;
                 }
                 return html;
             };
             
-            let contentHTML = `<div class="mt-3">`;
-
-            contentHTML += `
-            <div style="display:flex; gap:6px; margin-bottom:1.5rem; background:var(--card-bg); padding:4px; border-radius:8px; border:1px solid var(--border);">
-                <button class="btn" style="flex:1; border:none; box-shadow:none; transition:all 0.2s; background: ${state.adminMenuTab === 'this' ? 'var(--primary)' : 'transparent'}; color: ${state.adminMenuTab === 'this' ? 'white' : 'var(--text-muted)'}; font-weight:600;" onclick="switchAdminMenuTab('this')">
-                    <i class="fas fa-calendar-week"></i> Tuần này (${thisWeek.split('_')[1]})
+            let contentHTML = `<div class="mt-3">
+            <div style="display:flex;gap:6px;margin-bottom:1.5rem;background:var(--card-bg);padding:4px;border-radius:8px;border:1px solid var(--border);">
+                <button class="btn" style="flex:1;border:none;box-shadow:none;transition:all 0.2s;background:${state.adminMenuTab==='this'?'var(--primary)':'transparent'};color:${state.adminMenuTab==='this'?'white':'var(--text-muted)'};font-weight:600;" onclick="switchAdminMenuTab('this')">
+                    Tuần này (${thisWeek.split('_')[1]})
                 </button>
-                <button class="btn" style="flex:1; border:none; box-shadow:none; transition:all 0.2s; background: ${state.adminMenuTab === 'next' ? 'var(--primary)' : 'transparent'}; color: ${state.adminMenuTab === 'next' ? 'white' : 'var(--text-muted)'}; font-weight:600;" onclick="switchAdminMenuTab('next')">
-                    <i class="fas fa-calendar-plus"></i> Tuần sau (${nextWeek.split('_')[1]})
+                <button class="btn" style="flex:1;border:none;box-shadow:none;transition:all 0.2s;background:${state.adminMenuTab==='next'?'var(--primary)':'transparent'};color:${state.adminMenuTab==='next'?'white':'var(--text-muted)'};font-weight:600;" onclick="switchAdminMenuTab('next')">
+                    Tuần sau (${nextWeek.split('_')[1]})
                 </button>
             </div>`;
             
             if (state.adminMenuTab === 'this') {
-                contentHTML += renderReadOnlyMenuSection(thisWeekMenu);
+                if (!state.isEditingMenu) {
+                    contentHTML += renderReadOnlyMenuSection(thisWeekMenu);
+                    contentHTML += `<div class="mt-3 text-center"><button id="edit-menu-btn" class="btn btn-secondary btn-block" data-week="this"><i class="fas fa-edit"></i> Chỉnh sửa menu tuần này</button></div>`;
+                } else {
+                    contentHTML += renderEditableMenuSection('thisWeek', thisWeekMenu);
+                    contentHTML += `<button id="save-menu-nextWeek" class="btn btn-primary btn-block" style="margin-top:1rem;" data-week="${thisWeek}" data-weektype="this"><i class="fas fa-save"></i> Lưu & Đồng bộ</button>`;
+                    contentHTML += `<button id="cancel-edit-menu-btn" class="btn btn-secondary btn-block mt-2">Hủy</button>`;
+                }
             } else {
                 if (hasNextWeekData && !state.isEditingMenu) {
                     contentHTML += renderReadOnlyMenuSection(nextWeekMenu);
-                    contentHTML += `
-                    <div class="mt-3 text-center">
+                    contentHTML += `<div class="mt-3 text-center">
                         <p class="text-muted mb-3"><i class="fas fa-check-circle" style="color:var(--success)"></i> ${__('menuSavedState')}</p>
-                        <button id="edit-menu-btn" class="btn btn-secondary btn-block"><i class="fas fa-edit"></i> Chỉnh sửa menu</button>
+                        <button id="edit-menu-btn" class="btn btn-secondary btn-block" data-week="next"><i class="fas fa-edit"></i> Chỉnh sửa menu</button>
                     </div>`;
                 } else {
                     contentHTML += renderEditableMenuSection('nextWeek', nextWeekMenu);
-                    contentHTML += `<button id="save-menu-nextWeek" class="btn btn-primary btn-block" style="margin-top:1rem;" data-week="${nextWeek}"><i class="fas fa-save"></i> ${__('save')} ${__('menuNextWeek')}</button>`;
-                    
-                    if (state.isEditingMenu) {
-                         contentHTML += `<button id="cancel-edit-menu-btn" class="btn btn-secondary btn-block mt-2">${__('cancel')}</button>`;
-                    }
+                    contentHTML += `<button id="save-menu-nextWeek" class="btn btn-primary btn-block" style="margin-top:1rem;" data-week="${nextWeek}" data-weektype="next"><i class="fas fa-save"></i> Lưu & Đồng bộ</button>`;
+                    if (state.isEditingMenu) contentHTML += `<button id="cancel-edit-menu-btn" class="btn btn-secondary btn-block mt-2">Hủy</button>`;
                 }
             }
 
@@ -1863,8 +1955,13 @@
                 for (const dayKey of dayKeys) {
                     const rawM = state.guestOrderSelection[dayKey + '_M'];
                     const rawE = state.guestOrderSelection[dayKey + '_E'];
-                    if (rawM) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish"><span style="color:var(--primary);font-weight:700;margin-right:6px;">[M]</span>${parseDish(rawM)}</div></div></li>`;
-                    if (rawE) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${rawM ? '' : dayNames[dayKey]}</div><div class="staff-dish"><span style="color:var(--text-muted);font-weight:700;margin-right:6px;">[E]</span>${parseDish(rawE)}</div></div></li>`;
+                    if (rawM && rawE) {
+                        summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish" style="display:flex;flex-direction:column;gap:2px;"><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">Sáng</span>${parseDish(rawM)}</span><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">Chiều</span>${parseDish(rawE)}</span></div></div></li>`;
+                    } else if (rawM) {
+                        summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(rawM)}</div></div></li>`;
+                    } else if (rawE) {
+                        summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(rawE)}</div></div></li>`;
+                    }
                 }
                 container.innerHTML = summaryHTML + `</ul>`;
                 return;
@@ -1886,23 +1983,32 @@
                 const gSh = state.guestShiftSelection[dayKey] || 'M';
                 daysContentHTML += `<div id="guest-order-day-${dayKey}" class="${state.guestCurrentOrderDay === dayKey ? '' : 'hidden'}">`;
 
-                // Shift picker for guest
-                daysContentHTML += `<div class="shift-picker" style="display:flex;gap:6px;margin-bottom:10px;">
-                    <button class="guest-shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="M" style="flex:1;padding:7px 4px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid var(--border);cursor:pointer;background:${gSh==='M'?'var(--primary)':'var(--card-bg)'};color:${gSh==='M'?'white':'var(--text-muted)'};">🌅 Ca Sáng</button>
-                    <button class="guest-shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="E" style="flex:1;padding:7px 4px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid var(--border);cursor:pointer;background:${gSh==='E'?'#475569':'var(--card-bg)'};color:${gSh==='E'?'white':'var(--text-muted)'};">🌙 Ca Chiều</button>
-                    <button class="guest-shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="both" style="flex:1;padding:7px 4px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid var(--border);cursor:pointer;background:${gSh==='both'?'var(--accent)':'var(--card-bg)'};color:${gSh==='both'?'white':'var(--text-muted)'};">☀️🌙 Cả 2</button>
+                // Shift picker for guest - same toggle-group style
+                daysContentHTML += `<div style="display:flex;gap:6px;margin-bottom:12px;background:var(--card-bg);padding:4px;border-radius:8px;border:1px solid var(--border);">
+                    <button class="guest-shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="M" style="flex:1;padding:8px 4px;border-radius:6px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${gSh==='M'?'var(--primary)':'transparent'};color:${gSh==='M'?'white':'var(--text-muted)'};">Ca Sáng</button>
+                    <button class="guest-shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="E" style="flex:1;padding:8px 4px;border-radius:6px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${gSh==='E'?'var(--primary)':'transparent'};color:${gSh==='E'?'white':'var(--text-muted)'};">Ca Chiều</button>
+                    <button class="guest-shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="both" style="flex:1;padding:8px 4px;border-radius:6px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${gSh==='both'?'var(--primary)':'transparent'};color:${gSh==='both'?'white':'var(--text-muted)'};">Hai ca</button>
                 </div>`;
 
                 if (Array.isArray(dishes) && dishes.length > 0) {
-                    if (gSh === 'M' || gSh === 'both') {
+                    if (gSh === 'M' || gSh === 'E') {
+                        const sel = gSh === 'M' ? state.guestOrderSelection[dayKey + '_M'] : state.guestOrderSelection[dayKey + '_E'];
+                        daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item guest-dish-item ${dish === sel ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="${gSh}"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
+                    } else {
+                        // Hai ca: progressive flow - morning first
                         const selM = state.guestOrderSelection[dayKey + '_M'];
-                        daysContentHTML += `<div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:6px;">🌅 CA SÁNG</div>`;
-                        daysContentHTML += `<div class="order-dish-list" style="margin-bottom:${gSh==='both'?'1rem':'0'};">${dishes.map(dish => `<div class="order-dish-item guest-dish-item ${dish === selM ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="M"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
-                    }
-                    if (gSh === 'E' || gSh === 'both') {
                         const selE = state.guestOrderSelection[dayKey + '_E'];
-                        daysContentHTML += `<div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">🌙 CA CHIỀU</div>`;
-                        daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item guest-dish-item ${dish === selE ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="E"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
+                        if (!selM) {
+                            daysContentHTML += `<div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">Ca Sáng</div>`;
+                            daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item guest-dish-item" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="M"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
+                        } else {
+                            daysContentHTML += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(102,126,234,0.08);border-radius:8px;margin-bottom:10px;border:1px solid rgba(102,126,234,0.2);">
+                                <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:2px;">Ca Sáng</span><span style="font-size:14px;font-weight:500;">${parseDish(selM)}</span></div>
+                                <button class="guest-shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="both" data-clear-m="1" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;">Đổi</button>
+                            </div>`;
+                            daysContentHTML += `<div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">Ca Chiều</div>`;
+                            daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item guest-dish-item ${dish === selE ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="E"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
+                        }
                     }
                 } else {
                     daysContentHTML += `<p class="text-center text-muted p-3">${__('noDishes')}</p><div class="order-dish-list"><div class="order-dish-item guest-dish-item" data-dish="Nghỉ" data-day-key="${dayKey}" data-shift-key="${gSh === 'E' ? 'E' : 'M'}"><div class="order-dish-name">${__('rest')}</div></div></div>`;
@@ -1932,11 +2038,97 @@
 
         function autoResizeTextarea(element) { element.style.height = 'auto'; element.style.height = `${element.scrollHeight}px`; }
 
+        async function renderHistoryCalContent(userKey, monthVal) {
+            const content = el('history-cal-content');
+            if (!content) return;
+            content.innerHTML = `<p class="text-center text-muted p-3"><i class="fas fa-spinner fa-spin"></i> Đang tải...</p>`;
+
+            const [year, month] = monthVal.split('-').map(Number);
+            // Collect all week strings that overlap this month
+            const weekStrings = new Set();
+            const daysInMonth = new Date(year, month, 0).getDate();
+            for (let d = 1; d <= daysInMonth; d++) {
+                weekStrings.add(getWeekString(new Date(year, month - 1, d)));
+            }
+
+            const dayKeyMap = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri' };
+            const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
+            const results = []; // { date, dayKey, M, E }
+
+            for (const wk of weekStrings) {
+                const doc = await getDocument('order_list', wk);
+                if (!doc || !doc[userKey]) continue;
+                const userData = doc[userKey];
+                if (userData.order === 'reopen') continue;
+                // Find the Monday of this week
+                const [wYear, wNum] = wk.split('_').map(Number);
+                // Reconstruct Monday date from week string
+                const jan4 = new Date(wYear, 0, 4);
+                const mondayOfWeek = new Date(jan4);
+                mondayOfWeek.setDate(jan4.getDate() - (jan4.getDay() || 7) + 1 + (wNum - 1) * 7);
+
+                for (let i = 0; i < 5; i++) {
+                    const date = new Date(mondayOfWeek);
+                    date.setDate(mondayOfWeek.getDate() + i);
+                    if (date.getFullYear() === year && date.getMonth() === month - 1) {
+                        const dIdx = date.getDay(); // 1-5
+                        const dKey = dayKeyMap[dIdx];
+                        if (!dKey) continue;
+                        const rawM = userData[dKey + '_M'];
+                        const rawE = userData[dKey + '_E'];
+                        if (rawM || rawE) {
+                            results.push({
+                                date,
+                                dKey,
+                                M: rawM ? parseDish(rawM) : '',
+                                E: rawE ? parseDish(rawE) : '',
+                                statusM: rawM ? parseDishValue(rawM).status : '',
+                                statusE: rawE ? parseDishValue(rawE).status : ''
+                            });
+                        }
+                    }
+                }
+            }
+
+            results.sort((a, b) => a.date - b.date);
+
+            if (results.length === 0) {
+                content.innerHTML = `<p class="text-center text-muted p-3">Không có dữ liệu trong tháng này.</p>`;
+                return;
+            }
+
+            const statusColor = s => s === 'eaten' ? 'var(--success)' : s === 'giveup' ? 'var(--warning)' : 'var(--text-muted)';
+            let html = `<ul class="staff-list">`;
+            results.forEach(r => {
+                const dd = String(r.date.getDate()).padStart(2, '0');
+                const mm = String(r.date.getMonth() + 1).padStart(2, '0');
+                const dateLabel = `${dd}/${mm} (${dayNames[r.dKey]})`;
+                let dishText = '';
+                if (r.M && r.E) {
+                    dishText = `<div style="display:flex;flex-direction:column;gap:2px;">
+                        <span><span style="font-size:10px;color:var(--text-muted);">Sáng </span><span style="color:${statusColor(r.statusM)}">${r.M}</span></span>
+                        <span><span style="font-size:10px;color:var(--text-muted);">Chiều </span><span style="color:${statusColor(r.statusE)}">${r.E}</span></span>
+                    </div>`;
+                } else if (r.M) {
+                    dishText = `<span style="color:${statusColor(r.statusM)}">${r.M}</span>`;
+                } else {
+                    dishText = `<span style="color:${statusColor(r.statusE)}">${r.E}</span>`;
+                }
+                html += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dateLabel}</div><div class="staff-dish">${dishText}</div></div></li>`;
+            });
+            html += `</ul>`;
+            content.innerHTML = html;
+        }
+
         document.body.addEventListener('change', async (e) => {
             const { id, name, value, type, checked } = e.target;
             if (id === 'stats-date-picker') { state.statsViewDate = new Date(value);  await renderAdminStats(); }
             else if (name === 'stats-mode') { state.statsViewMode = value; await renderStatsContent(); }
             else if (name === 'guest-week') { state.guestOrderSelection = {}; state.guestShiftSelection = {}; await renderGuestOrderDays(value); }
+            else if (id === 'history-cal-month') {
+                const userKey = el('history-cal-modal').dataset.userKey;
+                if (userKey) await renderHistoryCalContent(userKey, value);
+            }
             else if (id === 'personnel-depart-select' && value === '__other__') {
                 const newDepart = prompt('Nhập tên phòng ban mới:');
                 if (newDepart && newDepart.trim()) {
@@ -2154,7 +2346,7 @@
                 }
             }
 
-            const target = e.target.closest('button, a, .profile-menu-item, .order-dish-item, .toggle-card-header, .toggle-option, .support-row, .status-icon-btn, .dropdown-item, .shift-pick-btn, .guest-shift-pick-btn');
+            const target = e.target.closest('button, a, .profile-menu-item, .order-dish-item, .toggle-card-header, .toggle-option, .support-row, .status-icon-btn, .dropdown-item, .shift-pick-btn, .guest-shift-pick-btn, .history-cal-btn, .remove-existing-dish-btn');
             if (!target) return;
 
             const { id, classList, dataset } = target;
@@ -2484,6 +2676,19 @@
                         });
                     });
 
+                    // Xử lý theo shift toggle: nếu toggle chỉ chọn M thì xóa E, và ngược lại
+                    detailRow.querySelectorAll('.admin-shift-toggle').forEach(toggle => {
+                        const { day, cur: shiftMode } = toggle.dataset;
+                        if (shiftMode === 'M') {
+                            // Xóa Ca Chiều cho ngày này
+                            payload[userKey][day + '_E'] = deleteField();
+                        } else if (shiftMode === 'E') {
+                            // Xóa Ca Sáng cho ngày này
+                            payload[userKey][day + '_M'] = deleteField();
+                        }
+                        // 'both' -> giữ cả 2
+                    });
+
                     // Áp dụng chọn mới từ mini-dish-item
                     detailRow.querySelectorAll('.mini-dish-item.selected').forEach(item => {
                         const day = item.dataset.day;
@@ -2579,7 +2784,17 @@
                     await render(); 
                 } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); }
             }
-            else if (id === 'add-department-btn') {
+            else if (classList.contains('history-cal-btn')) {
+                const { key, name } = dataset;
+                el('history-cal-title').textContent = `Lịch sử: ${name}`;
+                // Default to current month
+                const now = new Date();
+                const monthVal = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+                el('history-cal-month').value = monthVal;
+                el('history-cal-modal').classList.remove('hidden');
+                el('history-cal-modal').dataset.userKey = key;
+                await renderHistoryCalContent(key, monthVal);
+            }
                 el('department-modal-title').textContent = 'Thêm phòng ban'; el('department-original-name').value = ''; el('department-name-input').value = ''; el('department-modal').classList.remove('hidden'); el('department-name-input').focus();
             }
             else if (classList.contains('edit-department-btn')) {
@@ -2695,10 +2910,16 @@
                 } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); } 
             }
             else if (classList.contains('shift-pick-btn')) {
-                const { shiftDay, shiftVal } = dataset;
+                const { shiftDay, shiftVal, clearM } = dataset;
                 state.orderShiftSelection[shiftDay] = shiftVal;
-                if (shiftVal === 'M') delete state.orderSelection[shiftDay + '_E'];
-                if (shiftVal === 'E') delete state.orderSelection[shiftDay + '_M'];
+                // Nếu bấm "Đổi" (clear-m=1): xóa lựa chọn Ca Sáng để chọn lại
+                if (clearM === '1') {
+                    delete state.orderSelection[shiftDay + '_M'];
+                } else {
+                    if (shiftVal === 'M') delete state.orderSelection[shiftDay + '_E'];
+                    if (shiftVal === 'E') delete state.orderSelection[shiftDay + '_M'];
+                    // both: giữ nguyên lựa chọn cũ (nếu có)
+                }
                 if (state.reopenTargetWeek) {
                     renderReopenOrderSection(el('order-section-container'), state.reopenTargetWeek, state.reopenIsCurrentWeek);
                 } else {
@@ -2727,10 +2948,14 @@
                 await renderGuestOrderDays(document.querySelector('input[name="guest-week"]:checked').value); 
             } 
             else if (classList.contains('guest-shift-pick-btn')) {
-                const { shiftDay, shiftVal } = dataset;
+                const { shiftDay, shiftVal, clearM } = dataset;
                 state.guestShiftSelection[shiftDay] = shiftVal;
-                if (shiftVal === 'M') delete state.guestOrderSelection[shiftDay + '_E'];
-                if (shiftVal === 'E') delete state.guestOrderSelection[shiftDay + '_M'];
+                if (clearM === '1') {
+                    delete state.guestOrderSelection[shiftDay + '_M'];
+                } else {
+                    if (shiftVal === 'M') delete state.guestOrderSelection[shiftDay + '_E'];
+                    if (shiftVal === 'E') delete state.guestOrderSelection[shiftDay + '_M'];
+                }
                 await renderGuestOrderDays(document.querySelector('input[name="guest-week"]:checked').value);
             }
             else if (id === 'save-guest-order-btn') {
@@ -2788,8 +3013,85 @@
             else if(dataset.modal) el(dataset.modal).classList.toggle('hidden');
             else if (id === 'edit-menu-btn') { state.isEditingMenu = true; await renderAdminMenu(); }
             else if (id === 'cancel-edit-menu-btn') { state.isEditingMenu = false; await renderAdminMenu(); }
+            else if (classList.contains('remove-existing-dish-btn')) {
+                target.closest('div[style*="display:flex"]').remove();
+            }
             else if (id === 'save-menu-nextWeek') {
-                showLoader(); try { const weekStr = dataset.week; const weekKey = 'nextWeek'; const weekDoc = await getDocument('order_list', weekStr) || {}; const menuToSave = { ...(weekDoc.menu || {}) }; let hasData = false; for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) { const container = el(`menu-dishes-${weekKey}-${day}`); if (container) { const newDishes = Array.from(container.querySelectorAll('.menu-dish-textarea')).map(t => t.value.trim()).filter(Boolean); const existingDishes = menuToSave[day] || []; const finalDishes = [...existingDishes, ...newDishes]; if (finalDishes.length > 0) { hasData = true; if (!finalDishes.some(d => d.includes('Không đặt cơm'))) finalDishes.push('Không đặt cơm | No order'); } menuToSave[day] = finalDishes; } } await setDoc(doc(db, 'order_list', weekStr), { menu: menuToSave }, { merge: true }); showToast(__('menuSaved')); state.isEditingMenu = false; await renderAdminMenu(); } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); }
+                showLoader();
+                try {
+                    const weekStr = dataset.week;
+                    const weekType = dataset.weektype || 'next';
+                    const weekKey = weekType === 'this' ? 'thisWeek' : 'nextWeek';
+                    const weekDoc = await getDocument('order_list', weekStr) || {};
+                    const oldMenu = weekDoc.menu || {};
+                    const menuToSave = {};
+
+                    for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
+                        // Collect existing edited dishes
+                        const existingInputs = document.querySelectorAll(`.menu-existing-dish[data-week="${weekKey}"][data-day="${day}"]`);
+                        const existingDishes = Array.from(existingInputs).map(i => i.value.trim()).filter(Boolean);
+                        // Collect new dishes from textarea
+                        const newDishes = Array.from(document.querySelectorAll(`.menu-dish-textarea[data-week="${weekKey}"][data-day="${day}"]`)).map(t => t.value.trim()).filter(Boolean);
+                        const combined = [...existingDishes, ...newDishes];
+                        if (combined.length > 0 && !combined.some(d => d.toLowerCase().includes('không đặt cơm'))) combined.push('Không đặt cơm | No order');
+                        menuToSave[day] = combined;
+                    }
+
+                    // Find removed dishes per day (were in old menu, no longer in new menu)
+                    const removedByDay = {};
+                    for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
+                        const oldDishes = (oldMenu[day] || []).filter(d => !d.toLowerCase().includes('không đặt cơm'));
+                        const newDishes = (menuToSave[day] || []).filter(d => !d.toLowerCase().includes('không đặt cơm'));
+                        const removed = oldDishes.filter(d => !newDishes.includes(d));
+                        if (removed.length > 0) removedByDay[day] = removed;
+                    }
+
+                    // Sync menu to Firestore first
+                    await setDoc(doc(db, 'order_list', weekStr), { menu: menuToSave }, { merge: true });
+
+                    // For each removed dish, find users who had it and update their order
+                    if (Object.keys(removedByDay).length > 0) {
+                        const freshDoc = await getDocument('order_list', weekStr);
+                        const updates = {};
+                        const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
+
+                        for (const [day, removedDishes] of Object.entries(removedByDay)) {
+                            const newOptions = (menuToSave[day] || []).filter(d => !d.toLowerCase().includes('không đặt cơm'));
+                            const replacement = newOptions[0] || 'Không đặt cơm | No order';
+
+                            for (const [userKey, val] of Object.entries(freshDoc || {})) {
+                                if (userKey === 'menu' || typeof val !== 'object' || !val) continue;
+                                for (const sh of ['M', 'E']) {
+                                    const fk = day + '_' + sh;
+                                    const raw = val[fk];
+                                    if (!raw) continue;
+                                    const { dish, status } = parseDishValue(raw);
+                                    if (removedDishes.includes(dish) && status !== 'eaten') {
+                                        const isNoOrder = replacement.toLowerCase().includes('không đặt cơm');
+                                        const prefix = isNoOrder ? '[ignore] ' : 'not: ';
+                                        updates[`${userKey}.${fk}`] = `${prefix}${replacement}`;
+                                    }
+                                }
+                            }
+                        }
+                        if (Object.keys(updates).length > 0) {
+                            await updateDoc(doc(db, 'order_list', weekStr), updates);
+                            showToast(`Đã lưu menu. Cập nhật ${Object.keys(updates).length} lựa chọn bị ảnh hưởng.`);
+                        } else {
+                            showToast(__('menuSaved'));
+                        }
+                    } else {
+                        showToast(__('menuSaved'));
+                    }
+
+                    state.isEditingMenu = false;
+                    await renderAdminMenu();
+                } catch (err) {
+                    console.error(err);
+                    showToast(__('error'), 'error');
+                } finally {
+                    hideLoader();
+                }
             }
         });
 
