@@ -1328,20 +1328,61 @@
             await renderStatsContent();
         }
 
+        window.updateAdminDayShift = (userKey, weekType, dayKey, shiftValue) => {
+            const container = el(`detail-${weekType}-${userKey}`);
+            const dayBlock = container.querySelector(`.day-block:has(input[name="shift-${weekType}-${userKey}-${dayKey}"])`);
+            
+            const detailRow = el(`row-detail-${userKey}`);
+            const isThis = weekType === 'this';
+            
+            renderAdminSupport(el('search-support')?.value || '');
+            setTimeout(() => {
+                el(`row-detail-${userKey}`).classList.remove('hidden');
+                el(`detail-${weekType}-${userKey}`).classList.remove('hidden');
+            }, 0);
+        };
+        
+        window.selectAdminDishNew = (elem, userKey, weekType) => {
+            const { dish, day, shift } = elem.dataset;
+            const parent = elem.closest('.mini-dish-list');
+            
+            if (shift !== 'both') {
+                parent.querySelectorAll(`.mini-dish-item[data-shift="${shift}"]`).forEach(el => el.classList.remove('selected'));
+                elem.classList.add('selected');
+            }
+            
+            if (elem.closest('.day-block').querySelector('input[value="both"]').checked) {
+                const btnSave = elem.closest('.detail-inner-wrapper').querySelector('.admin-save-user-btn');
+                btnSave.style.boxShadow = "0 0 15px var(--primary)"; // Gợi ý admin cần bấm lưu
+                
+                elem.classList.add('selected');
+                updateAdminDayShift(userKey, weekType, day, 'both');
+            } else {
+                elem.classList.add('selected');
+            }
+        };
+        
+        window.clearAdminDayDish = (userKey, weekType, dayKey, shiftTag) => {
+            updateAdminDayShift(userKey, weekType, dayKey, 'both');
+        };
+        
         async function renderAdminSupport(searchTerm = '') {
             const today = new Date();
             const currentDayIdx = today.getDay();
             const currentHour = today.getHours();
             const thisWeekStr = getWeekString(today);
-            const nextWeekStr = getWeekString(new Date(today.getTime() + 7 * 86400000));
+            const nextWeekString = getWeekString(new Date(today.getTime() + 7 * 86400000));
             const isNextWeekOpen = (currentDayIdx === 4 && currentHour >= 15) || [5, 6, 0].includes(currentDayIdx);
+            
             const [allStaff, thisWeekDoc, nextWeekDoc] = await Promise.all([
                 getDocument("staff_list", "staffs"), 
                 getDocument('order_list', thisWeekStr),
-                getDocument('order_list', nextWeekStr)
+                getDocument('order_list', nextWeekString)
             ]);
+            
             const menuThisWeek = thisWeekDoc ? thisWeekDoc.menu : {};
             const menuNextWeek = nextWeekDoc ? nextWeekDoc.menu : {};
+            
             let staffList = allStaff ? Object.entries(allStaff).filter(([key]) => !key.startsWith('guest_')).map(([key, profile]) => {
                 const orderThis = thisWeekDoc?.[key] || null;
                 const orderNext = nextWeekDoc?.[key] || null;
@@ -1364,11 +1405,14 @@
                 staffList = staffList.filter(i => i.profile.name.toLowerCase().includes(low) || i.profile.email.toLowerCase().includes(low));
             }
         
-            let html = `<div class="mt-3"><div class="search-bar mb-2"><div class="search-wrapper"><i class="fas fa-search search-icon"></i><input type="text" id="search-support" class="search-input" placeholder="Tìm..." value="${searchTerm}"></div><button id="add-guest-order-btn" class="icon-btn"><i class="fas fa-user-plus"></i></button></div>`;
+            let html = `<div class="mt-3"><div class="search-bar mb-2"><div class="search-wrapper"><i class="fas fa-search search-icon"></i><input type="text" id="search-support" class="search-input" placeholder="Tìm tên hoặc email..." value="${searchTerm}"></div><button id="add-guest-order-btn" class="icon-btn"><i class="fas fa-user-plus"></i></button></div>`;
+            
             if (staffList.length > 0) {
-                html += `<div class="table-wrapper"><table><thead><tr><th style="text-align:center">T.Này</th><th style="text-align:center">T.Sau</th><th>Tên</th><th class="hide-mobile">Phòng</th></tr></thead><tbody>`;
+                html += `<div class="table-wrapper"><table><thead><tr><th style="text-align:center">Tuần này</th><th style="text-align:center">Tuần sau</th><th>Tên nhân viên</th><th class="hide-mobile">Phòng ban</th></tr></thead><tbody>`;
+                
                 const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
-                const dayNames = { mon: 'T2', tue: 'T3', wed: 'T4', thu: 'T5', fri: 'T6' };
+                const dayNames = { mon: 'Thứ 2', tue: 'Thứ 3', wed: 'Thứ 4', thu: 'Thứ 5', fri: 'Thứ 6' };
+                
                 const renderIcon = (status, key, weekType) => {
                     let iconClass = 'status-missing', iconContent = '<i class="fas fa-times"></i>';
                     if (status === 'morning') { iconClass = 'status-sun'; iconContent = '<i class="fas fa-sun"></i>'; }
@@ -1376,27 +1420,84 @@
                     else if (status === 'both') { iconClass = 'status-sun'; iconContent = '<i class="fas fa-circle-half-stroke"></i>'; }
                     return `<div class="status-icon-btn ${iconClass}" data-key="${key}" data-weektype="${weekType}">${iconContent}</div>`;
                 };
-                const renderDetailBlock = (key, weekType, orderData, menuData) => {
-                    let content = `<div id="detail-${weekType}-${key}" class="week-detail-container hidden"><div class="detail-inner-wrapper"><div class="week-detail-title">Chi tiết ${weekType==='this'?'Tuần này':'Tuần sau'}</div>`;
+        
+                const renderDetailBlock = (userKey, weekType, orderData, menuData) => {
+                    let content = `<div id="detail-${weekType}-${userKey}" class="week-detail-container hidden"><div class="detail-inner-wrapper"><div class="week-detail-title">Chi tiết đặt món ${weekType==='this'?'Tuần này':'Tuần sau'}</div>`;
+                    
                     dayKeys.forEach(dk => {
                         const dishes = menuData[dk] || [];
                         const valM = orderData?.[`${dk}_M`], valE = orderData?.[`${dk}_E`];
-                        content += `<div class="day-block" style="border-bottom:1px dashed var(--border); padding-bottom:8px; margin-bottom:8px;"><span class="day-label">${dayNames[dk]}</span><div class="mini-dish-list">`;
+                        
+                        let currentShift = 'morning';
+                        if (valM && valE) currentShift = 'both';
+                        else if (valE) currentShift = 'evening';
+        
+                        content += `<div class="day-block" style="border-bottom:1px dashed var(--border); padding-bottom:12px; margin-bottom:12px;">
+                            <span class="day-label" style="margin-bottom:8px; display:block;">${dayNames[dk]}</span>
+                            
+                            <div class="shift-toggle" style="margin-bottom: 10px; transform: scale(0.9); transform-origin: left;">
+                                <input type="radio" id="shift-${weekType}-${userKey}-${dk}-m" name="shift-${weekType}-${userKey}-${dk}" value="morning" ${currentShift==='morning'?'checked':''} onchange="updateAdminDayShift('${userKey}', '${weekType}', '${dk}', 'morning')">
+                                <label for="shift-${weekType}-${userKey}-${dk}-m">Ca sáng</label>
+                                <input type="radio" id="shift-${weekType}-${userKey}-${dk}-e" name="shift-${weekType}-${userKey}-${dk}" value="evening" ${currentShift==='evening'?'checked':''} onchange="updateAdminDayShift('${userKey}', '${weekType}', '${dk}', 'evening')">
+                                <label for="shift-${weekType}-${userKey}-${dk}-e">Ca chiều</label>
+                                <input type="radio" id="shift-${weekType}-${userKey}-${dk}-b" name="shift-${weekType}-${userKey}-${dk}" value="both" ${currentShift==='both'?'checked':''} onchange="updateAdminDayShift('${userKey}', '${weekType}', '${dk}', 'both')">
+                                <label for="shift-${weekType}-${userKey}-${dk}-b">Hai ca</label>
+                            </div>
+        
+                            <div id="admin-dishes-${weekType}-${userKey}-${dk}">
+                                <div class="mini-dish-list">`;
+                        
                         if (dishes.length > 0) {
-                            dishes.forEach(dish => {
-                                const isM = valM && parseDishValue(valM).dish === dish;
-                                const isE = valE && parseDishValue(valE).dish === dish;
-                                content += `<div class="mini-dish-item ${isM||isE?'selected':''}" data-dish="${dish}" data-day="${dk}" onclick="selectAdminDish(this)">${parseDish(dish)} ${isM?'(S)':''}${isE?'(C)':''}${(isM&&isE)?'(2Ca)':''}</div>`;
-                            });
-                        } else content += `<span class="text-muted">Nghỉ</span>`;
-                        content += `</div></div>`;
+                            if (currentShift === 'both') {
+                                const dishM = valM ? parseDishValue(valM).dish : null;
+                                const dishE = valE ? parseDishValue(valE).dish : null;
+        
+                                if (!dishM) {
+                                    content += `<div style="font-size:10px; color:var(--primary); font-weight:700; width:100%; margin-bottom:4px;">CHỌN MÓN SÁNG</div>`;
+                                    dishes.forEach(d => {
+                                        content += `<div class="mini-dish-item" data-dish="${d}" data-day="${dk}" data-shift="M" onclick="selectAdminDishNew(this, '${userKey}', '${weekType}')">${parseDish(d)}</div>`;
+                                    });
+                                } else {
+                                    content += `<div class="selected-step-summary" style="margin-bottom:8px;">
+                                        <div style="font-size:12px;">Sáng: ${parseDish(dishM)}</div>
+                                        <span class="btn-reselect" onclick="clearAdminDayDish('${userKey}', '${weekType}', '${dk}', 'M')"><i class="fa-regular fa-pen-to-square"></i></span>
+                                    </div>`;
+                                    
+                                    if (!dishE) {
+                                        content += `<div style="font-size:10px; color:var(--warning); font-weight:700; width:100%; margin-bottom:4px;">CHỌN MÓN CHIỀU</div>`;
+                                        dishes.forEach(d => {
+                                            content += `<div class="mini-dish-item" data-dish="${d}" data-day="${dk}" data-shift="E" onclick="selectAdminDishNew(this, '${userKey}', '${weekType}')">${parseDish(d)}</div>`;
+                                        });
+                                    } else {
+                                        content += `<div class="selected-step-summary">
+                                            <div style="font-size:12px;">Chiều: ${parseDish(dishE)}</div>
+                                            <span class="btn-reselect" onclick="clearAdminDayDish('${userKey}', '${weekType}', '${dk}', 'E')"><i class="fa-regular fa-pen-to-square"></i></span>
+                                        </div>`;
+                                    }
+                                }
+                            } else {
+                                const activeShift = currentShift === 'morning' ? 'M' : 'E';
+                                const currentDishRaw = activeShift === 'M' ? valM : valE;
+                                const currentDish = currentDishRaw ? parseDishValue(currentDishRaw).dish : null;
+        
+                                dishes.forEach(dish => {
+                                    const isSelected = currentDish === dish;
+                                    content += `<div class="mini-dish-item ${isSelected?'selected':''}" data-dish="${dish}" data-day="${dk}" data-shift="${activeShift}" onclick="selectAdminDishNew(this, '${userKey}', '${weekType}')">${parseDish(dish)}</div>`;
+                                });
+                            }
+                        } else {
+                            content += `<span class="text-muted">Nghỉ</span>`;
+                        }
+                        content += `</div></div></div>`;
                     });
+                    
                     const weekStr = weekType === 'this' ? thisWeekStr : nextWeekStr;
-                    content += `<div class="admin-action-buttons"><div class="btn-group-row"><button class="btn btn-delete-order" data-key="${key}" data-weekstr="${weekStr}" data-weektype="${weekType}" style="flex:1">Hủy</button><button class="btn btn-secondary reopen-order-btn" data-key="${key}" data-name="${allStaff[key].name}" data-weekstr="${weekStr}" style="flex:1; color:var(--warning)">Mở lại</button></div><button class="btn btn-primary admin-save-user-btn" data-key="${key}" data-weekstr="${weekStr}" data-weektype="${weekType}" style="width:100%">Lưu thay đổi</button></div></div></div>`;
+                    content += `<div class="admin-action-buttons"><div class="btn-group-row"><button class="btn btn-delete-order" data-key="${userKey}" data-weekstr="${weekStr}" data-weektype="${weekType}" style="flex:1">Hủy đơn</button><button class="btn btn-secondary reopen-order-btn" data-key="${userKey}" data-name="${allStaff[userKey].name}" data-weekstr="${weekStr}" style="flex:1; color:var(--warning)">Mở lại</button></div><button class="btn btn-primary admin-save-user-btn" data-key="${userKey}" data-weekstr="${weekStr}" data-weektype="${weekType}" style="width:100%">Lưu tất cả thay đổi</button></div></div></div>`;
                     return content;
                 };
+        
                 staffList.forEach(item => {
-                    html += `<tr class="support-row"><td style="text-align:center">${renderIcon(item.sThis, item.key, 'this')}</td><td style="text-align:center">${item.showNext ? renderIcon(item.sNext, item.key, 'next') : '-'}</td><td style="font-weight:500">${item.profile.name}</td><td class="hide-mobile">${item.profile.depart || '-'}</td></tr>`;
+                    html += `<tr class="support-row" data-target="row-detail-${item.key}"><td style="text-align:center">${renderIcon(item.sThis, item.key, 'this')}</td><td style="text-align:center">${item.showNext ? renderIcon(item.sNext, item.key, 'next') : '-'}</td><td style="font-weight:500">${item.profile.name}</td><td class="hide-mobile">${item.profile.depart || '-'}</td></tr>`;
                     html += `<tr id="row-detail-${item.key}" class="detail-row hidden"><td colspan="4"><div class="detail-content">${renderDetailBlock(item.key, 'this', item.orderThis, menuThisWeek)}${item.showNext ? renderDetailBlock(item.key, 'next', item.orderNext, menuNextWeek) : ''}</div></td></tr>`;
                 });
                 html += `</tbody></table></div>`;
@@ -2360,63 +2461,39 @@
                     const userKey = dataset.key; 
                     const weekStr = dataset.weekstr; 
                     const weekType = dataset.weektype; 
-                    
-                    const shiftInput = document.querySelector(`input[name="shift-${weekType}-${userKey}"]:checked`);
-                    const shift = shiftInput ? shiftInput.value : 'morning';
-                    const shifts = shift === 'both' ? ['M', 'E'] : [shift === 'morning' ? 'M' : 'E'];
+                    const detailRow = el(`detail-${weekType}-${userKey}`);
                     
                     const allStaff = await getDocument("staff_list", "staffs");
                     const userProfile = allStaff[userKey];
-                    
                     const payload = {
                         [userKey]: {
-                            name: userProfile.name,
-                            email: userProfile.email,
-                            depart: userProfile.depart,
-                            order: 'ordered'
+                            name: userProfile.name, email: userProfile.email,
+                            depart: userProfile.depart, order: 'ordered'
                         }
                     };
-                    
-                    const detailRow = el(`detail-${weekType}-${userKey}`);
-                    if (!detailRow) throw new Error("Không tìm thấy khung chọn món. Vui lòng tải lại trang.");
-                    
-                    const selectedItems = detailRow.querySelectorAll('.mini-dish-item.selected');
-                    const currentWeekDoc = await getDocument('order_list', weekStr);
-                    const oldOrderData = currentWeekDoc && currentWeekDoc[userKey] ? currentWeekDoc[userKey] : {};
-                    
-                    ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(d => {
-                        for (const s of ['M', 'E']) {
-                            const fk = `${d}_${s}`;
-                            if (oldOrderData[fk]) payload[userKey][fk] = oldOrderData[fk];
-                        }
-                        if (oldOrderData[d]) payload[userKey][d] = oldOrderData[d];
-                    });
-                    
-                    selectedItems.forEach(item => {
-                        const day = item.dataset.day;
-                        const newDish = item.dataset.dish;
-                        const isNoOrder = newDish.toLowerCase().includes('không đặt cơm') || newDish.toLowerCase().includes('no order');
-                        const statusPrefix = isNoOrder ? '[ignore] ' : 'not: ';
-                    
-                        for (const s of shifts) {
-                            const fieldKey = `${day}_${s}`;
-                            const oldDishString = oldOrderData[fieldKey] || '';
-                            if (oldDishString.includes('eaten:') && oldDishString.includes(newDish)) {
-                                payload[userKey][fieldKey] = oldDishString;
-                            } else {
-                                payload[userKey][fieldKey] = `[${s}] ${statusPrefix}${newDish}`;
-                            }
+            
+                    const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
+                    dayKeys.forEach(dk => {
+                        const shiftVal = detailRow.querySelector(`input[name="shift-${weekType}-${userKey}-${dk}"]:checked`).value;
+                        const selectedDishes = detailRow.querySelectorAll(`.mini-dish-item[data-day="${dk}"].selected`);
+                        
+                        if (shiftVal === 'both') {
+                            const dishM = detailRow.querySelector(`.mini-dish-item[data-day="${dk}"][data-shift="M"].selected`)?.dataset.dish;
+                            const dishE = detailRow.querySelector(`.mini-dish-item[data-day="${dk}"][data-shift="E"].selected`)?.dataset.dish;
+                            if (dishM) payload[userKey][`${dk}_M`] = `[M] ${dishM.includes('không đặt cơm')?'[ignore] ':'not: '}${dishM}`;
+                            if (dishE) payload[userKey][`${dk}_E`] = `[E] ${dishE.includes('không đặt cơm')?'[ignore] ':'not: '}${dishE}`;
+                        } else {
+                            const activeShift = shiftVal === 'morning' ? 'M' : 'E';
+                            const dish = detailRow.querySelector(`.mini-dish-item[data-day="${dk}"][data-shift="${activeShift}"].selected`)?.dataset.dish;
+                            if (dish) payload[userKey][`${dk}_${activeShift}`] = `[${activeShift}] ${dish.includes('không đặt cơm')?'[ignore] ':'not: '}${dish}`;
                         }
                     });
-                    
+            
                     await setDoc(doc(db, 'order_list', weekStr), payload, { merge: true });
-                    
-                    showToast(`Đã cập nhật thực đơn (${weekType === 'this' ? 'Tuần này' : 'Tuần sau'})`);
-                    await renderAdminSupport();
-
+                    showToast(`Đã cập nhật thành công`);
+                    await renderAdminSupport(el('search-support')?.value || '');
                 } catch (err) {
-                    console.error(err);
-                    showToast('Lỗi khi lưu: ' + err.message, 'error');
+                    showToast('Lỗi: ' + err.message, 'error');
                 } finally {
                     hideLoader();
                 }
