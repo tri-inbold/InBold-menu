@@ -865,7 +865,7 @@
                                 finalSummary += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[d]} - ${sLabel}</div><div class="staff-dish">${parseDish(state.orderSelection[d+'_'+sKey])}</div></div></li>`;
                             }
                         });
-                        finalSummary += `</ul><div style="display:flex;gap:10px;"><button id="btn-edit-again" class="btn btn-secondary btn-block mt-3">Sửa lại</button><button id="submit-order-btn" class="btn btn-primary btn-block mt-3">Hoàn tất</button></div></div>`;
+                        finalSummary += `</ul><div style="display:flex;gap:10px;"><button id="btn-edit-again" class="btn btn-secondary btn-block mt-3">Đặt lại</button><button id="submit-order-btn" class="btn btn-primary btn-block mt-3">Hoàn tất</button></div></div>`;
                         htmlContent += finalSummary;
                     } else {
                         let tabsHTML = `<div class="tabs">`;
@@ -882,9 +882,9 @@
                         const dishes = menu[currentDay] || [];
                         if (currentShift === 'both') {
                             if (!state.orderSelection[currentDay + '_M']) {
-                                dishListHTML += `<div style="margin: 10px 0; font-weight: 700; color: var(--primary);">CHỌN MÓN SÁNG</div><div class="order-dish-list">${dishes.map(d => `<div class="order-dish-item" data-dish="${d}" data-day-key="${currentDay}" data-target-shift="M"><div class="order-dish-name">${parseDish(d)}</div></div>`).join('')}</div>`;
+                                dishListHTML += `<div style="margin-bottom: 10px; font-weight: 700; color: var(--primary); font-size:11px;">CHỌN MÓN SÁNG</div><div class="order-dish-list">${dishes.map(d => `<div class="order-dish-item" data-dish="${d}" data-day-key="${currentDay}" data-target-shift="M"><div class="order-dish-name">${parseDish(d)}</div></div>`).join('')}</div>`;
                             } else {
-                                dishListHTML += `<div class="selected-step-summary"><div>Sáng: ${parseDish(state.orderSelection[currentDay + '_M'])}</div><span class="btn-reselect" data-reselect-day="${currentDay}" data-reselect-shift="M">Sửa</span></div><div style="margin: 10px 0; font-weight: 700; color: var(--warning);">CHỌN MÓN CHIỀU</div><div class="order-dish-list">${dishes.map(d => `<div class="order-dish-item" data-dish="${d}" data-day-key="${currentDay}" data-target-shift="E"><div class="order-dish-name">${parseDish(d)}</div></div>`).join('')}</div>`;
+                                dishListHTML += `<div class="selected-step-summary"><div>Sáng: ${parseDish(state.orderSelection[currentDay + '_M'])}</div><span class="btn-reselect" data-reselect-day="${currentDay}" data-reselect-shift="M"><i class="fa-regular fa-pen-to-square"></i></span></div><div style="margin-bottom: 10px; font-weight: 700; color: var(--warning); font-size:11px;">CHỌN MÓN CHIỀU</div><div class="order-dish-list">${dishes.map(d => `<div class="order-dish-item" data-dish="${d}" data-day-key="${currentDay}" data-target-shift="E"><div class="order-dish-name">${parseDish(d)}</div></div>`).join('')}</div>`;
                             }
                         } else {
                             const sTag = currentShift === 'morning' ? 'M' : 'E';
@@ -905,7 +905,7 @@
             }
             container.innerHTML = htmlContent;
         }
-        
+            
         async function renderReopenOrderSection(container, targetWeekString, isCurrentWeek) {
             const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
             const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
@@ -1327,180 +1327,83 @@
             
             await renderStatsContent();
         }
+
         async function renderAdminSupport(searchTerm = '') {
             const today = new Date();
             const currentDayIdx = today.getDay();
             const currentHour = today.getHours();
-        
             const thisWeekStr = getWeekString(today);
             const nextWeekStr = getWeekString(new Date(today.getTime() + 7 * 86400000));
-        
-            const isNextWeekOpen = (currentDayIdx === 4 && currentHour >= 15) || currentDayIdx === 5 || currentDayIdx === 6 || currentDayIdx === 0;
-        
+            const isNextWeekOpen = (currentDayIdx === 4 && currentHour >= 15) || [5, 6, 0].includes(currentDayIdx);
             const [allStaff, thisWeekDoc, nextWeekDoc] = await Promise.all([
                 getDocument("staff_list", "staffs"), 
                 getDocument('order_list', thisWeekStr),
                 getDocument('order_list', nextWeekStr)
             ]);
-            
             const menuThisWeek = thisWeekDoc ? thisWeekDoc.menu : {};
             const menuNextWeek = nextWeekDoc ? nextWeekDoc.menu : {};
-            
-            let staffList = allStaff ? Object.entries(allStaff)
-                .filter(([key]) => !key.startsWith('guest_'))
-                .map(([key, profile]) => {
-                    const orderThis = thisWeekDoc && thisWeekDoc[key] ? thisWeekDoc[key] : null;
-                    const orderNext = nextWeekDoc && nextWeekDoc[key] ? nextWeekDoc[key] : null;
-                    
-                    let statusThis = 'missing';
-                    if (orderThis && orderThis.order === 'ordered') {
-                        const hasM = ['mon','tue','wed','thu','fri'].some(d => orderThis[`${d}_M`]);
-                        const hasE = ['mon','tue','wed','thu','fri'].some(d => orderThis[`${d}_E`]);
-                        if (hasM && hasE) statusThis = 'both';
-                        else if (hasE) statusThis = 'evening';
-                        else statusThis = 'morning';
-                    } else if (orderThis && orderThis.order === 'reopen') { statusThis = 'missing'; }
-                    
-                    let statusNext = 'missing';
-                    let showNext = isNextWeekOpen;
-                    if (orderNext && orderNext.order === 'ordered') {
-                        const hasM = ['mon','tue','wed','thu','fri'].some(d => orderNext[`${d}_M`]);
-                        const hasE = ['mon','tue','wed','thu','fri'].some(d => orderNext[`${d}_E`]);
-                        if (hasM && hasE) statusNext = 'both';
-                        else if (hasE) statusNext = 'evening';
-                        else statusNext = 'morning';
-                        showNext = true;
-                    } else if (orderNext && orderNext.order === 'reopen') { showNext = true; }
-            
-                    return { key, profile, orderThis, statusThis, orderNext, statusNext, showNext };
-                })
-                .sort((a, b) => a.profile.name.localeCompare(b.profile.name)) : [];
+            let staffList = allStaff ? Object.entries(allStaff).filter(([key]) => !key.startsWith('guest_')).map(([key, profile]) => {
+                const orderThis = thisWeekDoc?.[key] || null;
+                const orderNext = nextWeekDoc?.[key] || null;
+                let sThis = 'missing', sNext = 'missing';
+                if (orderThis?.order === 'ordered') {
+                    const hasM = ['mon','tue','wed','thu','fri'].some(d => orderThis[`${d}_M`]);
+                    const hasE = ['mon','tue','wed','thu','fri'].some(d => orderThis[`${d}_E`]);
+                    sThis = (hasM && hasE) ? 'both' : (hasE ? 'evening' : 'morning');
+                }
+                if (orderNext?.order === 'ordered') {
+                    const hasM = ['mon','tue','wed','thu','fri'].some(d => orderNext[`${d}_M`]);
+                    const hasE = ['mon','tue','wed','thu','fri'].some(d => orderNext[`${d}_E`]);
+                    sNext = (hasM && hasE) ? 'both' : (hasE ? 'evening' : 'morning');
+                }
+                return { key, profile, orderThis, sThis, orderNext, sNext, showNext: isNextWeekOpen || orderNext?.order === 'ordered' };
+            }).sort((a,b) => a.profile.name.localeCompare(b.profile.name)) : [];
         
             if (searchTerm) {
-                const lower = searchTerm.toLowerCase();
-                staffList = staffList.filter(i => i.profile.name.toLowerCase().includes(lower) || i.profile.email.toLowerCase().includes(lower));
+                const low = searchTerm.toLowerCase();
+                staffList = staffList.filter(i => i.profile.name.toLowerCase().includes(low) || i.profile.email.toLowerCase().includes(low));
             }
         
-            let html = `<div class="mt-3">
-            <div class="search-bar mb-2">
-                <div class="search-wrapper">
-                    <i class="fas fa-search search-icon"></i>
-                    <input type="text" id="search-support" class="search-input" placeholder="${__('searchStaff')}" value="${searchTerm}">
-                </div>
-                <button id="add-guest-order-btn" class="icon-btn" title="${__('addGuest')}"><i class="fas fa-user-plus"></i></button>
-            </div>`;
-        
+            let html = `<div class="mt-3"><div class="search-bar mb-2"><div class="search-wrapper"><i class="fas fa-search search-icon"></i><input type="text" id="search-support" class="search-input" placeholder="Tìm..." value="${searchTerm}"></div><button id="add-guest-order-btn" class="icon-btn"><i class="fas fa-user-plus"></i></button></div>`;
             if (staffList.length > 0) {
-                html += `<div class="table-wrapper"><table>
-                    <thead>
-                        <tr>
-                            <th style="width: 50px; text-align: center;">Tuần này</th>
-                            <th style="width: 50px; text-align: center;">Tuần sau</th>
-                            <th>${__('name')}</th>
-                            <th class="hide-mobile">${__('department')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
-        
+                html += `<div class="table-wrapper"><table><thead><tr><th style="text-align:center">T.Này</th><th style="text-align:center">T.Sau</th><th>Tên</th><th class="hide-mobile">Phòng</th></tr></thead><tbody>`;
                 const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
-                const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
-        
+                const dayNames = { mon: 'T2', tue: 'T3', wed: 'T4', thu: 'T5', fri: 'T6' };
                 const renderIcon = (status, key, weekType) => {
-                    let iconClass = 'status-missing';
-                    let iconContent = '<i class="fas fa-times"></i>';
+                    let iconClass = 'status-missing', iconContent = '<i class="fas fa-times"></i>';
                     if (status === 'morning') { iconClass = 'status-sun'; iconContent = '<i class="fas fa-sun"></i>'; }
                     else if (status === 'evening') { iconClass = 'status-moon'; iconContent = '<i class="fas fa-moon"></i>'; }
-                    else if (status === 'both') { iconClass = 'status-sun'; iconContent = '<i class="fas fa-sun"></i><i class="fas fa-moon" style="font-size:10px;opacity:0.8;"></i>'; }
+                    else if (status === 'both') { iconClass = 'status-sun'; iconContent = '<i class="fas fa-circle-half-stroke"></i>'; }
                     return `<div class="status-icon-btn ${iconClass}" data-key="${key}" data-weektype="${weekType}">${iconContent}</div>`;
                 };
-        
-                const renderDetailBlock = (key, weekType, orderData, menuData, isPastWeek) => {
-                    let currentShift = 'morning';
-                    if (orderData) {
-                        const hasM = ['mon','tue','wed','thu','fri'].some(d => orderData[`${d}_M`]);
-                        const hasE = ['mon','tue','wed','thu','fri'].some(d => orderData[`${d}_E`]);
-                        if (hasM && hasE) currentShift = 'both';
-                        else if (hasE) currentShift = 'evening';
-                        else if (orderData.shift) currentShift = orderData.shift;
-                    }
-                    
-                    let content = `<div id="detail-${weekType}-${key}" class="week-detail-container hidden" style="border:none; box-shadow:none; margin:0; border-radius:0;">`;
-                    
-                    content += `<div class="detail-inner-wrapper">`;
-                    content += `<div class="week-detail-title"><i class="fas fa-calendar-alt"></i> Chi tiết ${weekType === 'this' ? 'Tuần này' : 'Tuần sau'}</div>`;
-                    
-                    content += `<div class="form-group" style="max-width: 350px;"><label class="form-label" style="font-size:11px;color:var(--primary);">Ca làm việc</label><div class="shift-toggle" style="display:flex;padding:4px;background:rgba(0,0,0,0.2);border-radius:50px;border:1px solid var(--border);">
-                        <input type="radio" id="shift-m-${weekType}-${key}" name="shift-${weekType}-${key}" value="morning" style="display:none;" ${(currentShift !== 'evening' && currentShift !== 'both') ? 'checked' : ''}><label for="shift-m-${weekType}-${key}" style="flex:1;text-align:center;padding:7px 4px;cursor:pointer;border-radius:40px;font-size:12px;font-weight:500;transition:all 0.2s;${(currentShift !== 'evening' && currentShift !== 'both')?'background:var(--primary);color:white;':'color:var(--text-muted);'}">☀️ Sáng</label>
-                        <input type="radio" id="shift-e-${weekType}-${key}" name="shift-${weekType}-${key}" value="evening" style="display:none;" ${currentShift === 'evening' ? 'checked' : ''}><label for="shift-e-${weekType}-${key}" style="flex:1;text-align:center;padding:7px 4px;cursor:pointer;border-radius:40px;font-size:12px;font-weight:500;transition:all 0.2s;${currentShift === 'evening'?'background:var(--warning);color:white;':'color:var(--text-muted);'}">🌙 Chiều</label>
-                        <input type="radio" id="shift-b-${weekType}-${key}" name="shift-${weekType}-${key}" value="both" style="display:none;" ${currentShift === 'both' ? 'checked' : ''}><label for="shift-b-${weekType}-${key}" style="flex:1;text-align:center;padding:7px 4px;cursor:pointer;border-radius:40px;font-size:12px;font-weight:500;transition:all 0.2s;${currentShift === 'both'?'background:var(--accent);color:white;':'color:var(--text-muted);'}">☀️🌙 Cả 2</label>
-                    </div></div>`;
-        
-                    content += `<div style="margin-bottom: 1rem;">`;
-                    dayKeys.forEach((dKey, idx) => {
-                        const isPast = (weekType === 'this') && ((idx + 1) < currentDayIdx && currentDayIdx !== 0 && currentDayIdx !== 6);
-                        const userDishRaw = orderData ? orderData[dKey] : '';
-                        const { dish: currentDish } = parseDishValue(userDishRaw);
-                        const dishes = menuData[dKey] || [];
-        
-                        content += `<div class="day-block" style="border-bottom:1px dashed var(--border); padding-bottom:8px; margin-bottom:8px;">
-                            <span class="day-label ${isPast ? 'past' : ''}" style="display:flex; justify-content:space-between;"><span>${dayNames[dKey]}</span>${isPast ? '<span style="font-size:10px;">(Đã qua)</span>' : ''}</span>
-                            <div class="mini-dish-list">`;
-                        
+                const renderDetailBlock = (key, weekType, orderData, menuData) => {
+                    let content = `<div id="detail-${weekType}-${key}" class="week-detail-container hidden"><div class="detail-inner-wrapper"><div class="week-detail-title">Chi tiết ${weekType==='this'?'Tuần này':'Tuần sau'}</div>`;
+                    dayKeys.forEach(dk => {
+                        const dishes = menuData[dk] || [];
+                        const valM = orderData?.[`${dk}_M`], valE = orderData?.[`${dk}_E`];
+                        content += `<div class="day-block" style="border-bottom:1px dashed var(--border); padding-bottom:8px; margin-bottom:8px;"><span class="day-label">${dayNames[dk]}</span><div class="mini-dish-list">`;
                         if (dishes.length > 0) {
                             dishes.forEach(dish => {
-                                const isSelected = dish === currentDish;
-                                const disabledClass = isPast ? 'disabled' : '';
-                                content += `<div class="mini-dish-item ${isSelected ? 'selected' : ''} ${disabledClass}" data-dish="${dish}" data-day="${dKey}" ${isPast ? '' : 'onclick="selectAdminDish(this)"'}>${parseDish(dish)}</div>`;
+                                const isM = valM && parseDishValue(valM).dish === dish;
+                                const isE = valE && parseDishValue(valE).dish === dish;
+                                content += `<div class="mini-dish-item ${isM||isE?'selected':''}" data-dish="${dish}" data-day="${dk}" onclick="selectAdminDish(this)">${parseDish(dish)} ${isM?'(S)':''}${isE?'(C)':''}${(isM&&isE)?'(2Ca)':''}</div>`;
                             });
-                        } else { content += `<span class="text-muted" style="font-size:12px;">${__('rest')}</span>`; }
+                        } else content += `<span class="text-muted">Nghỉ</span>`;
                         content += `</div></div>`;
                     });
-                    content += `</div>`;
-        
-                    const weekStringValue = weekType === 'this' ? thisWeekStr : nextWeekStr;
-                    const userName = allStaff[key] ? allStaff[key].name : '';
-                    
-                    content += `<div class="admin-action-buttons">
-                        <div class="btn-group-row">
-                            <button class="btn btn-delete-order" data-key="${key}" data-weekstr="${weekStringValue}" data-weektype="${weekType}" style="flex: 1;"><i class="fas fa-trash"></i> Hủy đặt</button>
-                            <button class="btn btn-secondary reopen-order-btn" data-key="${key}" data-name="${userName}" data-weekstr="${weekStringValue}" style="flex: 1; border: 1px solid var(--warning); color: var(--warning);"><i class="fas fa-redo"></i> Reopen</button>
-                        </div>
-                        <button class="btn btn-primary admin-save-user-btn" data-key="${key}" data-weekstr="${weekStringValue}" data-weektype="${weekType}" style="width: 100%;"><i class="fas fa-save"></i> Lưu ${weekType === 'this' ? 'Tuần này' : 'Tuần sau'}</button>
-                    </div>`;
-                    
-                    content += `</div></div>`; 
+                    const weekStr = weekType === 'this' ? thisWeekStr : nextWeekStr;
+                    content += `<div class="admin-action-buttons"><div class="btn-group-row"><button class="btn btn-delete-order" data-key="${key}" data-weekstr="${weekStr}" data-weektype="${weekType}" style="flex:1">Hủy</button><button class="btn btn-secondary reopen-order-btn" data-key="${key}" data-name="${allStaff[key].name}" data-weekstr="${weekStr}" style="flex:1; color:var(--warning)">Mở lại</button></div><button class="btn btn-primary admin-save-user-btn" data-key="${key}" data-weekstr="${weekStr}" data-weektype="${weekType}" style="width:100%">Lưu thay đổi</button></div></div></div>`;
                     return content;
                 };
-        
                 staffList.forEach(item => {
-                    const { key, profile, orderThis, statusThis, orderNext, statusNext, showNext } = item;
-        
-                    html += `<tr class="support-row">
-                        <td style="text-align: center;">${renderIcon(statusThis, key, 'this')}</td>
-                        <td style="text-align: center;">${showNext ? renderIcon(statusNext, key, 'next') : '<span class="text-muted">-</span>'}</td>
-                        <td style="font-weight: 500;">${profile.name}</td>
-                        <td class="hide-mobile">${profile.depart || '-'}</td>
-                    </tr>`;
-                    html += `<tr id="row-detail-${key}" class="detail-row hidden"><td colspan="4"><div class="detail-content">
-                        ${renderDetailBlock(key, 'this', orderThis, menuThisWeek, false)}
-                        ${showNext ? renderDetailBlock(key, 'next', orderNext, menuNextWeek, false) : ''}
-                    </div></td></tr>`;
+                    html += `<tr class="support-row"><td style="text-align:center">${renderIcon(item.sThis, item.key, 'this')}</td><td style="text-align:center">${item.showNext ? renderIcon(item.sNext, item.key, 'next') : '-'}</td><td style="font-weight:500">${item.profile.name}</td><td class="hide-mobile">${item.profile.depart || '-'}</td></tr>`;
+                    html += `<tr id="row-detail-${item.key}" class="detail-row hidden"><td colspan="4"><div class="detail-content">${renderDetailBlock(item.key, 'this', item.orderThis, menuThisWeek)}${item.showNext ? renderDetailBlock(item.key, 'next', item.orderNext, menuNextWeek) : ''}</div></td></tr>`;
                 });
-        
                 html += `</tbody></table></div>`;
-            } else { html += `<p class="text-center text-muted p-3">${__('notFound')}</p>`; }
-        
-            html += `</div>`;
-            
-            el('admin-content').innerHTML = html;
-            const searchInput = el('search-support');
-            if(searchInput) { 
-                searchInput.focus(); 
-                const val = searchInput.value; 
-                searchInput.value = ''; 
-                searchInput.value = val; 
-                searchInput.addEventListener('input', (e) => renderAdminSupport(e.target.value)); 
             }
+            el('admin-content').innerHTML = html;
+            const sInput = el('search-support');
+            if(sInput) { sInput.focus(); sInput.setSelectionRange(sInput.value.length, sInput.value.length); sInput.addEventListener('input', (e) => renderAdminSupport(e.target.value)); }
         }
         
         window.selectAdminDish = (elem) => {
@@ -1880,9 +1783,18 @@
             const { id, name, value, type, checked } = e.target;
             if (name === 'user-shift') {
                 if (type === 'radio' && checked) {
-                    state.dayShifts[state.currentOrderDay] = value;
-                    delete state.orderSelection[state.currentOrderDay + '_M'];
-                    delete state.orderSelection[state.currentOrderDay + '_E'];
+                    const currentDay = state.currentOrderDay;
+                    if (currentDay === 'mon') {
+                        ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(d => {
+                            state.dayShifts[d] = value;
+                            delete state.orderSelection[d + '_M'];
+                            delete state.orderSelection[d + '_E'];
+                        });
+                    } else {
+                        state.dayShifts[currentDay] = value;
+                        delete state.orderSelection[currentDay + '_M'];
+                        delete state.orderSelection[currentDay + '_E'];
+                    }
                     renderOrderSection(el('order-section-container'));
                 }
             }
@@ -2133,7 +2045,10 @@
                 renderOrderSection(el('order-section-container')); return;
             }
             if (id === 'btn-edit-again') {
-                state.orderSelection = {}; renderOrderSection(el('order-section-container')); return;
+                state.orderSelection = {};
+                state.currentOrderDay = 'mon';
+                renderOrderSection(el('order-section-container'));
+                return;
             }
             if (id === 'submit-order-btn') {
                 showLoader();
