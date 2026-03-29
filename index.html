@@ -475,8 +475,10 @@
             adminMenuTab: 'this',
             currentUser: null, staffProfile: null, isAdmin: false,
             currentTab: 'today', adminSubTab: 'stats', authReady: false,
-            menuFilterMode: 'auto', orderSelection: {},
-            currentOrderDay: 'mon', userShiftSelection: 'morning',
+            menuFilterMode: 'auto', 
+            orderSelection: {}, 
+            dayShifts: { mon: 'morning', tue: 'morning', wed: 'morning', thu: 'morning', fri: 'morning' },
+            currentOrderDay: 'mon',
             guestCurrentOrderDay: 'mon', guestShiftSelection: 'morning',
             reopenTarget: { key: null, name: null, weekStr: null }, deleteTarget: { key: null, name: null },
             statsViewMode: 'day', statsViewDate: new Date(), guestOrderSelection: {},
@@ -814,14 +816,14 @@
         }
         
         async function renderOrderSection(container) {
+            if (!container) return;
             const today = new Date();
             const dayOfWeek = today.getDay();
             const hour = today.getHours();
             const userEmailKey = emailToKey(state.currentUser.email);
             const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
-            const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
+            const dayNames = { mon: 'Thứ 2', tue: 'Thứ 3', wed: 'Thứ 4', thu: 'Thứ 5', fri: 'Thứ 6' };
         
-            const isCurrentWeekPeriod = (dayOfWeek >= 1 && dayOfWeek <= 3) || (dayOfWeek === 4 && hour < 15);
             const currentWeekString = getWeekString(today);
             const nextWeekString = getWeekString(new Date(today.getTime() + 7 * 86400000));
             
@@ -836,18 +838,13 @@
             let htmlContent = '';
         
             if (hasOrderedCurrentWeek) {
-                let summaryHTML = `<div class="card"><div class="card-header toggle-card-header" data-target="summary-list-current"><h2 class="card-title">${__('orderedWeek')} ${currentWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon rotate"></i></div><ul id="summary-list-current" class="staff-list hidden">`;
-                for (const key of dayKeys) {
+                let summaryHTML = `<div class="card"><div class="card-header toggle-card-header" data-target="summary-list-current"><h2 class="card-title">Đã đặt tuần ${currentWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon rotate"></i></div><ul id="summary-list-current" class="staff-list hidden">`;
+                dayKeys.forEach(key => {
                     const rawM = userDataCurrent[`${key}_M`];
                     const rawE = userDataCurrent[`${key}_E`];
-                    const rawLegacy = userDataCurrent[key];
-                    if (rawM || rawE) {
-                        if (rawM) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]} <span style="color:var(--primary);font-size:11px;font-weight:700;">[Sáng]</span></div><div class="staff-dish">${parseDish(rawM)}</div></div></li>`;
-                        if (rawE) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]} <span style="color:var(--warning);font-size:11px;font-weight:700;">[Chiều]</span></div><div class="staff-dish">${parseDish(rawE)}</div></div></li>`;
-                    } else if (rawLegacy) {
-                        summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish">${parseDish(rawLegacy)}</div></div></li>`;
-                    }
-                }
+                    if (rawM) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]} - Sáng</div><div class="staff-dish">${parseDish(rawM)}</div></div></li>`;
+                    if (rawE) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]} - Chiều</div><div class="staff-dish">${parseDish(rawE)}</div></div></li>`;
+                });
                 htmlContent += summaryHTML + `</ul></div>`;
             }
         
@@ -857,86 +854,82 @@
             if (!hasOrderedNextWeek) {
                 const menu = nextWeekDoc ? nextWeekDoc.menu : null;
                 if (!menu) {
-                    htmlContent += `<div class="card text-center"><p class="text-muted">${__('noMenu')}</p></div>`;
+                    htmlContent += `<div class="card text-center"><p class="text-muted">Chưa có thực đơn.</p></div>`;
                 } else {
-                    const currentDay = state.currentOrderDay;
-                    const isBoth = state.userShiftSelection === 'both';
-                    
-                    let isDayComplete = false;
-                    if (isBoth) {
-                        isDayComplete = !!(state.orderSelection[currentDay + '_M'] && state.orderSelection[currentDay + '_E']);
-                    } else {
-                        isDayComplete = !!state.orderSelection[currentDay];
-                    }
-        
-                    const allDaysComplete = dayKeys.every(d => isBoth ? (state.orderSelection[d+'_M'] && state.orderSelection[d+'_E']) : state.orderSelection[d]);
+                    const allDaysComplete = dayKeys.every(d => {
+                        const shift = state.dayShifts[d];
+                        if (shift === 'both') return state.orderSelection[d + '_M'] && state.orderSelection[d + '_E'];
+                        if (shift === 'morning') return state.orderSelection[d + '_M'];
+                        return state.orderSelection[d + '_E'];
+                    });
         
                     if (allDaysComplete) {
                         let finalSummary = `<div class="card"><div class="card-header"><h2 class="card-title">Xác nhận đơn hàng</h2></div><ul class="staff-list">`;
                         dayKeys.forEach(d => {
-                            if (isBoth) {
-                                finalSummary += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[d]} [Sáng]</div><div class="staff-dish">${parseDish(state.orderSelection[d+'_M'])}</div></div></li>`;
-                                finalSummary += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[d]} [Chiều]</div><div class="staff-dish">${parseDish(state.orderSelection[d+'_E'])}</div></div></li>`;
+                            const shift = state.dayShifts[d];
+                            if (shift === 'both') {
+                                finalSummary += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[d]} - Sáng</div><div class="staff-dish">${parseDish(state.orderSelection[d+'_M'])}</div></div></li>`;
+                                finalSummary += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[d]} - Chiều</div><div class="staff-dish">${parseDish(state.orderSelection[d+'_E'])}</div></div></li>`;
                             } else {
-                                const shiftName = state.userShiftSelection === 'morning' ? 'Sáng' : 'Chiều';
-                                finalSummary += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[d]} [${shiftName}]</div><div class="staff-dish">${parseDish(state.orderSelection[d])}</div></div></li>`;
+                                const sLabel = shift === 'morning' ? 'Sáng' : 'Chiều';
+                                const sKey = shift === 'morning' ? 'M' : 'E';
+                                finalSummary += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[d]} - ${sLabel}</div><div class="staff-dish">${parseDish(state.orderSelection[d+'_'+sKey])}</div></div></li>`;
                             }
                         });
-                        finalSummary += `</ul><div style="display:flex;gap:10px;"><button onclick="state.orderSelection={};render();" class="btn btn-secondary btn-block mt-3">${__('editAgain')}</button><button id="submit-order-btn" class="btn btn-primary btn-block mt-3">${__('complete')}</button></div></div>`;
+                        finalSummary += `</ul><div style="display:flex;gap:10px;"><button id="btn-edit-again" class="btn btn-secondary btn-block mt-3">Sửa lại</button><button id="submit-order-btn" class="btn btn-primary btn-block mt-3">Hoàn tất</button></div></div>`;
                         htmlContent += finalSummary;
                     } else {
                         let tabsHTML = `<div class="tabs">`;
                         dayKeys.forEach(dk => {
-                            const done = isBoth ? (state.orderSelection[dk+'_M'] && state.orderSelection[dk+'_E']) : state.orderSelection[dk];
+                            const shift = state.dayShifts[dk];
+                            const done = shift === 'both' ? (state.orderSelection[dk+'_M'] && state.orderSelection[dk+'_E']) : (shift === 'morning' ? state.orderSelection[dk+'_M'] : state.orderSelection[dk+'_E']);
                             tabsHTML += `<button class="tab-btn order-day-tab-btn ${state.currentOrderDay === dk ? 'active' : ''} ${done ? 'has-order' : ''}" data-day-key="${dk}">${dayNames[dk]}</button>`;
                         });
                         tabsHTML += `</div>`;
         
+                        const currentDay = state.currentOrderDay;
+                        const currentShift = state.dayShifts[currentDay];
+                        
                         const shiftToggleHTML = `
                         <div class="shift-toggle" style="margin-bottom: 15px;">
-                            <input type="radio" id="user-shift-m" name="user-shift" value="morning" ${state.userShiftSelection === 'morning' ? 'checked' : ''}>
+                            <input type="radio" id="user-shift-m" name="user-shift" value="morning" ${currentShift === 'morning' ? 'checked' : ''}>
                             <label for="user-shift-m">Ca sáng</label>
-                            <input type="radio" id="user-shift-e" name="user-shift" value="evening" ${state.userShiftSelection === 'evening' ? 'checked' : ''}>
+                            <input type="radio" id="user-shift-e" name="user-shift" value="evening" ${currentShift === 'evening' ? 'checked' : ''}>
                             <label for="user-shift-e">Ca chiều</label>
-                            <input type="radio" id="user-shift-b" name="user-shift" value="both" ${state.userShiftSelection === 'both' ? 'checked' : ''}>
+                            <input type="radio" id="user-shift-b" name="user-shift" value="both" ${currentShift === 'both' ? 'checked' : ''}>
                             <label for="user-shift-b">Hai ca</label>
                         </div>`;
         
                         let dishListHTML = '';
                         const dishes = menu[currentDay] || [];
                         
-                        if (isBoth) {
+                        if (currentShift === 'both') {
                             if (!state.orderSelection[currentDay + '_M']) {
-                                dishListHTML += `<div class="shift-step-header">☀️ Chọn món Ca sáng</div>`;
-                                dishListHTML += `<div class="order-dish-list">${dishes.map(d => `<div class="order-dish-item" data-dish="${d}" data-day-key="${currentDay}" data-shift-step="M"><div class="order-dish-name">${parseDish(d)}</div></div>`).join('')}</div>`;
-                            } 
-                            else {
-                                dishListHTML += `
-                                <div class="selected-step-summary">
-                                    <div><span style="font-weight:600; color:var(--primary);">Ca sáng:</span> ${parseDish(state.orderSelection[currentDay + '_M'])}</div>
-                                    <span class="btn-reselect" onclick="delete state.orderSelection['${currentDay}_M']; render();">Sửa</span>
-                                </div>`;
-                                
-                                dishListHTML += `<div class="shift-step-header">🌙 Chọn món Ca chiều</div>`;
-                                dishListHTML += `<div class="order-dish-list">${dishes.map(d => `<div class="order-dish-item" data-dish="${d}" data-day-key="${currentDay}" data-shift-step="E"><div class="order-dish-name">${parseDish(d)}</div></div>`).join('')}</div>`;
+                                dishListHTML += `<div style="margin: 10px 0; font-weight: 600; color: var(--primary);">Chọn món sáng</div>`;
+                                dishListHTML += `<div class="order-dish-list">${dishes.map(d => `<div class="order-dish-item" data-dish="${d}" data-day-key="${currentDay}" data-target-shift="M"><div class="order-dish-name">${parseDish(d)}</div></div>`).join('')}</div>`;
+                            } else {
+                                dishListHTML += `<div class="selected-step-summary"><div>Sáng: ${parseDish(state.orderSelection[currentDay + '_M'])}</div><span class="btn-reselect" data-reselect-day="${currentDay}" data-reselect-shift="M">Sửa</span></div>`;
+                                dishListHTML += `<div style="margin: 10px 0; font-weight: 600; color: var(--warning);">Chọn món chiều</div>`;
+                                dishListHTML += `<div class="order-dish-list">${dishes.map(d => `<div class="order-dish-item" data-dish="${d}" data-day-key="${currentDay}" data-target-shift="E"><div class="order-dish-name">${parseDish(d)}</div></div>`).join('')}</div>`;
                             }
                         } else {
-                            const shiftLabel = state.userShiftSelection === 'morning' ? 'Ca sáng' : 'Ca chiều';
-                            dishListHTML += `<div class="shift-step-header">${shiftLabel}</div>`;
-                            dishListHTML += `<div class="order-dish-list">${dishes.map(d => `<div class="order-dish-item" data-dish="${d}" data-day-key="${currentDay}"><div class="order-dish-name">${parseDish(d)}</div></div>`).join('')}</div>`;
+                            const sTag = currentShift === 'morning' ? 'M' : 'E';
+                            const sTxt = currentShift === 'morning' ? 'Chọn món sáng' : 'Chọn món chiều';
+                            dishListHTML += `<div style="margin: 10px 0; font-weight: 600; color: var(--primary);">${sTxt}</div>`;
+                            dishListHTML += `<div class="order-dish-list">${dishes.map(d => `<div class="order-dish-item" data-dish="${d}" data-day-key="${currentDay}" data-target-shift="${sTag}"><div class="order-dish-name">${parseDish(d)}</div></div>`).join('')}</div>`;
                         }
         
-                        htmlContent += `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderForWeek')} ${nextWeekString.split('_')[1]}</h2></div>${tabsHTML}${shiftToggleHTML}${dishListHTML}</div>`;
+                        htmlContent += `<div class="card"><div class="card-header"><h2 class="card-title">Đặt món tuần ${nextWeekString.split('_')[1]}</h2></div>${tabsHTML}${shiftToggleHTML}${dishListHTML}</div>`;
                     }
                 }
             } else {
-                let summaryHTML = `<div class="card"><div class="card-header toggle-card-header" data-target="summary-list-next"><h2 class="card-title">${__('orderedWeek')} ${nextWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon rotate"></i></div><ul id="summary-list-next" class="staff-list hidden">`;
-                for (const key of dayKeys) {
+                let summaryHTML = `<div class="card"><div class="card-header toggle-card-header" data-target="summary-list-next"><h2 class="card-title">Đã đặt tuần ${nextWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon rotate"></i></div><ul id="summary-list-next" class="staff-list hidden">`;
+                dayKeys.forEach(key => {
                     const rawM = userDataNext[`${key}_M`];
                     const rawE = userDataNext[`${key}_E`];
-                    if (rawM) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]} [Sáng]</div><div class="staff-dish">${parseDish(rawM)}</div></div></li>`;
-                    if (rawE) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]} [Chiều]</div><div class="staff-dish">${parseDish(rawE)}</div></div></li>`;
-                }
+                    if (rawM) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]} - Sáng</div><div class="staff-dish">${parseDish(rawM)}</div></div></li>`;
+                    if (rawE) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]} - Chiều</div><div class="staff-dish">${parseDish(rawE)}</div></div></li>`;
+                });
                 htmlContent += summaryHTML + `</ul></div>`;
             }
         
@@ -1915,15 +1908,16 @@
 
         document.body.addEventListener('change', async (e) => {
             const { id, name, value, type, checked } = e.target;
-            if (id === 'stats-date-picker') { state.statsViewDate = new Date(value);  await renderAdminStats(); }
-            else if (name === 'stats-mode') { state.statsViewMode = value; await renderStatsContent(); }
-            else if (name === 'guest-week') { await renderGuestOrderDays(value); }
-            else if (name === 'user-shift') { if (type === 'radio' && checked) {
-                        state.userShiftSelection = value; 
-                        state.orderSelection = {}; 
-                        render(); 
-                    }
+            if (name === 'user-shift') {
+                if (type === 'radio' && checked) {
+                    state.dayShifts[state.currentOrderDay] = value;
+                    delete state.orderSelection[state.currentOrderDay + '_M'];
+                    delete state.orderSelection[state.currentOrderDay + '_E'];
+                    renderOrderSection(el('order-section-container'));
                 }
+            }
+            else if (id === 'stats-date-picker') { state.statsViewDate = new Date(value); await renderAdminStats(); }
+            else if (name === 'guest-week') { await renderGuestOrderDays(value); }
             else if (name === 'guest-shift') { if (type === 'radio' && checked) state.guestShiftSelection = value; }
             else if (id === 'personnel-depart-select' && value === '__other__') {
                 const newDepart = prompt('Nhập tên phòng ban mới:');
