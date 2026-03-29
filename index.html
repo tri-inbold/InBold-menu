@@ -96,6 +96,7 @@
         [data-theme="light"] .toggle-option.active { background: var(--primary) !important; color: #ffffff !important; box-shadow: 0 4px 10px rgba(249, 115, 22, 0.4);font-weight: 700;}        
         [data-theme="light"] .toggle-group { background: #e2e8f0; }
         [data-theme="light"] #toast-notification { box-shadow: 0 10px 30px rgba(0,0,0,0.15); background: #ffffff; }
+        [data-theme="light"] .shift-pick-btn, [data-theme="light"] .guest-shift-pick-btn { border-color: #cbd5e1 !important; }
         
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Montserrat', sans-serif; background: var(--dark-bg); color: var(--text); line-height: 1.5; font-size: 14px; }
@@ -215,10 +216,6 @@
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-block { width: 100%; }
 
-        .shift-step-header {font-size: 13px; font-weight: 700; color: var(--primary); margin: 15px 0 10px; display: flex; align-items: center; gap: 8px; text-transform: uppercase;}
-        .selected-step-summary {background: rgba(102, 126, 234, 0.1); padding: 10px 12px; border-radius: var(--radius-sm); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--primary-light);}
-        .btn-reselect {font-size: 11px; color: var(--primary); cursor: pointer; text-decoration: underline;}
-        
         .status-icon { display: inline-flex; justify-content: center; align-items: center; width: 28px; height: 28px; border-radius: 50%; font-size: 13px; border: 1px solid transparent; transition: all 0.2s ease; }
         .status-icon-btn { display: inline-flex; justify-content: center; align-items: center; width: 32px; height: 32px; border-radius: 50%; font-size: 14px; border: 1px solid transparent; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease;}
         .status-icon-btn:hover { transform: scale(1.1); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
@@ -317,7 +314,7 @@
         
         .shift-toggle { display: flex; gap: 6px; background: rgba(102, 126, 234, 0.08); padding: 4px; border-radius: var(--radius-sm); }
         .shift-toggle input[type="radio"] { display: none; }
-        .shift-toggle label { flex: 1; text-align: center; padding: 8px 4px; cursor: pointer; border-radius: 40px; font-size: 13px; font-weight: 500; color: var(--text-muted); transition: all 0.2s; }
+        .shift-toggle label { flex: 1; padding: 6px 10px; text-align: center; border-radius: 6px; cursor: pointer; font-weight: 500; color: var(--text-muted); font-size: 13px; transition: all 0.2s; }
         .shift-toggle input[type="radio"]:checked + label { background: var(--primary); color: white; }
         
         .hidden { display: none !important; }
@@ -470,24 +467,21 @@
         const SUPPORT_EMAIL = 'truc.tran@inbold.com'; // email người hỗ trợ
 
         const state = {
-            orderSelection: {}, 
-            dayShifts: { mon: 'morning', tue: 'morning', wed: 'morning', thu: 'morning', fri: 'morning' },
-            currentOrderDay: 'mon',
             isEditingMenu: false,
             personnelViewMode: 'staff',
             adminMenuTab: 'this',
             currentUser: null, staffProfile: null, isAdmin: false,
             currentTab: 'today', adminSubTab: 'stats', authReady: false,
-            menuFilterMode: 'auto', 
-            orderSelection: {}, 
-            dayShifts: { mon: 'morning', tue: 'morning', wed: 'morning', thu: 'morning', fri: 'morning' },
+            menuFilterMode: 'auto', orderSelection: {},
+            // orderShiftSelection[dayKey] = 'M' | 'E' | 'both'
+            orderShiftSelection: {},
             currentOrderDay: 'mon',
-            guestCurrentOrderDay: 'mon', guestShiftSelection: 'morning',
+            guestCurrentOrderDay: 'mon', guestShiftSelection: {},
             reopenTarget: { key: null, name: null, weekStr: null }, deleteTarget: { key: null, name: null },
             statsViewMode: 'day', statsViewDate: new Date(), guestOrderSelection: {},
             reopenTargetWeek: null, reopenIsCurrentWeek: false 
         };
-        
+
         const loadXLSXLibrary = () => {
             return new Promise((resolve, reject) => {
                 if (window.XLSX) return resolve();
@@ -628,47 +622,45 @@
         const hideLoader = () => el('loader').classList.add('hidden');
         const emailToKey = (email) => email.replace(/[.@]/g, '_');
         
-        const buildDishValue = (dishName, shift) => {
-            const isNoOrder = dishName.toLowerCase().includes('không đặt cơm') || dishName.toLowerCase().includes('no order');
-            const prefix = isNoOrder ? '[ignore] ' : 'not: ';
-            const shiftTag = shift ? `[${shift}] ` : '';
-            return `${shiftTag}${prefix}${dishName}`;
+        // Trích xuất ca từ rawString dạng "[M] ..." hoặc "[E] ..."
+        const extractShiftPrefix = (rawString) => {
+            if (!rawString) return { shiftTag: '', rest: rawString || '' };
+            if (rawString.startsWith('[M] ')) return { shiftTag: 'M', rest: rawString.substring(4) };
+            if (rawString.startsWith('[E] ')) return { shiftTag: 'E', rest: rawString.substring(4) };
+            return { shiftTag: '', rest: rawString };
         };
-        
+
         const parseDishValue = (rawString) => {
-            if (!rawString) return { status: 'not', dish: '', shift: null };
-        
-            if (rawString.startsWith('[ignore]')) {
-                let cleanDish = rawString.substring(8).trim(); 
-                return { status: 'ignore', dish: cleanDish, shift: null };
+            if (!rawString) return { status: 'not', dish: '', shiftTag: '' };
+
+            const { shiftTag, rest } = extractShiftPrefix(rawString);
+
+            if (rest.startsWith('[ignore]')) {
+                let cleanDish = rest.substring(8).trim(); 
+                return { status: 'ignore', dish: cleanDish, shiftTag };
             }
-        
-            if (rawString.startsWith('giveup[')) {
-                const closeBracket = rawString.indexOf(']');
-                const receiver = rawString.substring(7, closeBracket);
-                const rest = rawString.substring(closeBracket + 2).trim();
-                let shift = null;
-                let dish = rest;
-                const shiftMatch = rest.match(/^\[([ME])\]\s*/);
-                if (shiftMatch) { shift = shiftMatch[1]; dish = rest.substring(shiftMatch[0].length); }
-                return { status: 'giveup', receiver, dish, shift };
+
+            if (rest.startsWith('giveup[')) {
+                const closeBracket = rest.indexOf(']');
+                const receiver = rest.substring(7, closeBracket);
+                const dish = rest.substring(closeBracket + 2).trim();
+                return { status: 'giveup', receiver, dish, shiftTag };
             }
-        
-            let shift = null;
-            let body = rawString;
-            const shiftMatch = rawString.match(/^\[([ME])\]\s*/);
-            if (shiftMatch) { shift = shiftMatch[1]; body = rawString.substring(shiftMatch[0].length); }
-        
+
             const prefixes = ['eaten:', 'giveup:', 'not:', 'placeholder:'];
             for (const prefix of prefixes) {
-                if (body.startsWith(prefix)) {
+                if (rest.startsWith(prefix)) {
                     let status = prefix.replace(':', '');
                     if (status === 'placeholder') status = 'ignore';
-                    return { status, dish: body.substring(prefix.length).trim(), shift };
+                    return { 
+                        status: status, 
+                        dish: rest.substring(prefix.length).trim(),
+                        shiftTag
+                    };
                 }
             }
-        
-            return { status: 'not', dish: body, shift };
+
+            return { status: 'not', dish: rest, shiftTag };
         };
 
         const parseDish = (rawString) => {
@@ -744,29 +736,34 @@
                 const myName = state.staffProfile.name;
                 const gifters = [];
                 Object.entries(weekData).forEach(([key, val]) => {
-                    if (key === 'menu' || key === userEmailKey) return; 
-                    const raw = val[dayKey];
-                    if (!raw) return;
-                    const { status, receiver, dish } = parseDishValue(raw);
-                    if (status === 'giveup' && receiver === myName) {
-                        gifters.push({ key: key, name: val.name, dish: parseDish(raw), rawDish: dish });
-                    }
+                    if (key === 'menu' || key === userEmailKey) return;
+                    // Check cả 2 ca
+                    ['M', 'E'].forEach(shiftTag => {
+                        const raw = val[dayKey + '_' + shiftTag];
+                        if (!raw) return;
+                        const { status, receiver, dish } = parseDishValue(raw);
+                        if (status === 'giveup' && receiver === myName) {
+                            gifters.push({ key, name: val.name, dish: parseDish(raw), rawDish: dish, shiftTag });
+                        }
+                    });
                 });
                 if (gifters.length > 0) {
                     giftHTML = gifters.map(g => 
                         `<div class="gift-alert">
                             <div style="display:flex; justify-content:space-between; align-items:start;">
-                                <div><h3><i class="fas fa-gift"></i> ${__('youGotGift')}</h3><div style="font-size:13px"><strong>${g.name}</strong> ${__('giftPrivate')}: ${g.dish}</div></div>
+                                <div><h3><i class="fas fa-gift"></i> ${__('youGotGift')}</h3><div style="font-size:13px"><strong>${g.name}</strong> ${__('giftPrivate')} [${g.shiftTag}]: ${g.dish}</div></div>
                             </div>
-                            <div class="gift-actions"><button class="btn btn-mark-eaten" style="background:var(--success); padding:6px 12px; font-size:12px;" data-action="eat-gift" data-giver-key="${g.key}" data-day="${dayKey}" data-dish="${g.rawDish}"><i class="fas fa-utensils"></i> ${__('confirmEat')}</button></div>
+                            <div class="gift-actions"><button class="btn btn-mark-eaten" style="background:var(--success); padding:6px 12px; font-size:12px;" data-action="eat-gift" data-giver-key="${g.key}" data-day="${dayKey}" data-shift="${g.shiftTag}" data-dish="${g.rawDish}"><i class="fas fa-utensils"></i> ${__('confirmEat')}</button></div>
                         </div>`
                     ).join('');
                 }
             }
             
+            // Logic tách biệt hoàn toàn Reopen
             let reopenWeekStr = null;
             let isCurrentWeek = false;
 
+            // Ưu tiên check tuần hiện tại trước
             if (userData && userData.order === 'reopen') {
                 reopenWeekStr = currentWeekString;
                 isCurrentWeek = true;
@@ -777,7 +774,7 @@
             
             if (reopenWeekStr) {
                 state.reopenTargetWeek = reopenWeekStr;
-                state.reopenIsCurrentWeek = isCurrentWeek;
+                state.reopenIsCurrentWeek = isCurrentWeek; // Lưu trạng thái
 
                 const titleText = isCurrentWeek 
                     ? `Đặt món bổ sung (${reopenWeekStr.split('_')[1]})` 
@@ -789,23 +786,43 @@
                 return;
             }
             
+            // Logic mặc định (khi không reopen)
             let heroHtml = '';
             if (['sun', 'sat'].includes(dayKey)) {
                 heroHtml = `<div class="card hero-card"><div class="hero-content"><div class="hero-greeting">${__('hi')} ${firstName}</div><div class="hero-title">${__('weekend')}</div></div></div>`;
             } else {
-                const rawDishString = userData ? userData[dayKey] : null;
-                if (rawDishString) {
-                    const { status, dish } = parseDishValue(rawDishString);
+                const rawM = userData ? userData[dayKey + '_M'] : null;
+                const rawE = userData ? userData[dayKey + '_E'] : null;
+
+                if (rawM || rawE) {
+                    // Hiển thị ca hiện tại (sáng < 15h, chiều ≥ 15h)
+                    const currentHour = new Date().getHours();
+                    const mainRaw = (currentHour < 15 && rawM) ? rawM : (rawE || rawM);
+                    const mainShift = (currentHour < 15 && rawM) ? 'M' : (rawE ? 'E' : 'M');
+                    const { status, dish } = parseDishValue(mainRaw);
                     const isSkipped = status === 'giveup';
                     const isEaten = status === 'eaten';
                     const isPlaceholder = status === 'ignore' || status === 'placeholder';
+                    const shiftLabel = mainShift === 'M' ? '<span style="font-size:13px;opacity:0.85;">[M] Ca Sáng</span>' : '<span style="font-size:13px;opacity:0.85;">[E] Ca Chiều</span>';
+
+                    // Nếu có cả 2 ca, hiển thị cả 2
+                    let extraMealHTML = '';
+                    if (rawM && rawE) {
+                        const otherRaw = mainShift === 'M' ? rawE : rawM;
+                        const otherShift = mainShift === 'M' ? 'E' : 'M';
+                        const { status: otherStatus, dish: otherDish } = parseDishValue(otherRaw);
+                        const otherLabel = otherShift === 'M' ? '[M] Ca Sáng' : '[E] Ca Chiều';
+                        extraMealHTML = `<div style="margin-top:4px;font-size:12px;opacity:0.8;">${otherLabel}: ${parseDish(otherRaw)}</div>`;
+                    }
 
                     heroHtml = `<div class="card hero-card">
                         <div class="hero-content">
                             <div class="hero-greeting">${__('hi')} ${firstName}</div>
-                            <div class="hero-title">${parseDish(rawDishString)}</div>
+                            <div style="margin-bottom:4px;">${shiftLabel}</div>
+                            <div class="hero-title">${parseDish(mainRaw)}</div>
+                            ${extraMealHTML}
                             ${!isPlaceholder ? `<div class="action-buttons-hero">
-                                <button class="btn btn-skip ${isSkipped ? 'active' : ''}" data-action="skip-modal" data-dish="${dish}" data-day="${dayKey}" ${isSkipped || isEaten ? 'disabled' : ''}><i class="fas fa-ban"></i> ${__('skip')}</button>
+                                <button class="btn btn-skip ${isSkipped ? 'active' : ''}" data-action="skip-modal" data-dish="${dish}" data-day="${dayKey}" data-shift="${mainShift}" ${isSkipped || isEaten ? 'disabled' : ''}><i class="fas fa-ban"></i> ${__('skip')}</button>
                                 <button class="btn btn-eaten ${isEaten ? 'active' : ''}" data-action="eaten" data-day="${dayKey}" ${isEaten ? 'disabled' : ''}><i class="fas fa-check"></i> ${__('eaten')}</button>
                             </div>` : ''}
                         </div>
@@ -819,71 +836,162 @@
         }
         
         async function renderOrderSection(container) {
-            if (!container) return;
             const today = new Date();
+            const dayOfWeek = today.getDay();
+            const hour = today.getHours();
             const userEmailKey = emailToKey(state.currentUser.email);
             const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
-            const dayNames = { mon: 'Thứ 2', tue: 'Thứ 3', wed: 'Thứ 4', thu: 'Thứ 5', fri: 'Thứ 6' };
+            const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
+        
+            const isCurrentWeekPeriod = (dayOfWeek >= 1 && dayOfWeek <= 3) || (dayOfWeek === 4 && hour < 15);
+            const currentWeekString = getWeekString(today);
             const nextWeekString = getWeekString(new Date(today.getTime() + 7 * 86400000));
             
-            const weekDoc = await getDocument('order_list', nextWeekString);
-            const userData = weekDoc ? weekDoc[userEmailKey] : null;
-        
-            if (userData && userData.order === 'ordered') {
-                let html = `<div class="card"><div class="card-header toggle-card-header" data-target="summary-list-next"><h2 class="card-title">Đã đặt tuần ${nextWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon rotate"></i></div><ul id="summary-list-next" class="staff-list">`;
-                dayKeys.forEach(dk => {
-                    if (userData[`${dk}_M`]) html += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dk]} - Sáng</div><div class="staff-dish">${parseDish(userData[`${dk}_M`])}</div></div></li>`;
-                    if (userData[`${dk}_E`]) html += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dk]} - Chiều</div><div class="staff-dish">${parseDish(userData[`${dk}_E`])}</div></div></li>`;
-                });
-                container.innerHTML = html + `</ul></div>`;
-                return;
-            }
-        
-            const menu = weekDoc ? weekDoc.menu : null;
-            if (!menu) { container.innerHTML = `<div class="card text-center"><p class="text-muted">Chưa có thực đơn.</p></div>`; return; }
-        
-            const allDone = dayKeys.every(d => state.dayShifts[d] === 'both' ? (state.orderSelection[d+'_M'] && state.orderSelection[d+'_E']) : state.orderSelection[d+(state.dayShifts[d]==='morning'?'_M':'_E')]);
-        
-            if (allDone) {
-                let html = `<div class="card"><div class="card-header"><h2 class="card-title">Xác nhận đơn hàng</h2></div><ul class="staff-list">`;
-                dayKeys.forEach(d => {
-                    const s = state.dayShifts[d];
-                    if (s === 'both' || s === 'morning') html += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[d]} - Sáng</div><div class="staff-dish">${parseDish(state.orderSelection[d+'_M'])}</div></div></li>`;
-                    if (s === 'both' || s === 'evening') html += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[d]} - Chiều</div><div class="staff-dish">${parseDish(state.orderSelection[d+'_E'])}</div></div></li>`;
-                });
-                container.innerHTML = html + `</ul><div style="display:flex;gap:10px;"><button id="btn-edit-again" class="btn btn-secondary btn-block mt-3">Đặt lại</button><button id="submit-order-btn" class="btn btn-primary btn-block mt-3">Hoàn tất</button></div></div>`;
-            } else {
-                const curD = state.currentOrderDay, curS = state.dayShifts[curD], dishes = menu[curD] || [];
-                let tabs = `<div class="tabs">` + dayKeys.map(dk => {
-                    const done = state.dayShifts[dk] === 'both' ? (state.orderSelection[dk+'_M'] && state.orderSelection[dk+'_E']) : state.orderSelection[dk+(state.dayShifts[dk]==='morning'?'_M':'_E')];
-                    return `<button class="tab-btn order-day-tab-btn ${curD===dk?'active':''} ${done?'has-order':''}" data-day-key="${dk}">${dayNames[dk]}</button>`;
-                }).join('') + `</div>`;
-        
-                let toggle = `<div class="shift-toggle" style="margin-bottom:15px;"><input type="radio" id="s-m" name="user-shift" value="morning" ${curS==='morning'?'checked':''}><label for="s-m">Ca sáng</label><input type="radio" id="s-e" name="user-shift" value="evening" ${curS==='evening'?'checked':''}><label for="s-e">Ca chiều</label><input type="radio" id="s-b" name="user-shift" value="both" ${curS==='both'?'checked':''}><label for="s-b">Hai ca</label></div>`;
-                
-                let list = '';
-                if (curS === 'both') {
-                    if (!state.orderSelection[curD+'_M']) {
-                        list = `<div class="order-dish-list">${dishes.map(d => `<div class="order-dish-item" data-dish="${d}" data-day-key="${curD}" data-target-shift="M"><div class="order-dish-name">${parseDish(d)}</div></div>`).join('')}</div>`;
-                    } else {
-                        list = `<div class="selected-step-summary"><div>Sáng: ${parseDish(state.orderSelection[curD+'_M'])}</div><span class="btn-reselect" data-reselect-day="${curD}" data-reselect-shift="M"><i class="fa-regular fa-pen-to-square"></i></span></div>` +
-                               `<div class="order-dish-list">${dishes.map(d => `<div class="order-dish-item" data-dish="${d}" data-day-key="${curD}" data-target-shift="E"><div class="order-dish-name">${parseDish(d)}</div></div>`).join('')}</div>`;
-                    }
-                } else {
-                    const tag = curS === 'morning' ? 'M' : 'E';
-                    list = `<div class="order-dish-list">${dishes.map(d => `<div class="order-dish-item" data-dish="${d}" data-day-key="${curD}" data-target-shift="${tag}"><div class="order-dish-name">${parseDish(d)}</div></div>`).join('')}</div>`;
-                }
-                container.innerHTML = `<div class="card"><div class="card-header"><h2 class="card-title">Đặt món tuần ${nextWeekString.split('_')[1]}</h2></div>${tabs}${toggle}${list}</div>`;
-            }
-        }
+            const [currentWeekDoc, nextWeekDoc] = await Promise.all([
+                getDocument('order_list', currentWeekString),
+                getDocument('order_list', nextWeekString)
+            ]);
+
+            const userDataCurrent = currentWeekDoc ? currentWeekDoc[userEmailKey] : null;
+            const hasOrderedCurrentWeek = userDataCurrent && userDataCurrent.order === 'ordered';
             
+            let htmlContent = '';
+
+            if (hasOrderedCurrentWeek) {
+                let summaryHTML = `<div class="card"><div class="card-header toggle-card-header" data-target="summary-list-current"><h2 class="card-title">${__('orderedWeek')} ${currentWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon rotate"></i></div><ul id="summary-list-current" class="staff-list hidden">`;
+                for (const key of dayKeys) {
+                    const rawM = userDataCurrent[key + '_M'];
+                    const rawE = userDataCurrent[key + '_E'];
+                    if (rawM || rawE) {
+                        if (rawM) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish"><span style="color:var(--primary);font-weight:700;margin-right:6px;">[M]</span>${parseDish(rawM)}</div></div></li>`;
+                        if (rawE) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${rawM ? '' : dayNames[key]}</div><div class="staff-dish"><span style="color:var(--text-muted);font-weight:700;margin-right:6px;">[E]</span>${parseDish(rawE)}</div></div></li>`;
+                    } else {
+                        summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish text-muted">${__('notOrdered')}</div></div></li>`;
+                    }
+                }
+                htmlContent += summaryHTML + `</ul></div>`;
+            } else if (isCurrentWeekPeriod) {
+                htmlContent += `<div class="card text-center" style="padding: 2rem;"><i class="fas fa-calendar-xmark" style="font-size: 48px; color: var(--text-muted); margin-bottom: 1rem;"></i><h3 style="color: var(--text); margin-bottom: 0.5rem;">${__('notOrderedThisWeek')}</h3><p class="text-muted" style="margin-bottom: 1.5rem;">${__('contactSupport')}</p><a href="mailto:${SUPPORT_EMAIL}" class="btn btn-primary" style="text-decoration: none;"><i class="fas fa-headset"></i> ${__('support')}</a></div>`;
+            }
+
+            if (!isCurrentWeekPeriod) {
+                const userDataNext = nextWeekDoc ? nextWeekDoc[userEmailKey] : null;
+                const hasOrderedNextWeek = userDataNext && userDataNext.order === 'ordered';
+
+                if (hasOrderedNextWeek) {
+                    let summaryHTML = `<div class="card"><div class="card-header toggle-card-header" data-target="summary-list-next"><h2 class="card-title">${__('orderedWeek')} ${nextWeekString.split('_')[1]}</h2><i class="fas fa-chevron-up toggle-icon rotate"></i></div><ul id="summary-list-next" class="staff-list hidden">`;
+                    for (const key of dayKeys) {
+                        const rawM = userDataNext[key + '_M'];
+                        const rawE = userDataNext[key + '_E'];
+                        if (rawM || rawE) {
+                            if (rawM) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish"><span style="color:var(--primary);font-weight:700;margin-right:6px;">[M]</span>${parseDish(rawM)}</div></div></li>`;
+                            if (rawE) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${rawM ? '' : dayNames[key]}</div><div class="staff-dish"><span style="color:var(--text-muted);font-weight:700;margin-right:6px;">[E]</span>${parseDish(rawE)}</div></div></li>`;
+                        } else {
+                            summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish text-muted">${__('rest')}</div></div></li>`;
+                        }
+                    }
+                    htmlContent += summaryHTML + `</ul></div>`;
+                } 
+                else {
+                    const allSelected = dayKeys.every(day => {
+                        const sh = state.orderShiftSelection[day] || 'M';
+                        if (sh === 'both') return state.orderSelection[day + '_M'] && state.orderSelection[day + '_E'];
+                        return state.orderSelection[day + '_' + sh];
+                    });
+
+                    if (allSelected) {
+                        let summaryHTML = `<div class="card"><div class="card-header"><h2 class="card-title">${__('orderForWeek')} ${nextWeekString.split('_')[1]}</h2></div><ul class="staff-list">`;
+                        for (const dayKey of dayKeys) {
+                            const rawM = state.orderSelection[dayKey + '_M'];
+                            const rawE = state.orderSelection[dayKey + '_E'];
+                            if (rawM) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish"><span style="color:var(--primary);font-weight:700;margin-right:6px;">[M]</span>${parseDish(rawM)}</div></div></li>`;
+                            if (rawE) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${rawM ? '' : dayNames[dayKey]}</div><div class="staff-dish"><span style="color:var(--text-muted);font-weight:700;margin-right:6px;">[E]</span>${parseDish(rawE)}</div></div></li>`;
+                        }
+                        htmlContent += summaryHTML + `</ul><button id="submit-order-btn" class="btn btn-primary btn-block mt-3"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;
+                    } else {
+                        const menu = nextWeekDoc ? nextWeekDoc.menu : null;
+                        if (!menu) { 
+                            htmlContent += `<div class="card text-center"><p class="text-muted">${__('noMenu')}</p></div>`; 
+                        } else {
+                            htmlContent += buildOrderFormHTML(menu, nextWeekString, false);
+                        }
+                    }
+                }
+            }
+
+            container.innerHTML = htmlContent;
+        }
+
+        function buildShiftPickerHTML(dayKey) {
+            const sh = state.orderShiftSelection[dayKey] || 'M';
+            return `<div class="shift-picker" style="display:flex;gap:6px;margin-bottom:10px;">
+                <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="M" style="flex:1;padding:7px 4px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid var(--border);cursor:pointer;background:${sh==='M'?'var(--primary)':'var(--card-bg)'};color:${sh==='M'?'white':'var(--text-muted)'};">🌅 Ca Sáng</button>
+                <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="E" style="flex:1;padding:7px 4px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid var(--border);cursor:pointer;background:${sh==='E'?'#475569':'var(--card-bg)'};color:${sh==='E'?'white':'var(--text-muted)'};">🌙 Ca Chiều</button>
+                <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="both" style="flex:1;padding:7px 4px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid var(--border);cursor:pointer;background:${sh==='both'?'var(--accent)':'var(--card-bg)'};color:${sh==='both'?'white':'var(--text-muted)'};">☀️🌙 Cả 2</button>
+            </div>`;
+        }
+
+        function buildOrderFormHTML(menu, targetWeekString, isReopen, currentDayIndex = 0, existingUserOrder = {}) {
+            const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
+            const dayMap = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5 };
+            const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
+
+            let tabsHTML = `<div class="tabs">`;
+            for (const dayKey of dayKeys) {
+                const isPast = isReopen && (dayMap[dayKey] < currentDayIndex);
+                const hasM = state.orderSelection[dayKey + '_M'];
+                const hasE = state.orderSelection[dayKey + '_E'];
+                const hasAny = hasM || hasE;
+                const styleAttr = isPast ? 'style="opacity:0.5;"' : '';
+                tabsHTML += `<button class="tab-btn order-day-tab-btn ${state.currentOrderDay === dayKey ? 'active' : ''} ${hasAny ? 'has-order' : ''}" data-day-key="${dayKey}" ${styleAttr}>${dayNames[dayKey]}</button>`;
+            }
+            tabsHTML += `</div>`;
+
+            let daysContentHTML = '';
+            for (const dayKey of dayKeys) {
+                const isPast = isReopen && (dayMap[dayKey] < currentDayIndex);
+                const dishes = menu[dayKey] || [];
+                const sh = state.orderShiftSelection[dayKey] || 'M';
+
+                daysContentHTML += `<div id="order-day-${dayKey}" class="${state.currentOrderDay === dayKey ? '' : 'hidden'}">`;
+
+                if (isPast) {
+                    const oldM = existingUserOrder[dayKey + '_M'] ? parseDish(existingUserOrder[dayKey + '_M']) : '';
+                    const oldE = existingUserOrder[dayKey + '_E'] ? parseDish(existingUserOrder[dayKey + '_E']) : '';
+                    const oldDish = [oldM ? `[M] ${oldM}` : '', oldE ? `[E] ${oldE}` : ''].filter(Boolean).join(' | ') || 'Chưa đặt';
+                    daysContentHTML += `<div class="text-center p-3" style="color:var(--text-muted);"><i class="fas fa-lock"></i> Ngày này đã qua.<br>Món đã chọn: <strong>${oldDish}</strong></div>`;
+                } else {
+                    daysContentHTML += buildShiftPickerHTML(dayKey);
+                    if (Array.isArray(dishes) && dishes.length > 0) {
+                        if (sh === 'M' || sh === 'both') {
+                            const selM = state.orderSelection[dayKey + '_M'];
+                            daysContentHTML += `<div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:6px;padding-top:4px;">🌅 CA SÁNG</div>`;
+                            daysContentHTML += `<div class="order-dish-list" style="margin-bottom:${sh==='both'?'1rem':'0'};">${dishes.map(dish => `<div class="order-dish-item ${dish === selM ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="M"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
+                        }
+                        if (sh === 'E' || sh === 'both') {
+                            const selE = state.orderSelection[dayKey + '_E'];
+                            daysContentHTML += `<div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px;padding-top:4px;">🌙 CA CHIỀU</div>`;
+                            daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item ${dish === selE ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="E"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
+                        }
+                    } else {
+                        daysContentHTML += `<p class="text-center text-muted p-3">${__('noDishes')}</p><div class="order-dish-list"><div class="order-dish-item" data-dish="Nghỉ" data-day-key="${dayKey}" data-shift-key="${sh === 'E' ? 'E' : 'M'}"><div class="order-dish-name">${__('rest')}</div></div></div>`;
+                    }
+                }
+                daysContentHTML += `</div>`;
+            }
+
+            const weekNum = targetWeekString.split('_')[1];
+            const title = isReopen ? `Đặt lại món (Tuần ${weekNum})` : `${__('orderForWeek')} ${weekNum}`;
+            const warningBanner = isReopen ? `<div style="background:var(--warning);color:white;padding:0.75rem;border-radius:var(--radius-sm);margin-bottom:1rem;text-align:center;"><i class="fas fa-info-circle"></i> Đặt lại: ${__('mon')} → ${__('fri')} (Tuần ${weekNum})</div>` : '';
+            return `<div class="card">${warningBanner}<div class="card-header"><h2 class="card-title">${title}</h2></div>${tabsHTML}${daysContentHTML}</div>`;
+        }
+        
         async function renderReopenOrderSection(container, targetWeekString, isCurrentWeek) {
             const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
             const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
             const userEmailKey = emailToKey(state.currentUser.email);
-            
             const today = new Date();
-            const currentDayIndex = today.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+            const currentDayIndex = today.getDay();
             const dayMap = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5 };
             
             const weekDoc = await getDocument('order_list', targetWeekString);
@@ -893,75 +1001,44 @@
             if (!menu) { container.innerHTML = `<div class="card text-center"><p class="text-muted">${__('noMenu')}</p></div>`; return; }
 
             if (!state.currentOrderDay || !dayKeys.includes(state.currentOrderDay)) {
-                 if (isCurrentWeek) {
-                     const nextAvailable = dayKeys.find(d => dayMap[d] >= currentDayIndex);
-                     state.currentOrderDay = nextAvailable || 'fri';
-                 } else {
-                     state.currentOrderDay = 'mon';
-                 }
+                if (isCurrentWeek) {
+                    const nextAvailable = dayKeys.find(d => dayMap[d] >= currentDayIndex);
+                    state.currentOrderDay = nextAvailable || 'fri';
+                } else {
+                    state.currentOrderDay = 'mon';
+                }
             }
 
-            const requiredDays = isCurrentWeek 
-                ? dayKeys.filter(d => dayMap[d] >= currentDayIndex) 
-                : dayKeys;
+            const requiredDays = isCurrentWeek ? dayKeys.filter(d => dayMap[d] >= currentDayIndex) : dayKeys;
 
-            const allRequiredSelected = requiredDays.every(day => state.orderSelection[day]);
+            const allRequiredSelected = requiredDays.every(day => {
+                const sh = state.orderShiftSelection[day] || 'M';
+                if (sh === 'both') return state.orderSelection[day + '_M'] && state.orderSelection[day + '_E'];
+                return state.orderSelection[day + '_' + sh];
+            });
 
             if (allRequiredSelected) {
-                let summaryHTML = `<div class="card"><div style="background: var(--warning); color: white; padding: 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem; text-align: center;"><i class="fas fa-info-circle"></i> Xác nhận lại các món</div><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${targetWeekString.split('_')[1]}</h2></div><ul class="staff-list">`;
-                
-                for (const dayKey of dayKeys) { 
+                let summaryHTML = `<div class="card"><div style="background:var(--warning);color:white;padding:0.75rem;border-radius:var(--radius-sm);margin-bottom:1rem;text-align:center;"><i class="fas fa-info-circle"></i> Xác nhận lại các món</div><div class="card-header"><h2 class="card-title">${__('orderedWeek')} ${targetWeekString.split('_')[1]}</h2></div><ul class="staff-list">`;
+                for (const dayKey of dayKeys) {
                     const isPast = isCurrentWeek && (dayMap[dayKey] < currentDayIndex);
-                    let displayDish = '';
-                    
                     if (isPast) {
-                        displayDish = existingUserOrder[dayKey] ? parseDish(existingUserOrder[dayKey]) : __('notOrdered');
+                        const oldM = existingUserOrder[dayKey + '_M'] ? parseDish(existingUserOrder[dayKey + '_M']) : '';
+                        const oldE = existingUserOrder[dayKey + '_E'] ? parseDish(existingUserOrder[dayKey + '_E']) : '';
+                        if (oldM) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish"><span style="color:var(--primary);font-weight:700;margin-right:6px;">[M]</span>${oldM}</div></div></li>`;
+                        if (oldE) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${oldM ? '' : dayNames[dayKey]}</div><div class="staff-dish"><span style="color:var(--text-muted);font-weight:700;margin-right:6px;">[E]</span>${oldE}</div></div></li>`;
                     } else {
-                        displayDish = parseDish(state.orderSelection[dayKey]);
+                        const newM = state.orderSelection[dayKey + '_M'];
+                        const newE = state.orderSelection[dayKey + '_E'];
+                        if (newM) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish"><span style="color:var(--primary);font-weight:700;margin-right:6px;">[M]</span>${parseDish(newM)}</div></div></li>`;
+                        if (newE) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${newM ? '' : dayNames[dayKey]}</div><div class="staff-dish"><span style="color:var(--text-muted);font-weight:700;margin-right:6px;">[E]</span>${parseDish(newE)}</div></div></li>`;
                     }
-
-                    summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${displayDish}</div></div></li>`; 
                 }
-                
                 summaryHTML += `</ul><button id="submit-reopen-order-btn" class="btn btn-primary btn-block mt-3"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;
-                container.innerHTML = summaryHTML; 
+                container.innerHTML = summaryHTML;
                 return;
             }
             
-            const shiftToggleHTML = `<div class="form-group"><label class="form-label">${__('shift')}</label><div class="shift-toggle"><input type="radio" id="user-shift-m" name="user-shift" value="morning" ${state.userShiftSelection === 'morning' ? 'checked' : ''}><label for="user-shift-m">${__('morning')}</label><input type="radio" id="user-shift-e" name="user-shift" value="evening" ${state.userShiftSelection === 'evening' ? 'checked' : ''}><label for="user-shift-e">${__('evening')}</label></div></div>`;
-            
-            let tabsHTML = `<div class="tabs">`;
-            for (const dayKey of dayKeys) { 
-                const isPast = isCurrentWeek && (dayMap[dayKey] < currentDayIndex);
-                const styleClass = isPast ? 'opacity: 0.5;' : '';
-                tabsHTML += `<button class="tab-btn order-day-tab-btn ${state.currentOrderDay === dayKey ? 'active' : ''}" style="${styleClass}" data-day-key="${dayKey}">${dayNames[dayKey]}</button>`; 
-            }
-            tabsHTML += `</div>`;
-            
-            let daysContentHTML = '';
-            for (const dayKey of dayKeys) {
-                const dishes = menu[dayKey] || [];
-                const isPast = isCurrentWeek && (dayMap[dayKey] < currentDayIndex);
-                
-                daysContentHTML += `<div id="order-day-${dayKey}" class="${state.currentOrderDay === dayKey ? '' : 'hidden'}">`;
-                
-                if (isPast) {
-                    const oldDish = existingUserOrder[dayKey] ? parseDish(existingUserOrder[dayKey]) : 'Chưa đặt';
-                    daysContentHTML += `<div class="text-center p-3" style="color:var(--text-muted);">
-                        <i class="fas fa-lock"></i> Ngày này đã qua.<br>
-                        Món đã chọn: <strong>${oldDish}</strong>
-                    </div>`;
-                } else {
-                    if (Array.isArray(dishes) && dishes.length > 0) { 
-                        daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item" data-dish="${dish}" data-day-key="${dayKey}"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`; 
-                    } else { 
-                        daysContentHTML += `<p class="text-center text-muted p-3">${__('noDishes')}</p><div class="order-dish-list"><div class="order-dish-item" data-dish="Nghỉ" data-day-key="${dayKey}"><div class="order-dish-name">${__('rest')}</div></div></div>`; 
-                    }
-                }
-                daysContentHTML += `</div>`;
-            }
-            
-            container.innerHTML = `<div class="card"><div style="background: var(--warning); color: white; padding: 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem; text-align: center;"><i class="fas fa-info-circle"></i> Đang chọn: ${dayNames[dayKeys[0]]} ${__('to')} ${dayNames[dayKeys[dayKeys.length - 1]]} (Tuần ${targetWeekString.split('_')[1]})</div><div class="card-header"><h2 class="card-title">Đặt lại món</h2></div>${shiftToggleHTML}${tabsHTML}${daysContentHTML}</div>`;
+            container.innerHTML = buildOrderFormHTML(menu, targetWeekString, true, currentDayIndex, existingUserOrder);
         }
         
         async function renderMenu() {
@@ -980,11 +1057,11 @@
             showLoader();
             try {
                 const weekString = getWeekString(new Date());
-                const { day, dish } = state.skipTarget;
+                const { day, dish, shift: shiftTag } = state.skipTarget;
                 const userKey = emailToKey(state.currentUser.email);
-                
+                const fieldKey = day + '_' + (shiftTag || 'M');
                 const newStatus = `giveup[${receiverName}]`;
-                await updateDoc(doc(db, 'order_list', weekString), { [`${userKey}.${day}`]: `${newStatus}: ${dish}` });
+                await updateDoc(doc(db, 'order_list', weekString), { [`${userKey}.${fieldKey}`]: `${newStatus}: ${dish}` });
                 
                 showToast(__('skipSuccess')); 
                 el('skip-receiver-input').value = '';
@@ -1001,94 +1078,88 @@
             const container = el('staff-list-container');
             const hour = new Date().getHours();
             const dayKey = getDayKey();
-        
-            const staffOrders = [];
+            
+            // Tách từng người thành 2 dòng riêng (M và E) nếu họ đặt cả 2 ca
+            const staffEntries = [];
             Object.entries(weekDoc).forEach(([key, val]) => {
                 if (key === 'menu' || val.order === 'reopen' || !val.name) return;
-                if (!val.name.toLowerCase().includes(searchTerm.toLowerCase())) return;
-        
-                const fieldM = val[`${dayKey}_M`];
-                const fieldE = val[`${dayKey}_E`];
-                const fieldLegacy = val[dayKey];
-        
-                if (fieldM) staffOrders.push({ ...val, key, rawDish: fieldM, caShift: 'M' });
-                if (fieldE) staffOrders.push({ ...val, key, rawDish: fieldE, caShift: 'E' });
-                if (!fieldM && !fieldE && fieldLegacy) {
-                    const parsed = parseDishValue(fieldLegacy);
-                    const caShift = parsed.shift || (val.shift === 'evening' || val.shift === 'E' ? 'E' : 'M');
-                    staffOrders.push({ ...val, key, rawDish: fieldLegacy, caShift });
-                }
+                if (searchTerm && !val.name.toLowerCase().includes(searchTerm.toLowerCase())) return;
+                const rawM = val[dayKey + '_M'];
+                const rawE = val[dayKey + '_E'];
+                if (rawM) staffEntries.push({ ...val, key, rawDish: rawM, shiftTag: 'M' });
+                if (rawE) staffEntries.push({ ...val, key, rawDish: rawE, shiftTag: 'E' });
             });
-        
+
             el('menu-filter-btn').innerHTML = state.menuFilterMode === 'auto' ? `<i class="fas ${hour < 15 ? 'fa-sun' : 'fa-moon'}"></i>` : `<i class="fas fa-user-group"></i>`;
-        
+            
             const createStaffItem = (order) => {
                 const { status, receiver } = parseDishValue(order.rawDish);
                 const isPlaceholder = status === 'ignore' || status === 'placeholder';
                 const isPublicGiveup = status === 'giveup' && (receiver === 'Everyone' || receiver === 'Mọi người');
                 const isPrivateGiveup = status === 'giveup' && !isPublicGiveup;
-        
+
                 let statusClass = '';
                 if (status === 'eaten') statusClass = 'eaten';
                 else if (isPublicGiveup) statusClass = 'skipped';
-        
+                
                 let showEatBtn = false;
                 if (!isPlaceholder && status !== 'eaten') {
                     if (state.isAdmin) showEatBtn = true;
                     else if (isPublicGiveup) showEatBtn = true;
                 }
-        
-                const caLabel = order.caShift === 'M'
-                    ? `<span style="color:var(--primary);font-size:10px;font-weight:700;padding:1px 5px;border:1px solid var(--primary);border-radius:4px;margin-right:4px;">[M]</span>`
-                    : `<span style="color:var(--warning);font-size:10px;font-weight:700;padding:1px 5px;border:1px solid var(--warning);border-radius:4px;margin-right:4px;">[E]</span>`;
-        
-                const fieldKey = `${dayKey}_${order.caShift}`;
-                const actionBtn = showEatBtn ? `<div class="staff-item-actions"><button class="btn-mark-eaten mark-eaten-btn" data-key="${order.key}" data-day="${fieldKey}"><i class="fas fa-check"></i> ${__('eaten')}</button></div>` : '';
-        
-                let nameHtml = `${caLabel}${order.name}`;
+
+                const shiftBadge = order.shiftTag === 'M'
+                    ? `<span style="font-size:10px;font-weight:700;color:var(--primary);background:rgba(102,126,234,0.12);padding:1px 6px;border-radius:4px;margin-right:4px;">[M]</span>`
+                    : `<span style="font-size:10px;font-weight:700;color:var(--text-muted);background:rgba(128,128,128,0.12);padding:1px 6px;border-radius:4px;margin-right:4px;">[E]</span>`;
+
+                const actionBtn = showEatBtn ? `<div class="staff-item-actions"><button class="btn-mark-eaten mark-eaten-btn" data-key="${order.key}" data-day="${dayKey}" data-shift="${order.shiftTag}"><i class="fas fa-check"></i> ${__('eaten')}</button></div>` : '';
+                
+                let nameHtml = order.name;
                 let extraInfo = '';
                 if (status === 'giveup') {
-                    if (isPrivateGiveup) nameHtml = `${caLabel}${order.name} <span style="color:var(--warning); font-size: 11px; margin-left: 4px;"><i class="fas fa-long-arrow-alt-right"></i> ${receiver}</span>`;
-                    else extraInfo = `<div style="font-size:11px;color:var(--warning);margin-top:2px;"><i class="fas fa-users"></i> ${__('everyone')}</div>`;
+                    if (isPrivateGiveup) {
+                        nameHtml = `${order.name} <span style="color:var(--warning);font-size:11px;margin-left:4px;"><i class="fas fa-long-arrow-alt-right"></i> ${receiver}</span>`;
+                    } else {
+                        extraInfo = `<div style="font-size:11px;color:var(--warning);margin-top:2px;"><i class="fas fa-users"></i> ${__('everyone')}</div>`;
+                    }
                 }
-        
-                return `<li class="staff-item ${statusClass}"><div class="staff-details"><div class="staff-name">${nameHtml}</div><div class="staff-dish">${parseDish(order.rawDish)}</div>${extraInfo}</div>${actionBtn}</li>`;
+
+                return `<li class="staff-item ${statusClass}"><div class="staff-details"><div class="staff-name">${nameHtml}</div><div class="staff-dish">${shiftBadge}${parseDish(order.rawDish)}</div>${extraInfo}</div>${actionBtn}</li>`;
             };
-        
+            
             const createDepartmentHTML = (list) => {
                 const byDepartment = {};
                 list.forEach(order => { const depart = order.depart || __('unknown'); if (!byDepartment[depart]) byDepartment[depart] = []; byDepartment[depart].push(order); });
-                const sortedDepartments = Object.keys(byDepartment).sort();
-                return sortedDepartments.map(depart => {
+                return Object.keys(byDepartment).sort().map(depart => {
                     const sorted = byDepartment[depart].sort((a, b) => {
                         const { status: sA } = parseDishValue(a.rawDish); const { status: sB } = parseDishValue(b.rawDish);
-                        return ({ not: 0, eaten: 1 }[sA] || 0) - ({ not: 0, eaten: 1 }[sB] || 0) || a.name.localeCompare(b.name);
+                        return ({not:0,eaten:1}[sA]||0) - ({not:0,eaten:1}[sB]||0) || a.name.localeCompare(b.name);
                     });
                     return `<div class="department-group"><div class="department-header">${depart}</div><ul class="staff-list">${sorted.map(order => createStaffItem(order)).join('')}</ul></div>`;
                 }).join('');
             };
-        
+            
             const createSkippedSection = (list) => {
                 if (list.length === 0) return '';
-                const sorted = list.sort((a, b) => a.name.localeCompare(b.name));
-                return `<div class="skipped-section"><div class="skipped-section-header"><i class="fas fa-hand-holding-heart"></i><span>${__('skippedList')} (${list.length})</span></div><ul class="staff-list">${sorted.map(order => createStaffItem(order)).join('')}</ul></div>`;
+                return `<div class="skipped-section"><div class="skipped-section-header"><i class="fas fa-hand-holding-heart"></i><span>${__('skippedList')} (${list.length})</span></div><ul class="staff-list">${list.sort((a,b)=>a.name.localeCompare(b.name)).map(order => createStaffItem(order)).join('')}</ul></div>`;
             };
-        
-            const sang = staffOrders.filter(o => o.caShift === 'M');
-            const chieu = staffOrders.filter(o => o.caShift === 'E');
-        
+
             const createShiftHTML = (list) => {
                 const skipped = list.filter(o => { const { status, receiver } = parseDishValue(o.rawDish); return status === 'giveup' && (receiver === 'Everyone' || receiver === 'Mọi người'); });
                 const others = list.filter(o => { const { status, receiver } = parseDishValue(o.rawDish); return !(status === 'giveup' && (receiver === 'Everyone' || receiver === 'Mọi người')); });
                 return createSkippedSection(skipped) + createDepartmentHTML(others);
             };
-        
+
+            // Tách theo ca dựa vào shiftTag
+            const sang = staffEntries.filter(o => o.shiftTag === 'M');
+            const chieu = staffEntries.filter(o => o.shiftTag === 'E');
+            
             let html = '';
             if ((state.menuFilterMode === 'auto' && hour < 15) || state.menuFilterMode === 'all') {
-                if (sang.length) html += `<h3 style="color:var(--primary);padding:1rem 0 .5rem;font-size:18px;border-bottom:2px solid var(--primary);margin-bottom:1rem;">☀️ ${__('morning')}</h3>` + createShiftHTML(sang);
+                if (sang.length) html += `<h3 style="color:var(--primary);padding:1rem 0 .5rem;font-size:18px;border-bottom:2px solid var(--primary);margin-bottom:1rem;">${__('morning')}</h3>` + createShiftHTML(sang);
             }
             if ((state.menuFilterMode === 'auto' && hour >= 15) || state.menuFilterMode === 'all') {
-                if (chieu.length) html += `<h3 style="color:var(--warning);padding:1rem 0 .5rem;font-size:18px;border-bottom:2px solid var(--warning);margin-bottom:1rem;margin-top:${sang.length ? '2rem' : '0'};">🌙 ${__('evening')}</h3>` + createShiftHTML(chieu);
+                if (chieu.length) html += `<h3 style="color:var(--primary);padding:1rem 0 .5rem;font-size:18px;border-bottom:2px solid var(--primary);margin-bottom:1rem;margin-top:${sang.length ? '2rem' : '0'};">${__('evening')}</h3>` + createShiftHTML(chieu);
             }
             container.innerHTML = html || `<p class="text-center text-muted p-3">${__('notFound')}</p>`;
         }
@@ -1298,124 +1369,178 @@
             
             await renderStatsContent();
         }
-
-        window.updateAdminDayShift = (userKey, weekType, dayKey, shiftValue) => {
-            const container = el(`detail-${weekType}-${userKey}`);
-            const dayBlock = container.querySelector(`.day-block:has(input[name="shift-${weekType}-${userKey}-${dayKey}"])`);
-            
-            const detailRow = el(`row-detail-${userKey}`);
-            const isThis = weekType === 'this';
-            
-            renderAdminSupport(el('search-support')?.value || '');
-            setTimeout(() => {
-                el(`row-detail-${userKey}`).classList.remove('hidden');
-                el(`detail-${weekType}-${userKey}`).classList.remove('hidden');
-            }, 0);
-        };
-        
-        window.selectAdminDishNew = (elem, userKey, weekType) => {
-            const { dish, day, shift } = elem.dataset;
-            const parent = elem.closest('.mini-dish-list');
-            
-            if (shift !== 'both') {
-                parent.querySelectorAll(`.mini-dish-item[data-shift="${shift}"]`).forEach(el => el.classList.remove('selected'));
-                elem.classList.add('selected');
-            }
-            
-            if (elem.closest('.day-block').querySelector('input[value="both"]').checked) {
-                const btnSave = elem.closest('.detail-inner-wrapper').querySelector('.admin-save-user-btn');
-                btnSave.style.boxShadow = "0 0 15px var(--primary)"; // Gợi ý admin cần bấm lưu
-                
-                elem.classList.add('selected');
-                updateAdminDayShift(userKey, weekType, day, 'both');
-            } else {
-                elem.classList.add('selected');
-            }
-        };
-        
-        window.clearAdminDayDish = (userKey, weekType, dayKey, shiftTag) => {
-            updateAdminDayShift(userKey, weekType, dayKey, 'both');
-        };
-        
         async function renderAdminSupport(searchTerm = '') {
-            const today = new Date(), thisWeekStr = getWeekString(today), nextWeekStr = getWeekString(new Date(today.getTime() + 7 * 86400000));
-            const [allStaff, thisWeekDoc, nextWeekDoc] = await Promise.all([getDocument("staff_list", "staffs"), getDocument('order_list', thisWeekStr), getDocument('order_list', nextWeekStr)]);
+            const today = new Date();
+            const currentDayIdx = today.getDay();
+            const currentHour = today.getHours();
+        
+            const thisWeekStr = getWeekString(today);
+            const nextWeekStr = getWeekString(new Date(today.getTime() + 7 * 86400000));
+        
+            const isNextWeekOpen = (currentDayIdx === 4 && currentHour >= 15) || currentDayIdx === 5 || currentDayIdx === 6 || currentDayIdx === 0;
+        
+            const [allStaff, thisWeekDoc, nextWeekDoc] = await Promise.all([
+                getDocument("staff_list", "staffs"), 
+                getDocument('order_list', thisWeekStr),
+                getDocument('order_list', nextWeekStr)
+            ]);
             
-            const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'], dayNames = { mon: 'Thứ 2', tue: 'Thứ 3', wed: 'Thứ 4', thu: 'Thứ 5', fri: 'Thứ 6' };
+            const menuThisWeek = thisWeekDoc ? thisWeekDoc.menu : {};
+            const menuNextWeek = nextWeekDoc ? nextWeekDoc.menu : {};
             
-            let staffList = Object.entries(allStaff || {}).filter(([key]) => !key.startsWith('guest_')).map(([key, profile]) => {
-                const oT = thisWeekDoc?.[key], oN = nextWeekDoc?.[key];
-                const getS = (o) => {
-                    const hasM = dayKeys.some(d => o?.[d+'_M']), hasE = dayKeys.some(d => o?.[d+'_E']);
-                    return (hasM && hasE) ? 'both' : (hasE ? 'evening' : (hasM ? 'morning' : 'missing'));
-                };
-                return { key, profile, oT, sT: getS(oT), oN, sN: getS(oN) };
-            }).sort((a,b) => a.profile.name.localeCompare(b.profile.name));
+            let staffList = allStaff ? Object.entries(allStaff)
+                .filter(([key]) => !key.startsWith('guest_'))
+                .map(([key, profile]) => {
+                    const orderThis = thisWeekDoc && thisWeekDoc[key] ? thisWeekDoc[key] : null;
+                    let statusThis = 'missing';
+                    if (orderThis && orderThis.order === 'ordered') {
+                        const hasM = ['mon','tue','wed','thu','fri'].some(d => orderThis[d + '_M']);
+                        const hasE = ['mon','tue','wed','thu','fri'].some(d => orderThis[d + '_E']);
+                        if (hasM && hasE) statusThis = 'both';
+                        else if (hasE) statusThis = 'evening';
+                        else statusThis = 'morning';
+                    } else if (orderThis && orderThis.order === 'reopen') {
+                        statusThis = 'missing';
+                    }
+        
+                    const orderNext = nextWeekDoc && nextWeekDoc[key] ? nextWeekDoc[key] : null;
+                    let statusNext = 'missing'; 
+                    let showNext = isNextWeekOpen; 
+        
+                    if (orderNext && orderNext.order === 'ordered') {
+                        const hasM = ['mon','tue','wed','thu','fri'].some(d => orderNext[d + '_M']);
+                        const hasE = ['mon','tue','wed','thu','fri'].some(d => orderNext[d + '_E']);
+                        if (hasM && hasE) statusNext = 'both';
+                        else if (hasE) statusNext = 'evening';
+                        else statusNext = 'morning';
+                        showNext = true; 
+                    } else if (orderNext && orderNext.order === 'reopen') {
+                        showNext = true;
+                    }
+        
+                    return { key, profile, orderThis, statusThis, orderNext, statusNext, showNext };
+                })
+                .sort((a, b) => a.profile.name.localeCompare(b.profile.name)) : [];
         
             if (searchTerm) {
-                const low = searchTerm.toLowerCase();
-                staffList = staffList.filter(i => i.profile.name.toLowerCase().includes(low) || i.profile.email.toLowerCase().includes(low));
+                const lower = searchTerm.toLowerCase();
+                staffList = staffList.filter(i => i.profile.name.toLowerCase().includes(lower) || i.profile.email.toLowerCase().includes(lower));
             }
         
-            let html = `<div class="mt-3"><div class="search-bar mb-2"><div class="search-wrapper"><i class="fas fa-search search-icon"></i><input type="text" id="search-support" class="search-input" placeholder="Tìm kiếm nhân viên..." value="${searchTerm}"></div><button id="add-guest-order-btn" class="icon-btn"><i class="fas fa-user-plus"></i></button></div><div class="table-wrapper"><table><thead><tr><th style="text-align:center">Tuần này</th><th style="text-align:center">Tuần sau</th><th>Nhân viên</th><th class="hide-mobile">Phòng ban</th></tr></thead><tbody>`;
+            let html = `<div class="mt-3">
+            <div class="search-bar mb-2">
+                <div class="search-wrapper">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="search-support" class="search-input" placeholder="${__('searchStaff')}" value="${searchTerm}">
+                </div>
+                <button id="add-guest-order-btn" class="icon-btn" title="${__('addGuest')}"><i class="fas fa-user-plus"></i></button>
+            </div>`;
         
-            staffList.forEach(item => {
-                const renderIcon = (s, k, w) => {
-                    let cls = 'status-missing', icon = '<i class="fas fa-times"></i>';
-                    if (s === 'morning') { cls = 'status-sun'; icon = '<i class="fas fa-sun"></i>'; }
-                    else if (s === 'evening') { cls = 'status-moon'; icon = '<i class="fas fa-moon"></i>'; }
-                    else if (s === 'both') { cls = 'status-sun'; icon = '<i class="fas fa-circle-half-stroke"></i>'; }
-                    return `<div class="status-icon-btn ${cls}" data-key="${k}" data-weektype="${w}">${icon}</div>`;
+            if (staffList.length > 0) {
+                html += `<div class="table-wrapper"><table>
+                    <thead>
+                        <tr>
+                            <th style="width: 50px; text-align: center;">Tuần này</th>
+                            <th style="width: 50px; text-align: center;">Tuần sau</th>
+                            <th>${__('name')}</th>
+                            <th class="hide-mobile">${__('department')}</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+        
+                const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
+                const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
+        
+                const renderIcon = (status, key, weekType) => {
+                    let iconClass = 'status-missing';
+                    let iconContent = '<i class="fas fa-times"></i>';
+                    if (status === 'morning') { iconClass = 'status-sun'; iconContent = '<i class="fas fa-sun"></i>'; }
+                    else if (status === 'evening') { iconClass = 'status-moon'; iconContent = '<i class="fas fa-moon"></i>'; }
+                    else if (status === 'both') { iconClass = 'status-sun'; iconContent = '<i class="fas fa-sun"></i><i class="fas fa-moon" style="font-size:10px;margin-left:2px;"></i>'; }
+                    return `<div class="status-icon-btn ${iconClass}" data-key="${key}" data-weektype="${weekType}">${iconContent}</div>`;
                 };
         
-                html += `<tr class="support-row" onclick="toggleAdminRow('${item.key}')"><td>${renderIcon(item.sT, item.key, 'this')}</td><td>${renderIcon(item.sN, item.key, 'next')}</td><td style="font-weight:600">${item.profile.name}</td><td class="hide-mobile">${item.profile.depart || '-'}</td></tr>`;
-                
-                const renderDetail = (wType, oData, mData, weekStr) => {
-                    let inner = `<div class="week-detail-container" style="margin-top:10px; border-top: 1px solid var(--border); padding-top:10px;">` +
-                                `<div class="week-detail-title" style="color:var(--accent)">CHI TIẾT ${wType === 'this' ? 'TUẦN NÀY' : 'TUẦN SAU'}</div>`;
-                    dayKeys.forEach(dk => {
-                        const dishes = (mData?.menu?.[dk]) || [];
-                        const valM = oData?.[dk+'_M'], valE = oData?.[dk+'_E'];
-                        let curS = (valM && valE) ? 'both' : (valE ? 'evening' : 'morning');
+                const renderDetailBlock = (key, weekType, orderData, menuData, isPastWeek) => {
+                    let content = `<div id="detail-${weekType}-${key}" class="week-detail-container hidden" style="border:none; box-shadow:none; margin:0; border-radius:0;">`;
+                    content += `<div class="detail-inner-wrapper">`;
+                    content += `<div class="week-detail-title"><i class="fas fa-calendar-alt"></i> Chi tiết ${weekType === 'this' ? 'Tuần này' : 'Tuần sau'}</div>`;
         
-                        inner += `<div class="day-block" style="margin-bottom:15px;"><span class="day-label">${dayNames[dk]}</span>` +
-                                 `<div class="shift-toggle" style="margin: 5px 0 10px; transform: scale(0.85); transform-origin: left;">` +
-                                 `<input type="radio" id="s-${wType}-${item.key}-${dk}-m" name="s-${wType}-${item.key}-${dk}" value="morning" ${curS==='morning'?'checked':''}><label for="s-${wType}-${item.key}-${dk}-m">Sáng</label>` +
-                                 `<input type="radio" id="s-${wType}-${item.key}-${dk}-e" name="s-${wType}-${item.key}-${dk}" value="evening" ${curS==='evening'?'checked':''}><label for="s-${wType}-${item.key}-${dk}-e">Chiều</label>` +
-                                 `<input type="radio" id="s-${wType}-${item.key}-${dk}-b" name="s-${wType}-${item.key}-${dk}" value="both" ${curS==='both'?'checked':''}><label for="s-${wType}-${item.key}-${dk}-b">Hai ca</label></div>` +
-                                 `<div class="mini-dish-list">`;
-                        
-                        dishes.forEach(d => {
-                            const isM = valM && parseDishValue(valM).dish === d;
-                            const isE = valE && parseDishValue(valE).dish === d;
-                            inner += `<div class="mini-dish-item ${isM||isE?'selected':''}" data-dish="${d}" data-day="${dk}" onclick="this.classList.toggle('selected')">${parseDish(d)}</div>`;
-                        });
-                        inner += `</div></div>`;
+                    content += `<div style="margin-bottom: 1rem;">`;
+                    dayKeys.forEach((dKey, idx) => {
+                        const isPast = (weekType === 'this') && ((idx + 1) < currentDayIdx && currentDayIdx !== 0 && currentDayIdx !== 6);
+                        const dishes = menuData[dKey] || [];
+                        const curM = orderData ? (parseDishValue(orderData[dKey + '_M']).dish || '') : '';
+                        const curE = orderData ? (parseDishValue(orderData[dKey + '_E']).dish || '') : '';
+
+                        content += `<div class="day-block" style="border-bottom:1px dashed var(--border);padding-bottom:8px;margin-bottom:8px;">
+                            <span class="day-label ${isPast ? 'past' : ''}" style="display:flex;justify-content:space-between;"><span>${dayNames[dKey]}</span>${isPast ? '<span style="font-size:10px;">(Đã qua)</span>' : ''}</span>`;
+
+                        if (dishes.length > 0) {
+                            ['M','E'].forEach(shiftTag => {
+                                const label = shiftTag === 'M' ? '🌅 Ca Sáng' : '🌙 Ca Chiều';
+                                const cur = shiftTag === 'M' ? curM : curE;
+                                content += `<div style="font-size:11px;font-weight:700;color:${shiftTag==='M'?'var(--primary)':'var(--text-muted)'};margin:6px 0 4px;">${label}</div>`;
+                                content += `<div class="mini-dish-list">`;
+                                dishes.forEach(dish => {
+                                    const isSelected = dish === cur;
+                                    const disabledClass = isPast ? 'disabled' : '';
+                                    content += `<div class="mini-dish-item ${isSelected ? 'selected' : ''} ${disabledClass}" data-dish="${dish}" data-day="${dKey}" data-shift="${shiftTag}" ${isPast ? '' : 'onclick="selectAdminDish(this)"'}>${parseDish(dish)}</div>`;
+                                });
+                                content += `</div>`;
+                            });
+                        } else {
+                            content += `<span class="text-muted" style="font-size:12px;">${__('rest')}</span>`;
+                        }
+
+                        content += `</div>`;
                     });
+                    content += `</div>`;
+        
+                    const weekStringValue = weekType === 'this' ? thisWeekStr : nextWeekStr;
+                    const userName = allStaff[key] ? allStaff[key].name : '';
                     
-                    return inner + `<div class="admin-action-buttons" style="margin-top:15px; padding-bottom:15px;">` +
-                                 `<div class="btn-group-row">` +
-                                 `<button class="btn btn-delete-order" data-key="${item.key}" data-weekstr="${weekStr}" data-weektype="${wType}" style="flex:1">Hủy đơn</button>` +
-                                 `<button class="btn btn-secondary reopen-order-btn" data-key="${item.key}" data-name="${item.profile.name}" data-weekstr="${weekStr}" style="flex:1; border:1px solid var(--warning); color:var(--warning)">Mở lại</button></div>` +
-                                 `<button class="btn btn-primary admin-save-user-btn" data-key="${item.key}" data-weekstr="${weekStr}" data-weektype="${wType}" style="width:100%; margin-top:8px;">Lưu ${wType==='this'?'Tuần này':'Tuần sau'}</button></div></div>`;
+                    content += `<div class="admin-action-buttons">
+                        <div class="btn-group-row">
+                            <button class="btn btn-delete-order" data-key="${key}" data-weekstr="${weekStringValue}" data-weektype="${weekType}" style="flex: 1;"><i class="fas fa-trash"></i> Hủy đặt</button>
+                            <button class="btn btn-secondary reopen-order-btn" data-key="${key}" data-name="${userName}" data-weekstr="${weekStringValue}" style="flex: 1; border: 1px solid var(--warning); color: var(--warning);"><i class="fas fa-redo"></i> Reopen</button>
+                        </div>
+                        <button class="btn btn-primary admin-save-user-btn" data-key="${key}" data-weekstr="${weekStringValue}" data-weektype="${weekType}" style="width: 100%;"><i class="fas fa-save"></i> Lưu ${weekType === 'this' ? 'Tuần này' : 'Tuần sau'}</button>
+                    </div>`;
+                    
+                    content += `</div></div>`; 
+                    return content;
                 };
         
-                html += `<tr id="row-detail-${item.key}" class="detail-row hidden"><td colspan="4"><div class="detail-content" style="padding:15px;">` +
-                        renderDetail('this', item.oT, thisWeekDoc, thisWeekStr) + 
-                        renderDetail('next', item.oN, nextWeekDoc, nextWeekStr) + 
-                        `</div></td></tr>`;
-            });
+                staffList.forEach(item => {
+                    const { key, profile, orderThis, statusThis, orderNext, statusNext, showNext } = item;
         
-            el('admin-content').innerHTML = html + `</tbody></table></div></div>`;
+                    html += `<tr class="support-row">
+                        <td style="text-align: center;">${renderIcon(statusThis, key, 'this')}</td>
+                        <td style="text-align: center;">${showNext ? renderIcon(statusNext, key, 'next') : '<span class="text-muted">-</span>'}</td>
+                        <td style="font-weight: 500;">${profile.name}</td>
+                        <td class="hide-mobile">${profile.depart || '-'}</td>
+                    </tr>`;
+                    html += `<tr id="row-detail-${key}" class="detail-row hidden"><td colspan="4"><div class="detail-content">
+                        ${renderDetailBlock(key, 'this', orderThis, menuThisWeek, false)}
+                        ${showNext ? renderDetailBlock(key, 'next', orderNext, menuNextWeek, false) : ''}
+                    </div></td></tr>`;
+                });
+        
+                html += `</tbody></table></div>`;
+            } else { html += `<p class="text-center text-muted p-3">${__('notFound')}</p>`; }
+        
+            html += `</div>`;
             
-            const sInput = el('search-support');
-            if(sInput) { sInput.focus(); sInput.addEventListener('input', (e) => renderAdminSupport(e.target.value)); }
+            el('admin-content').innerHTML = html;
+            const searchInput = el('search-support');
+            if(searchInput) { 
+                searchInput.focus(); 
+                const val = searchInput.value; 
+                searchInput.value = ''; 
+                searchInput.value = val; 
+                searchInput.addEventListener('input', (e) => renderAdminSupport(e.target.value)); 
+            }
         }
-        
-        window.toggleAdminRow = (key) => {
-            const row = el(`row-detail-${key}`);
-            row.classList.toggle('hidden');
-        };
         
         window.selectAdminDish = (elem) => {
             const parent = elem.parentElement;
@@ -1443,39 +1568,21 @@
                 Object.entries(weekDoc).forEach(([key, val]) => {
                     if (key === 'menu' || typeof val !== 'object' || !val) return;
                     if (val.order === 'reopen') return;
-                
-                    for (const s of ['M', 'E']) {
-                        const fieldKey = `${dayKey}_${s}`;
-                        const rawDish = val[fieldKey];
-                        if (!rawDish) continue;
-                
+
+                    ['M', 'E'].forEach(shiftTag => {
+                        const rawDish = val[dayKey + '_' + shiftTag];
+                        if (!rawDish) return;
                         const { status } = parseDishValue(rawDish);
-                        if (status === 'ignore' || status === 'placeholder') continue;
-                
+                        if (status === 'ignore' || status === 'placeholder') return;
                         const dish = parseDish(rawDish);
-                        if (!dish) continue;
-                
-                        const shiftKey = s === 'M' ? 'morning' : 'evening';
+                        if (!dish) return;
+                        const shiftKey = shiftTag === 'E' ? 'evening' : 'morning';
                         if (!stats[shiftKey][dish]) stats[shiftKey][dish] = { ordered: 0, eaten: 0, notEaten: 0 };
                         hasData = true;
                         stats[shiftKey][dish].ordered++;
                         if (status === 'eaten') stats[shiftKey][dish].eaten++;
                         else stats[shiftKey][dish].notEaten++;
-                    }
-                
-                    if (!val[`${dayKey}_M`] && !val[`${dayKey}_E`] && val[dayKey]) {
-                        const rawDish = val[dayKey];
-                        const { status } = parseDishValue(rawDish);
-                        if (status === 'ignore' || status === 'placeholder') return;
-                        const dish = parseDish(rawDish);
-                        if (!dish) return;
-                        const rawShift = String(val.shift || 'morning').toLowerCase().trim();
-                        const shiftKey = (rawShift.includes('e') || rawShift === 'evening') ? 'evening' : 'morning';
-                        if (!stats[shiftKey][dish]) stats[shiftKey][dish] = { ordered: 0, eaten: 0, notEaten: 0 };
-                        hasData = true;
-                        stats[shiftKey][dish].ordered++;
-                        if (status === 'eaten') stats[shiftKey][dish].eaten++; else stats[shiftKey][dish].notEaten++;
-                    }
+                    });
                 });
 
                 if (!hasData) {
@@ -1503,17 +1610,19 @@
                     const weekDoc = await getDocument('order_list', getWeekString(d));
                     
                     if (weekDoc) Object.entries(weekDoc).forEach(([key, val]) => {
-                        if (key === 'menu' || typeof val !== 'object' || val.order === 'reopen' || !val[dayKey]) return;
+                        if (key === 'menu' || typeof val !== 'object' || val.order === 'reopen') return;
                         
-                        const { status } = parseDishValue(val[dayKey]);
-                        if (status === 'placeholder') return;
-                        
-                        const depart = val.depart || __('unknown');
-                        if (!departStats[depart]) departStats[depart] = { ordered: 0, eaten: 0, notEaten: 0 };
-                        
-                        departStats[depart].ordered++;
-                        if (status === 'eaten') departStats[depart].eaten++; 
-                        else departStats[depart].notEaten++;
+                        ['M', 'E'].forEach(shiftTag => {
+                            const rawDish = val[dayKey + '_' + shiftTag];
+                            if (!rawDish) return;
+                            const { status } = parseDishValue(rawDish);
+                            if (status === 'placeholder' || status === 'ignore') return;
+                            const depart = val.depart || __('unknown');
+                            if (!departStats[depart]) departStats[depart] = { ordered: 0, eaten: 0, notEaten: 0 };
+                            departStats[depart].ordered++;
+                            if (status === 'eaten') departStats[depart].eaten++;
+                            else departStats[depart].notEaten++;
+                        });
                     });
                 }
                 if (Object.keys(departStats).length === 0) { statsContent.innerHTML = `<p class="text-center text-muted p-3">${__('noData')}</p>`; return; }
@@ -1742,34 +1851,65 @@
 
             if (!menu) { container.innerHTML = `<p class="text-center text-muted mt-2">${__('noMenu')}</p>`; saveBtn.classList.add('hidden'); return; }
 
-            const allSelected = dayKeys.every(day => state.guestOrderSelection[day]);
+            const allSelected = dayKeys.every(day => {
+                const gSh = state.guestShiftSelection[day] || 'M';
+                if (gSh === 'both') return state.guestOrderSelection[day + '_M'] && state.guestOrderSelection[day + '_E'];
+                return state.guestOrderSelection[day + '_' + gSh];
+            });
+
             if (allSelected) {
                 saveBtn.classList.remove('hidden');
                 let summaryHTML = `<h4 style="color:var(--primary);margin-top:1.5rem;margin-bottom:0.5rem;">${__('orderedWeek')} ${targetWeek.split('_')[1]}</h4><ul class="staff-list">`;
-                for (const dayKey of dayKeys) { summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(state.guestOrderSelection[dayKey])}</div></div></li>`; }
-                container.innerHTML = summaryHTML + `</ul>`; return;
+                for (const dayKey of dayKeys) {
+                    const rawM = state.guestOrderSelection[dayKey + '_M'];
+                    const rawE = state.guestOrderSelection[dayKey + '_E'];
+                    if (rawM) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish"><span style="color:var(--primary);font-weight:700;margin-right:6px;">[M]</span>${parseDish(rawM)}</div></div></li>`;
+                    if (rawE) summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${rawM ? '' : dayNames[dayKey]}</div><div class="staff-dish"><span style="color:var(--text-muted);font-weight:700;margin-right:6px;">[E]</span>${parseDish(rawE)}</div></div></li>`;
+                }
+                container.innerHTML = summaryHTML + `</ul>`;
+                return;
             }
             
             saveBtn.classList.add('hidden');
-            const shiftToggleHTML = `<div class="form-group"><label class="form-label">${__('shift')}</label><div class="shift-toggle" style="display:flex;padding:4px;background:rgba(0,0,0,0.2);border-radius:50px;border:1px solid var(--border);">
-                <input type="radio" id="guest-shift-m" name="guest-shift" value="morning" ${state.guestShiftSelection === 'morning' ? 'checked' : ''} style="display:none;"><label for="guest-shift-m" style="flex:1;text-align:center;padding:8px 4px;cursor:pointer;border-radius:40px;font-size:13px;font-weight:500;transition:all 0.2s;${state.guestShiftSelection==='morning'?'background:var(--primary);color:white;':'color:var(--text-muted);'}">☀️ Sáng</label>
-                <input type="radio" id="guest-shift-e" name="guest-shift" value="evening" ${state.guestShiftSelection === 'evening' ? 'checked' : ''} style="display:none;"><label for="guest-shift-e" style="flex:1;text-align:center;padding:8px 4px;cursor:pointer;border-radius:40px;font-size:13px;font-weight:500;transition:all 0.2s;${state.guestShiftSelection==='evening'?'background:var(--warning);color:white;':'color:var(--text-muted);'}">🌙 Chiều</label>
-                <input type="radio" id="guest-shift-b" name="guest-shift" value="both" ${state.guestShiftSelection === 'both' ? 'checked' : ''} style="display:none;"><label for="guest-shift-b" style="flex:1;text-align:center;padding:8px 4px;cursor:pointer;border-radius:40px;font-size:13px;font-weight:500;transition:all 0.2s;${state.guestShiftSelection==='both'?'background:var(--accent);color:white;':'color:var(--text-muted);'}">☀️🌙 Cả 2</label>
-            </div></div>`;
-            
+
             let tabsHTML = `<div class="tabs mt-2">`;
-            for (const dayKey of dayKeys) { tabsHTML += `<button class="tab-btn guest-order-tab-btn ${state.guestCurrentOrderDay === dayKey ? 'active' : ''}" data-day-key="${dayKey}">${dayNames[dayKey]}</button>`; }
+            for (const dayKey of dayKeys) {
+                const hasM = state.guestOrderSelection[dayKey + '_M'];
+                const hasE = state.guestOrderSelection[dayKey + '_E'];
+                tabsHTML += `<button class="tab-btn guest-order-tab-btn ${state.guestCurrentOrderDay === dayKey ? 'active' : ''} ${(hasM||hasE) ? 'has-order' : ''}" data-day-key="${dayKey}">${dayNames[dayKey]}</button>`;
+            }
             tabsHTML += `</div>`;
             
             let daysContentHTML = '';
             for (const dayKey of dayKeys) {
                 const dishes = menu[dayKey] || [];
+                const gSh = state.guestShiftSelection[dayKey] || 'M';
                 daysContentHTML += `<div id="guest-order-day-${dayKey}" class="${state.guestCurrentOrderDay === dayKey ? '' : 'hidden'}">`;
-                if (Array.isArray(dishes) && dishes.length > 0) { daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item guest-dish-item" data-dish="${dish}" data-day-key="${dayKey}"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`; } 
-                else { daysContentHTML += `<p class="text-center text-muted p-3">${__('noDishes')}</p><div class="order-dish-list"><div class="order-dish-item guest-dish-item" data-dish="Nghỉ" data-day-key="${dayKey}"><div class="order-dish-name">${__('rest')}</div></div></div>`; }
+
+                // Shift picker for guest
+                daysContentHTML += `<div class="shift-picker" style="display:flex;gap:6px;margin-bottom:10px;">
+                    <button class="guest-shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="M" style="flex:1;padding:7px 4px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid var(--border);cursor:pointer;background:${gSh==='M'?'var(--primary)':'var(--card-bg)'};color:${gSh==='M'?'white':'var(--text-muted)'};">🌅 Ca Sáng</button>
+                    <button class="guest-shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="E" style="flex:1;padding:7px 4px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid var(--border);cursor:pointer;background:${gSh==='E'?'#475569':'var(--card-bg)'};color:${gSh==='E'?'white':'var(--text-muted)'};">🌙 Ca Chiều</button>
+                    <button class="guest-shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="both" style="flex:1;padding:7px 4px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid var(--border);cursor:pointer;background:${gSh==='both'?'var(--accent)':'var(--card-bg)'};color:${gSh==='both'?'white':'var(--text-muted)'};">☀️🌙 Cả 2</button>
+                </div>`;
+
+                if (Array.isArray(dishes) && dishes.length > 0) {
+                    if (gSh === 'M' || gSh === 'both') {
+                        const selM = state.guestOrderSelection[dayKey + '_M'];
+                        daysContentHTML += `<div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:6px;">🌅 CA SÁNG</div>`;
+                        daysContentHTML += `<div class="order-dish-list" style="margin-bottom:${gSh==='both'?'1rem':'0'};">${dishes.map(dish => `<div class="order-dish-item guest-dish-item ${dish === selM ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="M"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
+                    }
+                    if (gSh === 'E' || gSh === 'both') {
+                        const selE = state.guestOrderSelection[dayKey + '_E'];
+                        daysContentHTML += `<div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">🌙 CA CHIỀU</div>`;
+                        daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item guest-dish-item ${dish === selE ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="E"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
+                    }
+                } else {
+                    daysContentHTML += `<p class="text-center text-muted p-3">${__('noDishes')}</p><div class="order-dish-list"><div class="order-dish-item guest-dish-item" data-dish="Nghỉ" data-day-key="${dayKey}" data-shift-key="${gSh === 'E' ? 'E' : 'M'}"><div class="order-dish-name">${__('rest')}</div></div></div>`;
+                }
                 daysContentHTML += `</div>`;
             }
-            container.innerHTML = shiftToggleHTML + tabsHTML + daysContentHTML;
+            container.innerHTML = tabsHTML + daysContentHTML;
         }
 
         async function checkOrderNotification() {
@@ -1781,10 +1921,12 @@
             const userEmailKey = emailToKey(state.currentUser.email);
             
             const isCurrentWeekPeriod = (dayOfWeek >= 1 && dayOfWeek <= 3) || (dayOfWeek === 4 && hour < 15);
-
             const checkWeekString = isCurrentWeekPeriod ? getWeekString(today) : getWeekString(new Date(today.getTime() + 7 * 86400000));
             const weekDoc = await getDocument('order_list', checkWeekString);
-            const hasOrder = weekDoc && weekDoc[userEmailKey] && weekDoc[userEmailKey].order === 'ordered';
+            const userData = weekDoc && weekDoc[userEmailKey];
+            // Kiểm tra có ít nhất 1 ngày được đặt (M hoặc E)
+            const hasOrder = userData && userData.order === 'ordered' && 
+                ['mon','tue','wed','thu','fri'].some(d => userData[d + '_M'] || userData[d + '_E']);
             todayTab.classList.toggle('needs-attention', !hasOrder);
         }
 
@@ -1792,27 +1934,9 @@
 
         document.body.addEventListener('change', async (e) => {
             const { id, name, value, type, checked } = e.target;
-            if (name === 'user-shift') {
-                if (type === 'radio' && checked) {
-                    const currentDay = state.currentOrderDay;
-                    // Nếu chọn ca ở Thứ 2 thì áp dụng cho cả tuần
-                    if (currentDay === 'mon') {
-                        ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(d => {
-                            state.dayShifts[d] = value;
-                            delete state.orderSelection[d + '_M'];
-                            delete state.orderSelection[d + '_E'];
-                        });
-                    } else {
-                        state.dayShifts[currentDay] = value;
-                        delete state.orderSelection[currentDay + '_M'];
-                        delete state.orderSelection[currentDay + '_E'];
-                    }
-                    renderOrderSection(el('order-section-container'));
-                }
-            }
-            else if (id === 'stats-date-picker') { state.statsViewDate = new Date(value); await renderAdminStats(); }
-            else if (name === 'guest-week') { await renderGuestOrderDays(value); }
-            else if (name === 'guest-shift') { if (type === 'radio' && checked) state.guestShiftSelection = value; }
+            if (id === 'stats-date-picker') { state.statsViewDate = new Date(value);  await renderAdminStats(); }
+            else if (name === 'stats-mode') { state.statsViewMode = value; await renderStatsContent(); }
+            else if (name === 'guest-week') { state.guestOrderSelection = {}; state.guestShiftSelection = {}; await renderGuestOrderDays(value); }
             else if (id === 'personnel-depart-select' && value === '__other__') {
                 const newDepart = prompt('Nhập tên phòng ban mới:');
                 if (newDepart && newDepart.trim()) {
@@ -2025,71 +2149,26 @@
         document.body.addEventListener('click', async (e) => {
             if (!e.target.closest('#stats-options-btn') && !e.target.closest('.stats-dropdown')) {
                 const dropdown = el('stats-dropdown');
-                if (dropdown && dropdown.classList.contains('show')) dropdown.classList.remove('show');
+                if (dropdown && dropdown.classList.contains('show')) {
+                    dropdown.classList.remove('show');
+                }
             }
-            const target = e.target.closest('button, a, .profile-menu-item, .order-dish-item, .toggle-card-header, .toggle-option, .support-row, .status-icon-btn, .dropdown-item, .nav-item, .order-day-tab-btn, .btn-reselect');
+
+            const target = e.target.closest('button, a, .profile-menu-item, .order-dish-item, .toggle-card-header, .toggle-option, .support-row, .status-icon-btn, .dropdown-item, .shift-pick-btn, .guest-shift-pick-btn');
             if (!target) return;
+
             const { id, classList, dataset } = target;
-        
+
             if (classList.contains('nav-item')) {
                 if (dataset.tab === state.currentTab) return;
                 document.querySelector('.nav-item.active').classList.remove('active'); target.classList.add('active');
                 state.currentTab = dataset.tab; await render(); return;
             }
-            if (classList.contains('order-day-tab-btn')) {
-                state.currentOrderDay = dataset.dayKey;
-                renderOrderSection(el('order-section-container')); return;
-            }
-            if (classList.contains('order-dish-item') && !classList.contains('guest-dish-item')) {
-                const { dayKey, dish, targetShift } = dataset;
-                state.orderSelection[dayKey + '_' + targetShift] = dish;
-                const shiftType = state.dayShifts[dayKey];
-                let dayDone = (shiftType === 'both') ? (state.orderSelection[dayKey + '_M'] && state.orderSelection[dayKey + '_E']) : true;
-                if (dayDone) {
-                    const days = ['mon', 'tue', 'wed', 'thu', 'fri'];
-                    const idx = days.indexOf(dayKey);
-                    if (idx < 4) state.currentOrderDay = days[idx + 1];
-                }
-                renderOrderSection(el('order-section-container')); return;
-            }
-            if (classList.contains('btn-reselect')) {
-                delete state.orderSelection[dataset.reselectDay + '_' + dataset.reselectShift];
-                renderOrderSection(el('order-section-container')); return;
-            }
-            if (id === 'btn-edit-again') {
-                state.orderSelection = {};
-                state.currentOrderDay = 'mon';
-                state.dayShifts = { mon: 'morning', tue: 'morning', wed: 'morning', thu: 'morning', fri: 'morning' };
-                renderOrderSection(el('order-section-container'));
-                return;
-            }
-            if (id === 'submit-order-btn') {
-                showLoader();
-                try {
-                    const nextWeekString = getWeekString(new Date(Date.now() + 7 * 86400000));
-                    const userKey = emailToKey(state.currentUser.email);
-                    const payload = { [userKey]: { name: state.staffProfile.name, email: state.currentUser.email, depart: state.staffProfile.depart || 'Unknown', order: 'ordered' } };
-                    ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(d => {
-                        const s = state.dayShifts[d];
-                        if (s === 'morning' || s === 'both') {
-                            const dish = state.orderSelection[d + '_M'];
-                            if (dish) payload[userKey][d + '_M'] = `[M] ${dish.toLowerCase().includes('không đặt cơm') ? '[ignore] ' : 'not: '}${dish}`;
-                        }
-                        if (s === 'evening' || s === 'both') {
-                            const dish = state.orderSelection[d + '_E'];
-                            if (dish) payload[userKey][d + '_E'] = `[E] ${dish.toLowerCase().includes('không đặt cơm') ? '[ignore] ' : 'not: '}${dish}`;
-                        }
-                    });
-                    await setDoc(doc(db, 'order_list', nextWeekString), payload, { merge: true });
-                    state.orderSelection = {}; showToast('Đặt món thành công'); await render();
-                } catch { showToast('Lỗi', 'error'); } finally { hideLoader(); }
-                return;
-            }
-        
-            if (dataset.subtab) { state.adminSubTab = dataset.subtab; await renderAdmin(); return; }
-            if (id === 'login-btn') { showLoader(); try { await signInWithPopup(auth, provider); } catch { showToast(__('error'), 'error'); } finally { hideLoader(); } }
+            else if (dataset.subtab) { state.adminSubTab = dataset.subtab; await renderAdmin(); return; }
+
+            else if (id === 'login-btn') { showLoader(); try { await signInWithPopup(auth, provider); } catch { showToast(__('error'), 'error'); } finally { hideLoader(); } }
             else if (id === 'logout-menu-item') { if (confirm(__('logoutConfirm'))) { await signOut(auth); showToast(__('loggedOut')); } }
-                
+            
             else if (id === 'add-personnel-btn') {
                 el('personnel-modal-title').textContent = 'Thêm nhân viên'; el('personnel-original-email-key').value = ''; el('personnel-name-input').value = ''; el('personnel-email-input').value = ''; el('personnel-depart-select').innerHTML = '';
                 const departments = await getDepartmentsList();
@@ -2170,6 +2249,7 @@
             } 
             else if (classList.contains('order-day-tab-btn')) {
                 state.currentOrderDay = dataset.dayKey;
+                // Nếu đang có state.reopenTargetWeek thì gọi renderReopen
                 if (state.reopenTargetWeek) {
                      await renderReopenOrderSection(el('order-section-container'), state.reopenTargetWeek, state.reopenIsCurrentWeek);
                 } else {
@@ -2214,29 +2294,25 @@
                 await renderAdminStats();
             }
             else if (classList.contains('order-dish-item') && !classList.contains('guest-dish-item')) {
-                const { dayKey, dish, shiftStep } = dataset;
+                const { dayKey, dish, shiftKey } = dataset;
+                const sh = shiftKey || (state.orderShiftSelection[dayKey] || 'M');
+                state.orderSelection[dayKey + '_' + sh] = dish;
                 
-                if (state.userShiftSelection === 'both') {
-                    if (shiftStep === 'M') {
-                        state.orderSelection[dayKey + '_M'] = dish;
-                    } else if (shiftStep === 'E') {
-                        state.orderSelection[dayKey + '_E'] = dish;
-                        const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri'];
-                        const currentIndex = dayOrder.indexOf(dayKey);
-                        if (currentIndex < dayOrder.length - 1) {
-                            state.currentOrderDay = dayOrder[currentIndex + 1];
-                        }
-                    }
-                } else {
-                    state.orderSelection[dayKey] = dish;
+                // Tự động sang ngày tiếp nếu đã chọn xong ca của ngày hiện tại
+                const curSh = state.orderShiftSelection[dayKey] || 'M';
+                const doneM = curSh !== 'E' ? !!state.orderSelection[dayKey + '_M'] : true;
+                const doneE = curSh !== 'M' ? !!state.orderSelection[dayKey + '_E'] : true;
+                if (doneM && doneE) {
                     const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri'];
                     const currentIndex = dayOrder.indexOf(dayKey);
-                    if (currentIndex < dayOrder.length - 1) {
-                        state.currentOrderDay = dayOrder[currentIndex + 1];
-                    }
+                    if (currentIndex < dayOrder.length - 1) state.currentOrderDay = dayOrder[currentIndex + 1];
                 }
                 
-                render();
+                if (state.reopenTargetWeek) {
+                    renderReopenOrderSection(el('order-section-container'), state.reopenTargetWeek, state.reopenIsCurrentWeek);
+                } else {
+                    renderOrderSection(el('order-section-container'));
+                }
             }
             else if (id === 'submit-order-btn' || id === 'submit-reopen-order-btn') {
                 showLoader();
@@ -2245,17 +2321,19 @@
                     const isReopen = id === 'submit-reopen-order-btn';
                     let targetWeek;
                     
-                    if (isReopen) {
+                    if (isReopen) { 
                         if (!state.reopenTargetWeek) throw new Error("Lỗi: Không xác định được tuần đặt món.");
-                        targetWeek = state.reopenTargetWeek;
+                        targetWeek = state.reopenTargetWeek; 
                     } else {
-                        const dayOfWeek = today.getDay();
+                        const dayOfWeek = today.getDay(); 
                         const hour = today.getHours();
                         const canOrderNextWeek = (dayOfWeek === 4 && hour >= 15) || dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0;
                         targetWeek = canOrderNextWeek ? getWeekString(new Date(today.getTime() + 7 * 86400000)) : getWeekString(today);
                     }
                     
                     const userKey = emailToKey(state.currentUser.email);
+                    
+                    // Logic yêu cầu chọn món: kiểm tra theo ca đã chọn cho từng ngày
                     const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
                     const dayMap = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5 };
                     const currentDayIndex = today.getDay();
@@ -2264,71 +2342,77 @@
                     if (isReopen && state.reopenIsCurrentWeek) {
                         requiredDays = dayKeys.filter(d => dayMap[d] >= currentDayIndex);
                     }
+
+                    // Kiểm tra các ngày bắt buộc theo ca đã chọn
+                    const missingDays = requiredDays.filter(day => {
+                        const sh = state.orderShiftSelection[day] || 'M';
+                        if (sh === 'both') return !state.orderSelection[day + '_M'] || !state.orderSelection[day + '_E'];
+                        return !state.orderSelection[day + '_' + sh];
+                    });
                     
-                    const missingDays = requiredDays.filter(day => !state.orderSelection[day]);
                     if (missingDays.length > 0) {
                         if (isReopen && state.reopenIsCurrentWeek) {
-                            const hasSelection = requiredDays.some(day => state.orderSelection[day]);
-                            if (!hasSelection && requiredDays.length > 0) { showToast('Vui lòng chọn món cho các ngày còn lại', 'error'); hideLoader(); return; }
+                            const hasAny = requiredDays.some(day => state.orderSelection[day + '_M'] || state.orderSelection[day + '_E']);
+                            if (!hasAny && requiredDays.length > 0) {
+                                showToast('Vui lòng chọn món cho các ngày còn lại', 'error');
+                                hideLoader(); return;
+                            }
                         } else {
-                            if (Object.keys(state.orderSelection).filter(d => state.orderSelection[d]).length === 0) { showToast('Vui lòng chọn món', 'error'); hideLoader(); return; }
+                            const selectedCount = Object.keys(state.orderSelection).filter(k => state.orderSelection[k]).length;
+                            if (selectedCount === 0) {
+                                showToast('Vui lòng chọn món', 'error');
+                                hideLoader(); return;
+                            }
                         }
                     }
                     
                     const currentWeekDoc = await getDocument('order_list', targetWeek);
                     const oldUserData = (currentWeekDoc && currentWeekDoc[userKey]) ? currentWeekDoc[userKey] : {};
-                    
-                    const shift = state.userShiftSelection; // 'morning', 'evening', 'both'
-                    const shifts = shift === 'both' ? ['M', 'E'] : [shift === 'morning' ? 'M' : 'E'];
-                    
-                    const payload = {
-                        [userKey]: {
-                            name: state.staffProfile.name,
-                            email: state.currentUser.email,
-                            depart: state.staffProfile.depart || 'Unknown',
-                            order: 'ordered'
-                        }
+            
+                    const payload = { 
+                        [userKey]: { 
+                            name: state.staffProfile.name, 
+                            email: state.currentUser.email, 
+                            depart: state.staffProfile.depart || 'Unknown', 
+                            order: 'ordered' 
+                        } 
                     };
                     
-                    for (const d of dayKeys) {
-                        for (const s of ['M', 'E']) {
-                            const fieldKey = `${d}_${s}`;
-                            if (oldUserData[fieldKey]) payload[userKey][fieldKey] = oldUserData[fieldKey];
-                        }
-                        if (oldUserData[d]) payload[userKey][d] = oldUserData[d];
-                    }
-                    
+                    // Merge dữ liệu cũ (tất cả day_M, day_E)
                     for (const day of dayKeys) {
-                        if (state.userShiftSelection === 'both') {
-                            const dishM = state.orderSelection[day + '_M'];
-                            if (dishM) {
-                                const prefix = dishM.toLowerCase().includes('không đặt cơm') ? '[ignore] ' : 'not: ';
-                                payload[userKey][day + '_M'] = `[M] ${prefix}${dishM}`;
+                        ['M', 'E'].forEach(sh => {
+                            const fk = day + '_' + sh;
+                            if (oldUserData[fk]) {
+                                // Giữ nguyên trạng thái eaten
+                                payload[userKey][fk] = oldUserData[fk];
                             }
-                            const dishE = state.orderSelection[day + '_E'];
-                            if (dishE) {
-                                const prefix = dishE.toLowerCase().includes('không đặt cơm') ? '[ignore] ' : 'not: ';
-                                payload[userKey][day + '_E'] = `[E] ${prefix}${dishE}`;
-                            }
-                        } else {
-                            const dish = state.orderSelection[day];
-                            if (dish) {
-                                const prefix = dish.toLowerCase().includes('không đặt cơm') ? '[ignore] ' : 'not: ';
-                                const shiftTag = state.userShiftSelection === 'morning' ? 'M' : 'E';
-                                payload[userKey][day + '_' + shiftTag] = `[${shiftTag}] ${prefix}${dish}`;
-                            }
-                        }
+                        });
+                    }
+
+                    // Ghi đè bằng lựa chọn mới
+                    for (const day of dayKeys) {
+                        ['M', 'E'].forEach(sh => {
+                            const fk = day + '_' + sh;
+                            const newDish = state.orderSelection[fk];
+                            if (!newDish) return;
+                            // Không ghi đè eaten
+                            if (oldUserData[fk] && oldUserData[fk].includes('eaten:')) return;
+                            const isNoOrder = newDish.toLowerCase().includes('không đặt cơm') || newDish.toLowerCase().includes('no order');
+                            const prefix = isNoOrder ? '[ignore] ' : 'not: ';
+                            payload[userKey][fk] = `${prefix}${newDish}`;
+                        });
                     }
                     
                     await setDoc(doc(db, 'order_list', targetWeek), payload, { merge: true });
                     
-                    showToast(__('orderSuccess'));
+                    showToast(__('orderSuccess')); 
                     state.orderSelection = {};
-                    state.currentOrderDay = 'mon';
-                    state.reopenTargetWeek = null;
+                    state.orderShiftSelection = {};
+                    state.currentOrderDay = 'mon'; 
+                    state.reopenTargetWeek = null; 
                     state.reopenIsCurrentWeek = false;
                     
-                    await render();
+                    await render(); 
                     await checkOrderNotification();
             
                 } catch (e) { 
@@ -2339,7 +2423,7 @@
                 }
             }
             else if (dataset.action === 'skip-modal') {
-                state.skipTarget = { day: dataset.day, dish: dataset.dish };
+                state.skipTarget = { day: dataset.day, dish: dataset.dish, shift: dataset.shift || 'M' };
                 el('skip-option-modal').classList.remove('hidden');
                 const datalist = el('staff-suggestions');
                 if (datalist.children.length === 0) {
@@ -2370,41 +2454,61 @@
             else if (classList.contains('admin-save-user-btn')) {
                 showLoader();
                 try {
-                    const userKey = dataset.key;
-                    const weekStr = dataset.weekstr;
-                    const weekType = dataset.weektype;
-                    const detailContainer = target.closest('.week-detail-container');
-                    
+                    const userKey = dataset.key; 
+                    const weekStr = dataset.weekstr; 
+                    const weekType = dataset.weektype; 
+
                     const allStaff = await getDocument("staff_list", "staffs");
                     const userProfile = allStaff[userKey];
+
                     const payload = {
                         [userKey]: {
-                            name: userProfile.name, email: userProfile.email,
-                            depart: userProfile.depart, order: 'ordered'
+                            name: userProfile.name,
+                            email: userProfile.email,
+                            depart: userProfile.depart,
+                            order: 'ordered'
                         }
                     };
-            
-                    ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(dk => {
-                        const shiftVal = detailContainer.querySelector(`input[name="s-${weekType}-${userKey}-${dk}"]:checked`).value;
-                        const selectedItems = Array.from(detailContainer.querySelectorAll(`.mini-dish-item[data-day="${dk}"].selected`));
-                        
-                        const getPrefix = (d) => d.toLowerCase().includes('không đặt cơm') ? '[ignore] ' : 'not: ';
-            
-                        if (shiftVal === 'both') {
-                            if (selectedItems[0]) payload[userKey][`${dk}_M`] = `[M] ${getPrefix(selectedItems[0].dataset.dish)}${selectedItems[0].dataset.dish}`;
-                            if (selectedItems[1]) payload[userKey][`${dk}_E`] = `[E] ${getPrefix(selectedItems[1].dataset.dish)}${selectedItems[1].dataset.dish}`;
-                            else if (selectedItems[0]) payload[userKey][`${dk}_E`] = `[E] ${getPrefix(selectedItems[0].dataset.dish)}${selectedItems[0].dataset.dish}`;
+
+                    const detailRow = el(`detail-${weekType}-${userKey}`);
+                    if (!detailRow) throw new Error("Không tìm thấy khung chọn món. Vui lòng tải lại trang.");
+                    
+                    const currentWeekDoc = await getDocument('order_list', weekStr);
+                    const oldOrderData = currentWeekDoc && currentWeekDoc[userKey] ? currentWeekDoc[userKey] : {};
+
+                    // Giữ tất cả các field cũ (mon_M, mon_E, v.v.)
+                    ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(d => {
+                        ['M','E'].forEach(sh => {
+                            const fk = d + '_' + sh;
+                            if (oldOrderData[fk]) payload[userKey][fk] = oldOrderData[fk];
+                        });
+                    });
+
+                    // Áp dụng chọn mới từ mini-dish-item
+                    detailRow.querySelectorAll('.mini-dish-item.selected').forEach(item => {
+                        const day = item.dataset.day;
+                        const shiftTag = item.dataset.shift || 'M';
+                        const newDish = item.dataset.dish;
+                        const fieldKey = day + '_' + shiftTag;
+                        const oldDishString = oldOrderData[fieldKey] || '';
+
+                        if (oldDishString.includes('eaten:') && oldDishString.includes(newDish)) {
+                            payload[userKey][fieldKey] = oldDishString;
                         } else {
-                            const sTag = shiftVal === 'morning' ? 'M' : 'E';
-                            if (selectedItems[0]) payload[userKey][`${dk}_${sTag}`] = `[${sTag}] ${getPrefix(selectedItems[0].dataset.dish)}${selectedItems[0].dataset.dish}`;
+                            const isNoOrder = newDish.toLowerCase().includes('không đặt cơm') || newDish.toLowerCase().includes('no order');
+                            const prefix = isNoOrder ? '[ignore] ' : 'not: ';
+                            payload[userKey][fieldKey] = `${prefix}${newDish}`;
                         }
                     });
-            
+
                     await setDoc(doc(db, 'order_list', weekStr), payload, { merge: true });
-                    showToast('Đã lưu thay đổi thành công');
-                    await renderAdminSupport(el('search-support')?.value || '');
+                    
+                    showToast(`Đã cập nhật thực đơn (${weekType === 'this' ? 'Tuần này' : 'Tuần sau'})`);
+                    await renderAdminSupport();
+
                 } catch (err) {
-                    showToast('Lỗi khi lưu', 'error');
+                    console.error(err);
+                    showToast('Lỗi khi lưu: ' + err.message, 'error');
                 } finally {
                     hideLoader();
                 }
@@ -2432,13 +2536,15 @@
                     const days = ['mon', 'tue', 'wed', 'thu', 'fri'];
 
                     days.forEach(day => {
-                        const dishValue = userData[day];
-                        if (dishValue && dishValue.includes('eaten:')) {
-                            hasEatenData = true;
-                        } 
-                        else {
-                            updates[`${userKey}.${day}`] = deleteField();
-                        }
+                        ['M', 'E'].forEach(sh => {
+                            const fk = day + '_' + sh;
+                            const dishValue = userData[fk];
+                            if (dishValue && dishValue.includes('eaten:')) {
+                                hasEatenData = true;
+                            } else if (dishValue) {
+                                updates[`${userKey}.${fk}`] = deleteField();
+                            }
+                        });
                     });
 
                     if (!hasEatenData) {
@@ -2464,7 +2570,14 @@
                 }
             }
             else if (dataset.action === 'eat-gift') {
-                showLoader(); try { const weekString = getWeekString(new Date()); const { giverKey, day, dish } = dataset; await updateDoc(doc(db, 'order_list', weekString), { [`${giverKey}.${day}`]: `eaten: ${dish}` }); showToast('Đã xác nhận ăn món được nhường!'); await render(); } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); }
+                showLoader(); try { 
+                    const weekString = getWeekString(new Date()); 
+                    const { giverKey, day, dish, shift: shiftTag } = dataset; 
+                    const fieldKey = day + '_' + (shiftTag || 'M');
+                    await updateDoc(doc(db, 'order_list', weekString), { [`${giverKey}.${fieldKey}`]: `eaten: ${dish}` }); 
+                    showToast('Đã xác nhận ăn món được nhường!'); 
+                    await render(); 
+                } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); }
             }
             else if (id === 'add-department-btn') {
                 el('department-modal-title').textContent = 'Thêm phòng ban'; el('department-original-name').value = ''; el('department-name-input').value = ''; el('department-modal').classList.remove('hidden'); el('department-name-input').focus();
@@ -2544,8 +2657,55 @@
             } 
             else if (id === 'skip-everyone-btn') { await processSkip('Everyone'); }
             else if (id === 'skip-specific-btn') { const receiver = el('skip-receiver-input').value.trim(); if (!receiver) return showToast('Vui lòng nhập tên người nhận', 'error'); await processSkip(receiver); }
-            else if (dataset.action === 'eaten') { showLoader(); try { const weekString = getWeekString(new Date()); const { day } = dataset; const userKey = emailToKey(state.currentUser.email); const weekDoc = await getDocument('order_list', weekString); const userData = weekDoc[userKey]; const todayKey = getDayKey(); const fieldM = todayKey + '_M'; const fieldE = todayKey + '_E'; const updates = {}; if (userData[fieldM]) { const parsed1 = parseDishValue(userData[fieldM]); updates[userKey + '.' + fieldM] = '[M] eaten: ' + parsed1.dish; } if (userData[fieldE]) { const parsed2 = parseDishValue(userData[fieldE]); updates[userKey + '.' + fieldE] = '[E] eaten: ' + parsed2.dish; } if (!userData[fieldM] && !userData[fieldE] && userData[day]) { const parsed3 = parseDishValue(userData[day]); updates[userKey + '.' + day] = 'eaten: ' + parsed3.dish; } if (Object.keys(updates).length > 0) await updateDoc(doc(db, 'order_list', weekString), updates); showToast(__('eatenSuccess')); await render(); } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); } }            else if (classList.contains('mark-eaten-btn')) { e.preventDefault(); e.stopPropagation(); showLoader(); try { const weekString = getWeekString(new Date()); const { key: userKey, day: fieldKey } = dataset; const weekDoc = await getDocument('order_list', weekString); const { dish } = parseDishValue(weekDoc[userKey][fieldKey]); const caMatch = fieldKey.match(/_([ME])$/); const caTag = caMatch ? ('[' + caMatch[1] + '] ') : ''; const eatenVal = caTag + 'eaten: ' + dish; const updateKey = userKey + '.' + fieldKey; await updateDoc(doc(db, 'order_list', weekString), { [updateKey]: eatenVal }); showToast(__('eatenSuccess')); const updatedDoc = await getDocument('order_list', weekString); updateStaffListView(updatedDoc); } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); } }
-            else if (id === 'menu-filter-btn') { state.menuFilterMode = state.menuFilterMode === 'auto' ? 'all' : 'auto'; const weekDoc = await getDocument('order_list', getWeekString(new Date())); if (weekDoc) updateStaffListView(weekDoc); } 
+            else if (dataset.action === 'eaten') { 
+                showLoader(); 
+                try { 
+                    const weekString = getWeekString(new Date()); 
+                    const { day } = dataset; 
+                    const userKey = emailToKey(state.currentUser.email); 
+                    const weekDoc = await getDocument('order_list', weekString);
+                    const updates = {};
+                    // Mark cả M và E nếu có
+                    ['M','E'].forEach(sh => {
+                        const fk = day + '_' + sh;
+                        const raw = weekDoc[userKey] && weekDoc[userKey][fk];
+                        if (raw) {
+                            const { dish } = parseDishValue(raw);
+                            updates[`${userKey}.${fk}`] = `eaten: ${dish}`;
+                        }
+                    });
+                    if (Object.keys(updates).length > 0) await updateDoc(doc(db, 'order_list', weekString), updates);
+                    showToast(__('eatenSuccess')); 
+                    await render(); 
+                } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); } 
+            }
+            else if (classList.contains('mark-eaten-btn')) { 
+                e.preventDefault(); e.stopPropagation(); 
+                showLoader(); 
+                try { 
+                    const weekString = getWeekString(new Date()); 
+                    const { key: userKey, day, shift: shiftTag } = dataset; 
+                    const weekDoc = await getDocument('order_list', weekString);
+                    const fk = day + '_' + (shiftTag || 'M');
+                    const { dish } = parseDishValue(weekDoc[userKey][fk]); 
+                    await updateDoc(doc(db, 'order_list', weekString), { [`${userKey}.${fk}`]: `eaten: ${dish}` }); 
+                    showToast(__('eatenSuccess')); 
+                    const updatedDoc = await getDocument('order_list', weekString); 
+                    updateStaffListView(updatedDoc); 
+                } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); } 
+            }
+            else if (classList.contains('shift-pick-btn')) {
+                const { shiftDay, shiftVal } = dataset;
+                state.orderShiftSelection[shiftDay] = shiftVal;
+                if (shiftVal === 'M') delete state.orderSelection[shiftDay + '_E'];
+                if (shiftVal === 'E') delete state.orderSelection[shiftDay + '_M'];
+                if (state.reopenTargetWeek) {
+                    renderReopenOrderSection(el('order-section-container'), state.reopenTargetWeek, state.reopenIsCurrentWeek);
+                } else {
+                    renderOrderSection(el('order-section-container'));
+                }
+            }
+            else if (id === 'menu-filter-btn') { state.menuFilterMode = state.menuFilterMode === 'auto' ? 'all' : 'auto'; const weekDoc = await getDocument('order_list', getWeekString(new Date())); if (weekDoc) updateStaffListView(weekDoc); }
             else if (id === 'stats-today-btn') { state.statsViewDate = new Date(); el('stats-date-picker').value = state.statsViewDate.toISOString().split('T')[0]; await renderStatsContent(); } 
             else if (classList.contains('remove-menu-dish-btn')) { target.closest('div[style*="display:flex"]').remove(); } 
             else if (id === 'export-stats-btn') {
@@ -2554,55 +2714,44 @@
             else if (id === 'export-personnel-btn') {
                 try { await loadXLSXLibrary(); const allStaff = await getDocument("staff_list", "staffs"); const data = Object.entries(allStaff).filter(([key]) => !key.startsWith('guest_')).map(([_, p]) => ({ [__('name')]: p.name, [__('email')]: p.email, [__('department')]: p.depart || '-' })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), __('personnel')); XLSX.writeFile(wb, 'personnel.xlsx'); } catch { showToast(__('error'), 'error'); }
             } 
-            else if (id === 'add-guest-order-btn') { state.guestOrderSelection = {}; state.guestCurrentOrderDay = 'mon'; await renderGuestOrderDays('this'); el('guest-order-modal').classList.remove('hidden'); } 
+            else if (id === 'add-guest-order-btn') { state.guestOrderSelection = {}; state.guestCurrentOrderDay = 'mon'; state.guestShiftSelection = {}; await renderGuestOrderDays('this'); el('guest-order-modal').classList.remove('hidden'); } 
             else if (classList.contains('guest-order-tab-btn')) { state.guestCurrentOrderDay = dataset.dayKey; await renderGuestOrderDays(document.querySelector('input[name="guest-week"]:checked').value); } 
-            else if (classList.contains('guest-dish-item')) { state.guestOrderSelection[dataset.dayKey] = dataset.dish; const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri']; if (dayOrder.indexOf(dataset.dayKey) < 4) state.guestCurrentOrderDay = dayOrder[dayOrder.indexOf(dataset.dayKey) + 1]; await renderGuestOrderDays(document.querySelector('input[name="guest-week"]:checked').value); } 
+            else if (classList.contains('guest-dish-item')) { 
+                const shiftKey = dataset.shiftKey || 'M';
+                state.guestOrderSelection[dataset.dayKey + '_' + shiftKey] = dataset.dish; 
+                const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri']; 
+                const gSh = state.guestShiftSelection[dataset.dayKey] || 'M';
+                const doneM = gSh !== 'E' ? !!state.guestOrderSelection[dataset.dayKey + '_M'] : true;
+                const doneE = gSh !== 'M' ? !!state.guestOrderSelection[dataset.dayKey + '_E'] : true;
+                if (doneM && doneE && dayOrder.indexOf(dataset.dayKey) < 4) state.guestCurrentOrderDay = dayOrder[dayOrder.indexOf(dataset.dayKey) + 1]; 
+                await renderGuestOrderDays(document.querySelector('input[name="guest-week"]:checked').value); 
+            } 
+            else if (classList.contains('guest-shift-pick-btn')) {
+                const { shiftDay, shiftVal } = dataset;
+                state.guestShiftSelection[shiftDay] = shiftVal;
+                if (shiftVal === 'M') delete state.guestOrderSelection[shiftDay + '_E'];
+                if (shiftVal === 'E') delete state.guestOrderSelection[shiftDay + '_M'];
+                await renderGuestOrderDays(document.querySelector('input[name="guest-week"]:checked').value);
+            }
             else if (id === 'save-guest-order-btn') {
-                showLoader(); 
-                try { 
+                showLoader(); try { 
                     const guestName = el('guest-name-input').value.trim(); 
-                    if (!guestName) { 
-                        showToast('Vui lòng nhập tên khách.', 'error'); 
-                        hideLoader(); 
-                        return; 
-                    } 
-                    
-                    const targetWeek = document.querySelector('input[name="guest-week"]:checked').value === 'next' 
-                        ? getWeekString(new Date(Date.now() + 7 * 86400000)) 
-                        : getWeekString(new Date()); 
-                        
+                    if (!guestName) { showToast('Vui lòng nhập tên khách.', 'error'); hideLoader(); return; } 
+                    const targetWeek = document.querySelector('input[name="guest-week"]:checked').value === 'next' ? getWeekString(new Date(Date.now() + 7*864e5)) : getWeekString(new Date()); 
                     const guestKey = `guest_${Date.now()}`; 
-                    const payload = { 
-                        [guestKey]: { 
-                            name: guestName, 
-                            depart: el('guest-depart-input').value.trim(), 
-                            shift: state.guestShiftSelection, 
-                            order: 'ordered' 
-                        } 
-                    }; 
-            
-                    for (const day in state.guestOrderSelection) { 
-                        const dishName = state.guestOrderSelection[day]; 
+                    const payload = { [guestKey]: { name: guestName, depart: el('guest-depart-input').value.trim(), order: 'ordered' } }; 
+                    for (const fk in state.guestOrderSelection) { 
+                        const dishName = state.guestOrderSelection[fk]; 
                         const isNoOrder = dishName.toLowerCase().includes('không đặt cơm'); 
                         const prefix = isNoOrder ? '[ignore] ' : 'not: '; 
-                        const guestShifts = state.guestShiftSelection === 'both' ? ['M', 'E'] : [state.guestShiftSelection === 'morning' ? 'M' : 'E']; 
-                        
-                        for (const s of guestShifts) { 
-                            const fieldKey = `${day}_${s}`; 
-                            payload[guestKey][fieldKey] = `[${s}] ${prefix}${dishName}`; 
-                        } 
-                    }
-            
+                        payload[guestKey][fk] = `${prefix}${dishName}`; 
+                    } 
                     await setDoc(doc(db, 'order_list', targetWeek), payload, { merge: true }); 
-                    showToast(__('orderSuccess')); 
+                    showToast(`${__('orderSuccess')} cho khách ${guestName}`); 
+                    state.guestOrderSelection = {}; state.guestShiftSelection = {};
                     el('guest-order-modal').classList.add('hidden'); 
-                    await render(); 
-                } catch (err) { 
-                    console.error(err); 
-                    showToast(__('error'), 'error'); 
-                } finally { 
-                    hideLoader(); 
-                } 
+                    await renderAdmin(); 
+                } catch(err) { console.error(err); showToast(__('orderFailed'), 'error'); } finally { hideLoader(); }
             }
             else if (classList.contains('reopen-order-btn')) { 
                 state.reopenTarget = { key: dataset.key, name: dataset.name, weekStr: dataset.weekstr }; 
@@ -2640,46 +2789,7 @@
             else if (id === 'edit-menu-btn') { state.isEditingMenu = true; await renderAdminMenu(); }
             else if (id === 'cancel-edit-menu-btn') { state.isEditingMenu = false; await renderAdminMenu(); }
             else if (id === 'save-menu-nextWeek') {
-                showLoader();
-                try {
-                    const weekStr = dataset.week;
-                    const weekDoc = await getDocument('order_list', weekStr) || {};
-                    const oldMenu = weekDoc.menu || {};
-                    const newMenu = {};
-                    
-                    for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
-                        const container = el(`menu-dishes-nextWeek-${day}`);
-                        newMenu[day] = Array.from(container.querySelectorAll('.menu-dish-textarea')).map(t => t.value.trim()).filter(Boolean);
-                        if (newMenu[day].length > 0 && !newMenu[day].some(d => d.includes('Không đặt cơm'))) {
-                            newMenu[day].push('Không đặt cơm | No order');
-                        }
-                    }
-            
-                    const updates = { menu: newMenu };
-                    
-                    // Logic đồng bộ món ăn cho tất cả user
-                    Object.entries(weekDoc).forEach(([userKey, userData]) => {
-                        if (userKey === 'menu' || typeof userData !== 'object') return;
-                        ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(day => {
-                            ['M', 'E'].forEach(shift => {
-                                const field = `${day}_${shift}`;
-                                const oldVal = userData[field];
-                                if (oldVal) {
-                                    const parsed = parseDishValue(oldVal);
-                                    const oldIdx = oldMenu[day]?.indexOf(parsed.dish);
-                                    if (oldIdx !== -1 && newMenu[day][oldIdx] && newMenu[day][oldIdx] !== parsed.dish) {
-                                        const prefix = newMenu[day][oldIdx].includes('Không đặt cơm') ? '[ignore] ' : (parsed.status + ': ');
-                                        updates[`${userKey}.${field}`] = `[${shift}] ${prefix}${newMenu[day][oldIdx]}`;
-                                    }
-                                }
-                            });
-                        });
-                    });
-            
-                    await updateDoc(doc(db, 'order_list', weekStr), updates);
-                    showToast('Đã lưu và đồng bộ đơn hàng!');
-                    state.isEditingMenu = false; await renderAdminMenu();
-                } catch (err) { showToast('Lỗi đồng bộ', 'error'); } finally { hideLoader(); }
+                showLoader(); try { const weekStr = dataset.week; const weekKey = 'nextWeek'; const weekDoc = await getDocument('order_list', weekStr) || {}; const menuToSave = { ...(weekDoc.menu || {}) }; let hasData = false; for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) { const container = el(`menu-dishes-${weekKey}-${day}`); if (container) { const newDishes = Array.from(container.querySelectorAll('.menu-dish-textarea')).map(t => t.value.trim()).filter(Boolean); const existingDishes = menuToSave[day] || []; const finalDishes = [...existingDishes, ...newDishes]; if (finalDishes.length > 0) { hasData = true; if (!finalDishes.some(d => d.includes('Không đặt cơm'))) finalDishes.push('Không đặt cơm | No order'); } menuToSave[day] = finalDishes; } } await setDoc(doc(db, 'order_list', weekStr), { menu: menuToSave }, { merge: true }); showToast(__('menuSaved')); state.isEditingMenu = false; await renderAdminMenu(); } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); }
             }
         });
 
@@ -2693,7 +2803,7 @@
                         try { await syncUserProfile(); updateUIForUser(user); await render(); showToast(`${__('hi')}, ${getFirstName(state.staffProfile.name)}!`); await checkOrderNotification(); } catch(e) { showToast(e.message, 'error'); await signOut(auth); }
                     } else {
                         state.currentUser = null; state.isAdmin = false; state.authReady = true;
-                        Object.assign(state, { orderSelection: {}, currentOrderDay: 'mon', userShiftSelection: 'morning', guestOrderSelection: {}, guestShiftSelection: 'morning', reopenTargetWeek: null });
+                        Object.assign(state, { orderSelection: {}, orderShiftSelection: {}, currentOrderDay: 'mon', guestOrderSelection: {}, guestShiftSelection: {}, reopenTargetWeek: null });
                         updateUIForUser(null);
                     }
                     hideLoader();
