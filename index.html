@@ -1697,6 +1697,7 @@
                 activeWeekStr = nextWeekStr;
                 weekKey = 'nextWeek';
             } else if (state.adminMenuTab === 'custom') {
+                if (!state.adminMenuCustomWeek) state.adminMenuCustomWeek = thisWeekStr;
                 activeWeekStr = state.adminMenuCustomWeek;
                 weekKey = 'customWeek';
             }
@@ -1749,28 +1750,46 @@
                 return html;
             };
             
+            const getWeekDateRangeText = (weekStr) => {
+                const [y, w] = weekStr.split('_').map(Number);
+                const jan4 = new Date(y, 0, 4);
+                const monday = new Date(jan4);
+                monday.setDate(jan4.getDate() - (jan4.getDay() || 7) + 1 + (w - 1) * 7);
+                const friday = new Date(monday);
+                friday.setDate(monday.getDate() + 4);
+                
+                const format = (d) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}`;
+                return `${format(monday)} - ${format(friday)}`;
+            };
+
             let inputVal = '';
-            if (state.adminMenuTab === 'custom' && state.adminMenuCustomWeek) {
-                const parts = state.adminMenuCustomWeek.split('_');
-                inputVal = `${parts[0]}-W${parts[1].padStart(2, '0')}`;
-            }
+            const parts = activeWeekStr.split('_');
+            inputVal = `${parts[0]}-W${parts[1].padStart(2, '0')}`;
 
             let contentHTML = `<div class="mt-3">
             <div style="display:flex;gap:6px;margin-bottom:1.5rem;background:var(--card-bg);padding:4px;border-radius:8px;border:1px solid var(--border);">
                 <button class="btn" style="flex:1;border:none;box-shadow:none;transition:all 0.2s;background:${state.adminMenuTab==='this'?'var(--primary)':'transparent'};color:${state.adminMenuTab==='this'?'white':'var(--text-muted)'};font-weight:600;" onclick="switchAdminMenuTab('this')">
-                    Tuần này (${thisWeekStr.split('_')[1]})
+                    Tuần này
                 </button>
                 <button class="btn" style="flex:1;border:none;box-shadow:none;transition:all 0.2s;background:${state.adminMenuTab==='next'?'var(--primary)':'transparent'};color:${state.adminMenuTab==='next'?'white':'var(--text-muted)'};font-weight:600;" onclick="switchAdminMenuTab('next')">
-                    Tuần sau (${nextWeekStr.split('_')[1]})
+                    Tuần sau
                 </button>
-                <div style="position:relative; display:flex; align-items:center;">
-                    <input type="week" id="admin-menu-week-picker" title="Chọn tuần" class="hidden-date-input" style="width:100%; height:100%; position:absolute; top:0; left:0; opacity:0; cursor:pointer;" value="${inputVal}">
-                    <button class="icon-btn" style="background:${state.adminMenuTab==='custom'?'var(--primary)':'transparent'};color:${state.adminMenuTab==='custom'?'white':'var(--text-muted)'};border:none;"><i class="fas fa-calendar-week"></i></button>
-                </div>
+                <button class="btn" style="flex:1;border:none;box-shadow:none;transition:all 0.2s;background:${state.adminMenuTab==='custom'?'var(--primary)':'transparent'};color:${state.adminMenuTab==='custom'?'white':'var(--text-muted)'};font-weight:600;" onclick="switchAdminMenuTab('custom')">
+                    Tuần khác
+                </button>
             </div>`;
 
             if (state.adminMenuTab === 'custom') {
-                 contentHTML += `<h4 class="text-center mb-3" style="color: var(--primary);">Đang xem Tuần ${activeWeekStr.split('_')[1]} / ${activeWeekStr.split('_')[0]}</h4>`;
+                 const displayText = `Tuần ${parts[1]} (${getWeekDateRangeText(activeWeekStr)})`;
+                 contentHTML += `
+                 <div class="stats-header" style="margin-bottom: 1.5rem;">
+                     <div class="date-navigator" style="max-width: 100%;">
+                         <div class="date-display-wrapper" onclick="document.getElementById('admin-menu-week-picker').showPicker()">
+                             <span class="date-display-text" style="color: var(--primary);"><i class="fas fa-calendar-week" style="margin-right:6px;"></i> Đang xem ${displayText}</span>
+                             <input type="week" id="admin-menu-week-picker" class="hidden-date-input" value="${inputVal}">
+                         </div>
+                     </div>
+                 </div>`;
             }
             
             if (!state.isEditingMenu) {
@@ -2196,8 +2215,9 @@
                         });
                     }
 
-                    const textareas = document.querySelectorAll('.menu-dish-textarea');
-                    const activeWeekKey = textareas.length > 0 ? textareas[0].dataset.week : 'nextWeek';
+                    let activeWeekKey = 'thisWeek';
+                    if (state.adminMenuTab === 'next') activeWeekKey = 'nextWeek';
+                    else if (state.adminMenuTab === 'custom') activeWeekKey = 'customWeek';
 
                      for (const dayKey of['mon', 'tue', 'wed', 'thu', 'fri']) {
                         const container = el(`menu-dishes-${activeWeekKey}-${dayKey}`);
