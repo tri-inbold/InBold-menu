@@ -2632,6 +2632,21 @@
                             payload[userKey][fk] = `${prefix}${newDish}`;
                         });
                     }
+
+                    requiredDays.forEach(day => {
+                        const sh = state.orderShiftSelection[day] || 'M';
+                        if (sh === 'M') {
+                            // Nếu người dùng chỉ chọn ca sáng, chủ động xóa dữ liệu ca chiều cũ (nếu chưa ăn)
+                            if (payload[userKey][day + '_E'] && !payload[userKey][day + '_E'].toString().includes('eaten:')) {
+                                payload[userKey][day + '_E'] = deleteField();
+                            }
+                        } else if (sh === 'E') {
+                            // Nếu người dùng chỉ chọn ca chiều, chủ động xóa dữ liệu ca sáng cũ (nếu chưa ăn)
+                            if (payload[userKey][day + '_M'] && !payload[userKey][day + '_M'].toString().includes('eaten:')) {
+                                payload[userKey][day + '_M'] = deleteField();
+                            }
+                        }
+                    });
                     
                     await setDoc(doc(db, 'order_list', targetWeek), payload, { merge: true });
                     
