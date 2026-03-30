@@ -635,7 +635,6 @@
         const hideLoader = () => el('loader').classList.add('hidden');
         const emailToKey = (email) => email.replace(/[.@]/g, '_');
         
-        // Trích xuất ca từ rawString dạng "[M] ..." hoặc "[E] ..."
         const extractShiftPrefix = (rawString) => {
             if (!rawString) return { shiftTag: '', rest: rawString || '' };
             if (rawString.startsWith('[M] ')) return { shiftTag: 'M', rest: rawString.substring(4) };
@@ -750,7 +749,6 @@
                 const gifters = [];
                 Object.entries(weekData).forEach(([key, val]) => {
                     if (key === 'menu' || key === userEmailKey) return;
-                    // Check cả 2 ca
                     ['M', 'E'].forEach(shiftTag => {
                         const raw = val[dayKey + '_' + shiftTag];
                         if (!raw) return;
@@ -772,11 +770,9 @@
                 }
             }
             
-            // Logic tách biệt hoàn toàn Reopen
             let reopenWeekStr = null;
             let isCurrentWeek = false;
 
-            // Ưu tiên check tuần hiện tại trước
             if (userData && userData.order === 'reopen') {
                 reopenWeekStr = currentWeekString;
                 isCurrentWeek = true;
@@ -787,7 +783,7 @@
             
             if (reopenWeekStr) {
                 state.reopenTargetWeek = reopenWeekStr;
-                state.reopenIsCurrentWeek = isCurrentWeek; // Lưu trạng thái
+                state.reopenIsCurrentWeek = isCurrentWeek; 
 
                 const titleText = isCurrentWeek 
                     ? `Đặt món bổ sung (${reopenWeekStr.split('_')[1]})` 
@@ -799,7 +795,6 @@
                 return;
             }
             
-            // Logic mặc định (khi không reopen)
             let heroHtml = '';
             if (['sun', 'sat'].includes(dayKey)) {
                 heroHtml = `<div class="card hero-card"><div class="hero-content"><div class="hero-greeting">${__('hi')} ${firstName}</div><div class="hero-title">${__('weekend')}</div></div></div>`;
@@ -808,7 +803,6 @@
                 const rawE = userData ? userData[dayKey + '_E'] : null;
 
                 if (rawM || rawE) {
-                    // Hiển thị ca hiện tại (sáng < 15h, chiều ≥ 15h)
                     const currentHour = new Date().getHours();
                     const mainRaw = (currentHour < 15 && rawM) ? rawM : (rawE || rawM);
                     const mainShift = (currentHour < 15 && rawM) ? 'M' : (rawE ? 'E' : 'M');
@@ -816,22 +810,16 @@
                     const isSkipped = status === 'giveup';
                     const isEaten = status === 'eaten';
                     const isPlaceholder = status === 'ignore' || status === 'placeholder';
-                    const shiftLabel = mainShift === 'M' ? '<span style="font-size:13px;opacity:0.85;">[M] Ca Sáng</span>' : '<span style="font-size:13px;opacity:0.85;">[E] Ca Chiều</span>';
 
-                    // Nếu có cả 2 ca, hiển thị cả 2
                     let extraMealHTML = '';
                     if (rawM && rawE) {
                         const otherRaw = mainShift === 'M' ? rawE : rawM;
-                        const otherShift = mainShift === 'M' ? 'E' : 'M';
-                        const { status: otherStatus, dish: otherDish } = parseDishValue(otherRaw);
-                        const otherLabel = otherShift === 'M' ? '[M] Ca Sáng' : '[E] Ca Chiều';
-                        extraMealHTML = `<div style="margin-top:4px;font-size:12px;opacity:0.8;">${otherLabel}: ${parseDish(otherRaw)}</div>`;
+                        extraMealHTML = `<div style="margin-top:4px;font-size:12px;opacity:0.8;">${parseDish(otherRaw)}</div>`;
                     }
 
                     heroHtml = `<div class="card hero-card">
                         <div class="hero-content">
                             <div class="hero-greeting">${__('hi')} ${firstName}</div>
-                            <div style="margin-bottom:4px;">${shiftLabel}</div>
                             <div class="hero-title">${parseDish(mainRaw)}</div>
                             ${extraMealHTML}
                             ${!isPlaceholder ? `<div class="action-buttons-hero">
@@ -994,7 +982,6 @@
                             const sel = sh === 'M' ? selM : selE;
                             daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item ${dish === sel ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="${sh}"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
                         } else {
-                            // Hai ca: show morning first. After morning chosen, show confirmed + evening list
                             if (!selM) {
                                 daysContentHTML += `<div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">Ca Sáng</div>`;
                                 daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="M"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
@@ -1111,7 +1098,6 @@
             const hour = new Date().getHours();
             const dayKey = getDayKey();
             
-            // Tách từng người thành 2 dòng riêng (M và E) nếu họ đặt cả 2 ca
             const staffEntries = [];
             Object.entries(weekDoc).forEach(([key, val]) => {
                 if (key === 'menu' || val.order === 'reopen' || !val.name) return;
@@ -1182,7 +1168,6 @@
                 return createSkippedSection(skipped) + createDepartmentHTML(others);
             };
 
-            // Tách theo ca dựa vào shiftTag
             const sang = staffEntries.filter(o => o.shiftTag === 'M');
             const chieu = staffEntries.filter(o => o.shiftTag === 'E');
             
@@ -1504,35 +1489,29 @@
                         const dishes = menuData[dKey] || [];
                         const curM = orderData ? (parseDishValue(orderData[dKey + '_M']).dish || '') : '';
                         const curE = orderData ? (parseDishValue(orderData[dKey + '_E']).dish || '') : '';
-                        // Determine current admin-selected shift mode for this cell
                         const adminShiftKey = `admin-shift-${weekType}-${key}-${dKey}`;
                         const hasBoth = curM && curE;
                         const defShift = hasBoth ? 'both' : (curE ? 'E' : 'M');
-                        // We embed selected shift in data- so JS can toggle
                         content += `<div class="day-block" style="border-bottom:1px dashed var(--border);padding-bottom:8px;margin-bottom:8px;">
                             <span class="day-label ${isPast ? 'past' : ''}" style="display:flex;justify-content:space-between;"><span>${dayNames[dKey]}</span>${isPast ? '<span style="font-size:10px;">(Đã qua)</span>' : ''}</span>`;
 
                         if (dishes.length > 0 && !isPast) {
-                            // 3-option shift toggle inline
                             content += `<div class="admin-shift-toggle" data-uid="${key}" data-wt="${weekType}" data-day="${dKey}" data-cur="${defShift}" style="display:flex;gap:4px;margin:6px 0 8px;background:var(--card-bg);padding:3px;border-radius:7px;border:1px solid var(--border);">
                                 <button onclick="adminToggleShift(this,'M')" class="ast-btn ${defShift==='M'?'ast-active':''}" style="flex:1;padding:4px;border-radius:5px;font-size:11px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${defShift==='M'?'var(--primary)':'transparent'};color:${defShift==='M'?'white':'var(--text-muted)'};">Ca Sáng</button>
                                 <button onclick="adminToggleShift(this,'E')" class="ast-btn ${defShift==='E'?'ast-active':''}" style="flex:1;padding:4px;border-radius:5px;font-size:11px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${defShift==='E'?'var(--primary)':'transparent'};color:${defShift==='E'?'white':'var(--text-muted)'};">Ca Chiều</button>
                                 <button onclick="adminToggleShift(this,'both')" class="ast-btn ${defShift==='both'?'ast-active':''}" style="flex:1;padding:4px;border-radius:5px;font-size:11px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${defShift==='both'?'var(--primary)':'transparent'};color:${defShift==='both'?'white':'var(--text-muted)'};">Hai ca</button>
                             </div>`;
-                            // Ca Sáng list (show if M or both)
                             content += `<div class="admin-shift-section admin-shift-M-${key}-${dKey}" style="display:${defShift==='E'?'none':'block'}">`;
                             if (defShift !== 'E') content += `<div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Ca Sáng</div>`;
                             content += `<div class="mini-dish-list">`;
                             dishes.forEach(dish => { content += `<div class="mini-dish-item ${dish===curM?'selected':''}" data-dish="${dish}" data-day="${dKey}" data-shift="M" onclick="selectAdminDish(this)">${parseDish(dish)}</div>`; });
                             content += `</div></div>`;
-                            // Ca Chiều list (show if E or both)
                             content += `<div class="admin-shift-section admin-shift-E-${key}-${dKey}" style="display:${defShift==='M'?'none':'block'};${defShift==='both'?'margin-top:8px;':''}">`;
                             if (defShift !== 'M') content += `<div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-bottom:4px;">Ca Chiều</div>`;
                             content += `<div class="mini-dish-list">`;
                             dishes.forEach(dish => { content += `<div class="mini-dish-item ${dish===curE?'selected':''}" data-dish="${dish}" data-day="${dKey}" data-shift="E" onclick="selectAdminDish(this)">${parseDish(dish)}</div>`; });
                             content += `</div></div>`;
                         } else if (dishes.length > 0 && isPast) {
-                            // Past day - read only
                             if (curM) content += `<div style="font-size:12px;padding:4px 0;"><span style="font-size:10px;color:var(--text-muted);">Sáng: </span>${curM}</div>`;
                             if (curE) content += `<div style="font-size:12px;padding:4px 0;"><span style="font-size:10px;color:var(--text-muted);">Chiều: </span>${curE}</div>`;
                             if (!curM && !curE) content += `<span class="text-muted" style="font-size:12px;">Chưa đặt</span>`;
@@ -1591,7 +1570,6 @@
         }
         
         window.selectAdminDish = (elem) => {
-            // Only deselect within same shift section (same day + same shift)
             const shiftSection = elem.closest('.mini-dish-list');
             if (shiftSection) shiftSection.querySelectorAll('.mini-dish-item').forEach(e => e.classList.remove('selected'));
             elem.classList.add('selected');
@@ -1602,13 +1580,11 @@
             if (!toggle) return;
             const { uid, wt, day } = toggle.dataset;
             toggle.dataset.cur = newShift;
-            // Update button styles
             toggle.querySelectorAll('.ast-btn').forEach(b => {
                 const active = b.getAttribute('onclick').includes(`'${newShift}'`);
                 b.style.background = active ? 'var(--primary)' : 'transparent';
                 b.style.color = active ? 'white' : 'var(--text-muted)';
             });
-            // Show/hide M and E sections
             const secM = document.querySelector(`.admin-shift-M-${uid}-${day}`);
             const secE = document.querySelector(`.admin-shift-E-${uid}-${day}`);
             if (secM) {
@@ -1622,7 +1598,6 @@
                 const labelE = secE.querySelector('div[style*="font-size:10px"]');
                 if (labelE) labelE.style.display = newShift === 'both' ? 'block' : 'none';
             }
-            // If switching away from a shift, clear its selection
             if (newShift === 'M' && secE) secE.querySelectorAll('.mini-dish-item.selected').forEach(e => e.classList.remove('selected'));
             if (newShift === 'E' && secM) secM.querySelectorAll('.mini-dish-item.selected').forEach(e => e.classList.remove('selected'));
         };
@@ -1731,7 +1706,6 @@
                 return html;
             };
         
-            // Full editable section: show existing dishes as editable rows + add new textarea
             const renderEditableMenuSection = (weekKey, menuData) => {
                 let html = `<div style="margin-bottom:1rem;">
                     <button onclick="document.getElementById('menu-file-input').click()" class="btn btn-secondary" style="width:100%;justify-content:center;padding:10px;font-size:13px;border:1px dashed var(--border);">
@@ -1985,7 +1959,6 @@
                 const gSh = state.guestShiftSelection[dayKey] || 'M';
                 daysContentHTML += `<div id="guest-order-day-${dayKey}" class="${state.guestCurrentOrderDay === dayKey ? '' : 'hidden'}">`;
 
-                // Shift picker for guest - same toggle-group style
                 daysContentHTML += `<div style="display:flex;gap:6px;margin-bottom:12px;background:var(--card-bg);padding:4px;border-radius:8px;border:1px solid var(--border);">
                     <button class="guest-shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="M" style="flex:1;padding:8px 4px;border-radius:6px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${gSh==='M'?'var(--primary)':'transparent'};color:${gSh==='M'?'white':'var(--text-muted)'};">Ca Sáng</button>
                     <button class="guest-shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="E" style="flex:1;padding:8px 4px;border-radius:6px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${gSh==='E'?'var(--primary)':'transparent'};color:${gSh==='E'?'white':'var(--text-muted)'};">Ca Chiều</button>
@@ -1997,7 +1970,6 @@
                         const sel = gSh === 'M' ? state.guestOrderSelection[dayKey + '_M'] : state.guestOrderSelection[dayKey + '_E'];
                         daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item guest-dish-item ${dish === sel ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="${gSh}"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
                     } else {
-                        // Hai ca: progressive flow - morning first
                         const selM = state.guestOrderSelection[dayKey + '_M'];
                         const selE = state.guestOrderSelection[dayKey + '_E'];
                         if (!selM) {
@@ -2032,7 +2004,6 @@
             const checkWeekString = isCurrentWeekPeriod ? getWeekString(today) : getWeekString(new Date(today.getTime() + 7 * 86400000));
             const weekDoc = await getDocument('order_list', checkWeekString);
             const userData = weekDoc && weekDoc[userEmailKey];
-            // Kiểm tra có ít nhất 1 ngày được đặt (M hoặc E)
             const hasOrder = userData && userData.order === 'ordered' && 
                 ['mon','tue','wed','thu','fri'].some(d => userData[d + '_M'] || userData[d + '_E']);
             todayTab.classList.toggle('needs-attention', !hasOrder);
@@ -2046,7 +2017,6 @@
             content.innerHTML = `<p class="text-center text-muted p-3"><i class="fas fa-spinner fa-spin"></i> Đang tải...</p>`;
 
             const [year, month] = monthVal.split('-').map(Number);
-            // Collect all week strings that overlap this month
             const weekStrings = new Set();
             const daysInMonth = new Date(year, month, 0).getDate();
             for (let d = 1; d <= daysInMonth; d++) {
@@ -2062,9 +2032,7 @@
                 if (!doc || !doc[userKey]) continue;
                 const userData = doc[userKey];
                 if (userData.order === 'reopen') continue;
-                // Find the Monday of this week
                 const [wYear, wNum] = wk.split('_').map(Number);
-                // Reconstruct Monday date from week string
                 const jan4 = new Date(wYear, 0, 4);
                 const mondayOfWeek = new Date(jan4);
                 mondayOfWeek.setDate(jan4.getDate() - (jan4.getDay() || 7) + 1 + (wNum - 1) * 7);
@@ -2341,6 +2309,11 @@
         });
 
         document.body.addEventListener('click', async (e) => {
+            if (e.target.id === 'skip-option-modal') {
+                e.target.classList.add('hidden');
+                return;
+            }
+
             if (!e.target.closest('#stats-options-btn') && !e.target.closest('.stats-dropdown')) {
                 const dropdown = el('stats-dropdown');
                 if (dropdown && dropdown.classList.contains('show')) {
@@ -2443,7 +2416,6 @@
             } 
             else if (classList.contains('order-day-tab-btn')) {
                 state.currentOrderDay = dataset.dayKey;
-                // Nếu đang có state.reopenTargetWeek thì gọi renderReopen
                 if (state.reopenTargetWeek) {
                      await renderReopenOrderSection(el('order-section-container'), state.reopenTargetWeek, state.reopenIsCurrentWeek);
                 } else {
@@ -2492,7 +2464,6 @@
                 const sh = shiftKey || (state.orderShiftSelection[dayKey] || 'M');
                 state.orderSelection[dayKey + '_' + sh] = dish;
                 
-                // Tự động sang ngày tiếp nếu đã chọn xong ca của ngày hiện tại
                 const curSh = state.orderShiftSelection[dayKey] || 'M';
                 const doneM = curSh !== 'E' ? !!state.orderSelection[dayKey + '_M'] : true;
                 const doneE = curSh !== 'M' ? !!state.orderSelection[dayKey + '_E'] : true;
@@ -2527,7 +2498,6 @@
                     
                     const userKey = emailToKey(state.currentUser.email);
                     
-                    // Logic yêu cầu chọn món: kiểm tra theo ca đã chọn cho từng ngày
                     const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
                     const dayMap = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5 };
                     const currentDayIndex = today.getDay();
@@ -2537,7 +2507,6 @@
                         requiredDays = dayKeys.filter(d => dayMap[d] >= currentDayIndex);
                     }
 
-                    // Kiểm tra các ngày bắt buộc theo ca đã chọn
                     const missingDays = requiredDays.filter(day => {
                         const sh = state.orderShiftSelection[day] || 'M';
                         if (sh === 'both') return !state.orderSelection[day + '_M'] || !state.orderSelection[day + '_E'];
@@ -2572,24 +2541,20 @@
                         } 
                     };
                     
-                    // Merge dữ liệu cũ (tất cả day_M, day_E)
                     for (const day of dayKeys) {
                         ['M', 'E'].forEach(sh => {
                             const fk = day + '_' + sh;
                             if (oldUserData[fk]) {
-                                // Giữ nguyên trạng thái eaten
                                 payload[userKey][fk] = oldUserData[fk];
                             }
                         });
                     }
 
-                    // Ghi đè bằng lựa chọn mới
                     for (const day of dayKeys) {
                         ['M', 'E'].forEach(sh => {
                             const fk = day + '_' + sh;
                             const newDish = state.orderSelection[fk];
                             if (!newDish) return;
-                            // Không ghi đè eaten
                             if (oldUserData[fk] && oldUserData[fk].includes('eaten:')) return;
                             const isNoOrder = newDish.toLowerCase().includes('không đặt cơm') || newDish.toLowerCase().includes('no order');
                             const prefix = isNoOrder ? '[ignore] ' : 'not: ';
@@ -2670,7 +2635,6 @@
                     const currentWeekDoc = await getDocument('order_list', weekStr);
                     const oldOrderData = currentWeekDoc && currentWeekDoc[userKey] ? currentWeekDoc[userKey] : {};
 
-                    // Giữ tất cả các field cũ (mon_M, mon_E, v.v.)
                     ['mon', 'tue', 'wed', 'thu', 'fri'].forEach(d => {
                         ['M','E'].forEach(sh => {
                             const fk = d + '_' + sh;
@@ -2678,20 +2642,15 @@
                         });
                     });
 
-                    // Xử lý theo shift toggle: nếu toggle chỉ chọn M thì xóa E, và ngược lại
                     detailRow.querySelectorAll('.admin-shift-toggle').forEach(toggle => {
                         const { day, cur: shiftMode } = toggle.dataset;
                         if (shiftMode === 'M') {
-                            // Xóa Ca Chiều cho ngày này
                             payload[userKey][day + '_E'] = deleteField();
                         } else if (shiftMode === 'E') {
-                            // Xóa Ca Sáng cho ngày này
                             payload[userKey][day + '_M'] = deleteField();
                         }
-                        // 'both' -> giữ cả 2
                     });
 
-                    // Áp dụng chọn mới từ mini-dish-item
                     detailRow.querySelectorAll('.mini-dish-item.selected').forEach(item => {
                         const day = item.dataset.day;
                         const shiftTag = item.dataset.shift || 'M';
@@ -2789,7 +2748,6 @@
             else if (classList.contains('history-cal-btn')) {
                 const { key, name } = dataset;
                 el('history-cal-title').textContent = `Lịch sử: ${name}`;
-                // Default to current month
                 const now = new Date();
                 const monthVal = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
                 el('history-cal-month').value = monthVal;
@@ -2883,7 +2841,6 @@
                     const userKey = emailToKey(state.currentUser.email); 
                     const weekDoc = await getDocument('order_list', weekString);
                     const updates = {};
-                    // Mark cả M và E nếu có
                     ['M','E'].forEach(sh => {
                         const fk = day + '_' + sh;
                         const raw = weekDoc[userKey] && weekDoc[userKey][fk];
@@ -2915,13 +2872,11 @@
             else if (classList.contains('shift-pick-btn')) {
                 const { shiftDay, shiftVal, clearM } = dataset;
                 state.orderShiftSelection[shiftDay] = shiftVal;
-                // Nếu bấm "Đổi" (clear-m=1): xóa lựa chọn Ca Sáng để chọn lại
                 if (clearM === '1') {
                     delete state.orderSelection[shiftDay + '_M'];
                 } else {
                     if (shiftVal === 'M') delete state.orderSelection[shiftDay + '_E'];
                     if (shiftVal === 'E') delete state.orderSelection[shiftDay + '_M'];
-                    // both: giữ nguyên lựa chọn cũ (nếu có)
                 }
                 if (state.reopenTargetWeek) {
                     renderReopenOrderSection(el('order-section-container'), state.reopenTargetWeek, state.reopenIsCurrentWeek);
@@ -3030,17 +2985,14 @@
                     const menuToSave = {};
 
                     for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
-                        // Collect existing edited dishes
                         const existingInputs = document.querySelectorAll(`.menu-existing-dish[data-week="${weekKey}"][data-day="${day}"]`);
                         const existingDishes = Array.from(existingInputs).map(i => i.value.trim()).filter(Boolean);
-                        // Collect new dishes from textarea
                         const newDishes = Array.from(document.querySelectorAll(`.menu-dish-textarea[data-week="${weekKey}"][data-day="${day}"]`)).map(t => t.value.trim()).filter(Boolean);
                         const combined = [...existingDishes, ...newDishes];
                         if (combined.length > 0 && !combined.some(d => d.toLowerCase().includes('không đặt cơm'))) combined.push('Không đặt cơm | No order');
                         menuToSave[day] = combined;
                     }
 
-                    // Find removed dishes per day (were in old menu, no longer in new menu)
                     const removedByDay = {};
                     for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
                         const oldDishes = (oldMenu[day] || []).filter(d => !d.toLowerCase().includes('không đặt cơm'));
@@ -3049,10 +3001,8 @@
                         if (removed.length > 0) removedByDay[day] = removed;
                     }
 
-                    // Sync menu to Firestore first
                     await setDoc(doc(db, 'order_list', weekStr), { menu: menuToSave }, { merge: true });
 
-                    // For each removed dish, find users who had it and update their order
                     if (Object.keys(removedByDay).length > 0) {
                         const freshDoc = await getDocument('order_list', weekStr);
                         const updates = {};
