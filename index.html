@@ -823,7 +823,7 @@
                     if ((state.staffProfile?.lan || 'vi').startsWith('en')) {
                         let viName = dish.replace('[ignore]', '').split('|')[0].trim();
                         viName = viName.replace(/"/g, '&quot;');
-                        dishContentHTML = `<span class="speakable-dish" data-speak="${viName}" title="Listen in Vietnamese" style="cursor:pointer; display:inline; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.75'" onmouseout="this.style.opacity='1'">${parseDish(mainRaw)}&nbsp;<i class="fas fa-volume-up" style="font-size:0.8em; opacity:0.9;"></i></span>`;
+                        dishContentHTML = `<span class="speakable-dish" data-speak="${viName}" title="Listen in Vietnamese" style="cursor:pointer; display:inline; transition: opacity 0.2s;" onmouseover="if(this.dataset.speaking !== 'true') this.style.opacity='0.75'" onmouseout="if(this.dataset.speaking !== 'true') this.style.opacity='1'">${parseDish(mainRaw)}&nbsp;<i class="fas fa-volume-up" style="font-size:0.8em; opacity:0.9;"></i></span>`;
                     }
 
                     heroHtml = `<div class="card hero-card">
@@ -2402,9 +2402,28 @@
                 const text = dataset.speak;
                 if (text && 'speechSynthesis' in window) {
                     window.speechSynthesis.cancel();
+                    document.querySelectorAll('.speakable-dish').forEach(el => {
+                        el.style.opacity = '1';
+                        el.dataset.speaking = 'false';
+                    });
+                    
+                    target.style.opacity = '0.5';
+                    target.dataset.speaking = 'true';
+                    
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'vi-VN'; 
-                    utterance.rate = 0.65; 
+                    utterance.rate = 0.55; 
+                    
+                    utterance.onend = () => {
+                        target.style.opacity = '1';
+                        target.dataset.speaking = 'false';
+                    };
+                    
+                    utterance.onerror = () => {
+                        target.style.opacity = '1';
+                        target.dataset.speaking = 'false';
+                    };
+                    
                     window.speechSynthesis.speak(utterance);
                 } else if (!('speechSynthesis' in window)) {
                     showToast('Trình duyệt không hỗ trợ đọc văn bản', 'error');
