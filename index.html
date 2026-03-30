@@ -852,7 +852,10 @@
             const userEmailKey = emailToKey(state.currentUser.email);
             const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
             const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
-        
+
+            const lblM = (state.staffProfile?.lan || 'vi').startsWith('en') ? 'Morning' : 'Sáng';
+            const lblE = (state.staffProfile?.lan || 'vi').startsWith('en') ? 'Evening' : 'Chiều';
+            
             const isCurrentWeekPeriod = (dayOfWeek >= 1 && dayOfWeek <= 3) || (dayOfWeek === 4 && hour < 15);
             const currentWeekString = getWeekString(today);
             const nextWeekString = getWeekString(new Date(today.getTime() + 7 * 86400000));
@@ -1023,6 +1026,9 @@
             const today = new Date();
             const currentDayIndex = today.getDay();
             const dayMap = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5 };
+
+            const lblM = (state.staffProfile?.lan || 'vi').startsWith('en') ? 'Morning' : 'Sáng';
+            const lblE = (state.staffProfile?.lan || 'vi').startsWith('en') ? 'Evening' : 'Chiều';
             
             const weekDoc = await getDocument('order_list', targetWeekString);
             const menu = weekDoc ? weekDoc.menu : null;
@@ -1976,6 +1982,9 @@
             const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
             const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
 
+            const lblM = (state.staffProfile?.lan || 'vi').startsWith('en') ? 'Morning' : 'Sáng';
+            const lblE = (state.staffProfile?.lan || 'vi').startsWith('en') ? 'Evening' : 'Chiều';
+            
             if (!menu) { container.innerHTML = `<p class="text-center text-muted mt-2">${__('noMenu')}</p>`; saveBtn.classList.add('hidden'); return; }
 
             const allSelected = dayKeys.every(day => {
