@@ -1687,18 +1687,28 @@
         }        
         async function renderAdminMenu() {
             const today = new Date();
-            const thisWeek = getWeekString(today);
-            const nextWeek = getWeekString(new Date(today.getTime() + 7 * 86400000));
-            const [thisWeekDoc, nextWeekDoc] = await Promise.all([getDocument('order_list', thisWeek), getDocument('order_list', nextWeek)]);
-            const thisWeekMenu = (thisWeekDoc && thisWeekDoc.menu) ? thisWeekDoc.menu : {};
-            const nextWeekMenu = (nextWeekDoc && nextWeekDoc.menu) ? nextWeekDoc.menu : {};
+            const thisWeekStr = getWeekString(today);
+            const nextWeekStr = getWeekString(new Date(today.getTime() + 7 * 86400000));
+            
+            let activeWeekStr = thisWeekStr;
+            let weekKey = 'thisWeek'; 
+            
+            if (state.adminMenuTab === 'next') {
+                activeWeekStr = nextWeekStr;
+                weekKey = 'nextWeek';
+            } else if (state.adminMenuTab === 'custom') {
+                activeWeekStr = state.adminMenuCustomWeek;
+                weekKey = 'customWeek';
+            }
 
-            const hasNextWeekData = Object.values(nextWeekMenu).some(d => d && d.length > 0);
+            const weekDoc = await getDocument('order_list', activeWeekStr);
+            const activeMenu = (weekDoc && weekDoc.menu) ? weekDoc.menu : {};
+            const hasData = Object.values(activeMenu).some(d => d && d.length > 0);
         
             const renderReadOnlyMenuSection = (menuData) => {
                 let html = '';
                 for (const [dayKey, dayName] of Object.entries({ mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') })) {
-                    const dishes = menuData[dayKey] || [];
+                    const dishes = menuData[dayKey] ||[];
                     html += `<div class="form-group"><label class="form-label">${dayName}</label><ul class="staff-list">`;
                     if (dishes.length > 0) dishes.forEach(d => html += `<li class="staff-item"><div class="staff-details"><div class="staff-dish">${parseDish(d)}</div></div></li>`);
                     else html += `<li class="staff-item"><div class="staff-details"><div class="staff-dish text-muted">${__('noDishYet')}</div></div></li>`;
@@ -1716,8 +1726,8 @@
                     <input type="file" id="menu-file-input" class="hidden" accept=".xlsx,.xls,.csv">
                 </div>`;
 
-                for (const [dayKey, dayName] of Object.entries({ mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') })) {
-                    const dishes = (menuData[dayKey] || []).filter(d => !d.toLowerCase().includes('không đặt cơm') && !d.toLowerCase().includes('no order'));
+                for (const[dayKey, dayName] of Object.entries({ mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') })) {
+                    const dishes = (menuData[dayKey] ||[]).filter(d => !d.toLowerCase().includes('không đặt cơm') && !d.toLowerCase().includes('no order'));
                     html += `<div class="form-group">
                         <label class="form-label">${dayName}</label>
                         <div id="menu-existing-${weekKey}-${dayKey}" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;">`;
@@ -1739,37 +1749,41 @@
                 return html;
             };
             
+            let inputVal = '';
+            if (state.adminMenuTab === 'custom' && state.adminMenuCustomWeek) {
+                const parts = state.adminMenuCustomWeek.split('_');
+                inputVal = `${parts[0]}-W${parts[1].padStart(2, '0')}`;
+            }
+
             let contentHTML = `<div class="mt-3">
             <div style="display:flex;gap:6px;margin-bottom:1.5rem;background:var(--card-bg);padding:4px;border-radius:8px;border:1px solid var(--border);">
                 <button class="btn" style="flex:1;border:none;box-shadow:none;transition:all 0.2s;background:${state.adminMenuTab==='this'?'var(--primary)':'transparent'};color:${state.adminMenuTab==='this'?'white':'var(--text-muted)'};font-weight:600;" onclick="switchAdminMenuTab('this')">
-                    Tuần này (${thisWeek.split('_')[1]})
+                    Tuần này (${thisWeekStr.split('_')[1]})
                 </button>
                 <button class="btn" style="flex:1;border:none;box-shadow:none;transition:all 0.2s;background:${state.adminMenuTab==='next'?'var(--primary)':'transparent'};color:${state.adminMenuTab==='next'?'white':'var(--text-muted)'};font-weight:600;" onclick="switchAdminMenuTab('next')">
-                    Tuần sau (${nextWeek.split('_')[1]})
+                    Tuần sau (${nextWeekStr.split('_')[1]})
                 </button>
+                <div style="position:relative; display:flex; align-items:center;">
+                    <input type="week" id="admin-menu-week-picker" title="Chọn tuần" class="hidden-date-input" style="width:100%; height:100%; position:absolute; top:0; left:0; opacity:0; cursor:pointer;" value="${inputVal}">
+                    <button class="icon-btn" style="background:${state.adminMenuTab==='custom'?'var(--primary)':'transparent'};color:${state.adminMenuTab==='custom'?'white':'var(--text-muted)'};border:none;"><i class="fas fa-calendar-week"></i></button>
+                </div>
             </div>`;
+
+            if (state.adminMenuTab === 'custom') {
+                 contentHTML += `<h4 class="text-center mb-3" style="color: var(--primary);">Đang xem Tuần ${activeWeekStr.split('_')[1]} / ${activeWeekStr.split('_')[0]}</h4>`;
+            }
             
-            if (state.adminMenuTab === 'this') {
-                if (!state.isEditingMenu) {
-                    contentHTML += renderReadOnlyMenuSection(thisWeekMenu);
-                    contentHTML += `<div class="mt-3 text-center"><button id="edit-menu-btn" class="btn btn-secondary btn-block" data-week="this"><i class="fas fa-edit"></i> Chỉnh sửa menu tuần này</button></div>`;
+            if (!state.isEditingMenu) {
+                if (!hasData && state.adminMenuTab !== 'this') {
+                    contentHTML += `<p class="text-center text-muted p-3">Chưa có thực đơn cho tuần này.</p>`;
                 } else {
-                    contentHTML += renderEditableMenuSection('thisWeek', thisWeekMenu);
-                    contentHTML += `<button id="save-menu-nextWeek" class="btn btn-primary btn-block" style="margin-top:1rem;" data-week="${thisWeek}" data-weektype="this"><i class="fas fa-save"></i> Lưu & Đồng bộ</button>`;
-                    contentHTML += `<button id="cancel-edit-menu-btn" class="btn btn-secondary btn-block mt-2">Hủy</button>`;
+                    contentHTML += renderReadOnlyMenuSection(activeMenu);
                 }
+                contentHTML += `<div class="mt-3 text-center"><button id="edit-menu-btn" class="btn btn-secondary btn-block" data-week="${activeWeekStr}"><i class="fas fa-edit"></i> Chỉnh sửa menu</button></div>`;
             } else {
-                if (hasNextWeekData && !state.isEditingMenu) {
-                    contentHTML += renderReadOnlyMenuSection(nextWeekMenu);
-                    contentHTML += `<div class="mt-3 text-center">
-                        <p class="text-muted mb-3"><i class="fas fa-check-circle" style="color:var(--success)"></i> ${__('menuSavedState')}</p>
-                        <button id="edit-menu-btn" class="btn btn-secondary btn-block" data-week="next"><i class="fas fa-edit"></i> Chỉnh sửa menu</button>
-                    </div>`;
-                } else {
-                    contentHTML += renderEditableMenuSection('nextWeek', nextWeekMenu);
-                    contentHTML += `<button id="save-menu-nextWeek" class="btn btn-primary btn-block" style="margin-top:1rem;" data-week="${nextWeek}" data-weektype="next"><i class="fas fa-save"></i> Lưu & Đồng bộ</button>`;
-                    if (state.isEditingMenu) contentHTML += `<button id="cancel-edit-menu-btn" class="btn btn-secondary btn-block mt-2">Hủy</button>`;
-                }
+                contentHTML += renderEditableMenuSection(weekKey, activeMenu);
+                contentHTML += `<button id="save-menu-nextWeek" class="btn btn-primary btn-block" style="margin-top:1rem;" data-week="${activeWeekStr}" data-weektype="${weekKey}"><i class="fas fa-save"></i> Lưu & Đồng bộ</button>`;
+                contentHTML += `<button id="cancel-edit-menu-btn" class="btn btn-secondary btn-block mt-2">Hủy</button>`;
             }
 
             contentHTML += `</div>`;
@@ -2100,6 +2114,15 @@
                 const userKey = el('history-cal-modal').dataset.userKey;
                 if (userKey) await renderHistoryCalContent(userKey, value);
             }
+            else if (id === 'admin-menu-week-picker') {
+                if (value) {
+                    const [y, w] = value.split('-W');
+                    state.adminMenuCustomWeek = `${y}_${parseInt(w, 10)}`;
+                    state.adminMenuTab = 'custom';
+                    state.isEditingMenu = false; 
+                    await renderAdminMenu();
+                }
+            }
             else if (id === 'personnel-depart-select' && value === '__other__') {
                 const newDepart = prompt('Nhập tên phòng ban mới:');
                 if (newDepart && newDepart.trim()) {
@@ -2173,8 +2196,11 @@
                         });
                     }
 
-                     for (const dayKey of ['mon', 'tue', 'wed', 'thu', 'fri']) {
-                        const container = el(`menu-dishes-nextWeek-${dayKey}`);
+                    const textareas = document.querySelectorAll('.menu-dish-textarea');
+                    const activeWeekKey = textareas.length > 0 ? textareas[0].dataset.week : 'nextWeek';
+
+                     for (const dayKey of['mon', 'tue', 'wed', 'thu', 'fri']) {
+                        const container = el(`menu-dishes-${activeWeekKey}-${dayKey}`);
                         if (container) {
                             container.innerHTML = ''; 
                             
@@ -2187,8 +2213,8 @@
                                 div.style.marginTop = '0.5rem';
                                 
                                 div.innerHTML = `
-                                    <textarea class="form-textarea menu-dish-textarea" data-week="nextWeek" data-day="${dayKey}" data-index="${index}" placeholder="${__('oneDishPerLine')}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;">${dish}</textarea>
-                                    <button class="icon-btn remove-menu-dish-btn" data-week="nextWeek" data-day="${dayKey}" data-index="${index}"><i class="fas fa-times"></i></button>
+                                    <textarea class="form-textarea menu-dish-textarea" data-week="${activeWeekKey}" data-day="${dayKey}" data-index="${index}" placeholder="${__('oneDishPerLine')}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;">${dish}</textarea>
+                                    <button class="icon-btn remove-menu-dish-btn" data-week="${activeWeekKey}" data-day="${dayKey}" data-index="${index}"><i class="fas fa-times"></i></button>
                                 `;
                                 container.appendChild(div);
                             });
@@ -2199,8 +2225,8 @@
                             emptyDiv.style.alignItems = 'center';
                             emptyDiv.style.marginTop = '0.5rem';
                             emptyDiv.innerHTML = `
-                                <textarea class="form-textarea menu-dish-textarea" data-week="nextWeek" data-day="${dayKey}" data-index="${dishes.length}" placeholder="${__('oneDishPerLine')}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;"></textarea>
-                                <button class="icon-btn remove-menu-dish-btn hidden" data-week="nextWeek" data-day="${dayKey}" data-index="${dishes.length}"><i class="fas fa-times"></i></button>
+                                <textarea class="form-textarea menu-dish-textarea" data-week="${activeWeekKey}" data-day="${dayKey}" data-index="${dishes.length}" placeholder="${__('oneDishPerLine')}" style="flex:1;min-height:40px;padding-bottom:10px;overflow:hidden;"></textarea>
+                                <button class="icon-btn remove-menu-dish-btn hidden" data-week="${activeWeekKey}" data-day="${dayKey}" data-index="${dishes.length}"><i class="fas fa-times"></i></button>
                             `;
                             container.appendChild(emptyDiv);
                         }
@@ -2404,17 +2430,23 @@
                 } catch (err) { console.error(err); showToast(__('error'), 'error'); document.documentElement.setAttribute('data-theme', state.staffProfile.theme || 'dark'); } finally { hideLoader(); }
             }
             
-            else if (target.closest('.toggle-card-header')) {
-                const header = target.closest('.toggle-card-header');
-                const targetId = header.dataset.target;
-                const listEl = el(targetId);
-                const icon = header.querySelector('.toggle-icon');
-                if (listEl) {
-                    const isHidden = listEl.classList.toggle('hidden');
-                    if (icon) icon.classList.toggle('rotate');
-                    header.classList.toggle('collapsed', isHidden);
+            else if (target.closest('.toggle-card-header') || (target.closest('.card') && target.closest('.card').querySelector('.toggle-card-header'))) {
+                const card = target.closest('.card');
+                
+                if (target.closest('.staff-list') || target.tagName === 'BUTTON' || target.closest('button')) return; 
+
+                const header = card.querySelector('.toggle-card-header');
+                if (header) {
+                    const targetId = header.dataset.target;
+                    const listEl = el(targetId);
+                    const icon = header.querySelector('.toggle-icon');
+                    if (listEl) {
+                        const isHidden = listEl.classList.toggle('hidden');
+                        if (icon) icon.classList.toggle('rotate');
+                        header.classList.toggle('collapsed', isHidden);
+                    }
                 }
-            } 
+            }
             else if (classList.contains('order-day-tab-btn')) {
                 state.currentOrderDay = dataset.dayKey;
                 if (state.reopenTargetWeek) {
@@ -2828,10 +2860,6 @@
                     el('delete-department-modal').classList.add('hidden'); await renderAdminPersonnel();
                 } catch (err) { console.error(err); showToast('Lỗi: ' + err.message, 'error'); } finally { hideLoader(); }
             }
-            else if (target.closest('.toggle-card-header')) {
-                const header = target.closest('.toggle-card-header'); const targetId = header.dataset.target; const listEl = el(targetId); const icon = header.querySelector('.toggle-icon');
-                if (listEl) { const isHidden = listEl.classList.toggle('hidden'); if (icon) icon.classList.toggle('rotate'); header.classList.toggle('collapsed', isHidden); }
-            } 
             else if (id === 'skip-everyone-btn') { await processSkip('Everyone'); }
             else if (id === 'skip-specific-btn') { const receiver = el('skip-receiver-input').value.trim(); if (!receiver) return showToast('Vui lòng nhập tên người nhận', 'error'); await processSkip(receiver); }
             else if (dataset.action === 'eaten') { 
@@ -2979,8 +3007,7 @@
                 showLoader();
                 try {
                     const weekStr = dataset.week;
-                    const weekType = dataset.weektype || 'next';
-                    const weekKey = weekType === 'this' ? 'thisWeek' : 'nextWeek';
+                    const weekKey = dataset.weektype;
                     const weekDoc = await getDocument('order_list', weekStr) || {};
                     const oldMenu = weekDoc.menu || {};
                     const menuToSave = {};
