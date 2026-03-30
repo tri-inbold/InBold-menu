@@ -107,8 +107,10 @@
         .card { background: var(--card-bg); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1rem; border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: all 0.2s ease; }
         @media (min-width: 769px) { .card { padding: 1.5rem; } }
         .card:hover { box-shadow: var(--shadow-md); }
-        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; transition: margin-bottom 0.3s ease; transition: margin-bottom 0.2s ease; }
-        .card-header.collapsed { margin-bottom: 0 !important; border-bottom: none; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; transition: margin-bottom 0.2s ease; }
+        .card-header.collapsed { border-bottom: none; }
+        .toggle-card-header { margin-bottom: 0 !important; }
+        .toggle-card-header + .staff-list:not(.hidden) { margin-top: 0.75rem; }
         
         .btn-upload { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 500; }
         .btn-upload:hover { background: var(--card-hover); border-color: var(--primary); }
@@ -1126,11 +1128,7 @@
                     else if (isPublicGiveup) showEatBtn = true;
                 }
 
-                const shiftBadge = order.shiftTag === 'M'
-                    ? `<span style="font-size:10px;font-weight:700;color:var(--primary);background:rgba(102,126,234,0.12);padding:1px 6px;border-radius:4px;margin-right:4px;">[M]</span>`
-                    : `<span style="font-size:10px;font-weight:700;color:var(--text-muted);background:rgba(128,128,128,0.12);padding:1px 6px;border-radius:4px;margin-right:4px;">[E]</span>`;
-
-                const actionBtn = showEatBtn ? `<div class="staff-item-actions"><button class="btn-mark-eaten mark-eaten-btn" data-key="${order.key}" data-day="${dayKey}" data-shift="${order.shiftTag}"><i class="fas fa-check"></i> ${__('eaten')}</button></div>` : '';
+            const actionBtn = showEatBtn ? `<div class="staff-item-actions"><button class="btn-mark-eaten mark-eaten-btn" data-key="${order.key}" data-day="${dayKey}" data-shift="${order.shiftTag}"><i class="fas fa-check"></i> ${__('eaten')}</button></div>` : '';
                 
                 let nameHtml = order.name;
                 let extraInfo = '';
@@ -1142,8 +1140,7 @@
                     }
                 }
 
-                return `<li class="staff-item ${statusClass}"><div class="staff-details"><div class="staff-name">${nameHtml}</div><div class="staff-dish">${shiftBadge}${parseDish(order.rawDish)}</div>${extraInfo}</div>${actionBtn}</li>`;
-            };
+                return `<li class="staff-item ${statusClass}"><div class="staff-details"><div class="staff-name">${nameHtml}</div><div class="staff-dish">${parseDish(order.rawDish)}</div>${extraInfo}</div>${actionBtn}</li>`;
             
             const createDepartmentHTML = (list) => {
                 const byDepartment = {};
@@ -1457,11 +1454,11 @@
                 html += `<div class="table-wrapper"><table>
                     <thead>
                         <tr>
-                            <th style="width: 36px; text-align: center; padding: 8px 4px;">Chọn ngày</th>
-                            <th style="width: 36px; text-align: center; padding: 8px 4px;">Tuần này</th>
-                            <th style="width: 36px; text-align: center; padding: 8px 4px;">Tuần sau</th>
-                            <th>${__('name')}</th>
-                            <th class="hide-mobile">${__('department')}</th>
+                            <th style="width: 36px; text-align: center; padding: 8px 4px; font-size: 8.5px;">Chọn ngày</th>
+                            <th style="width: 36px; text-align: center; padding: 8px 4px; font-size: 8.5px;">Tuần này</th>
+                            <th style="width: 36px; text-align: center; padding: 8px 4px; font-size: 8.5px;">Tuần sau</th>
+                            <th style="font-size: 8.5px;">${__('name')}</th>
+                            <th class="hide-mobile" style="font-size: 8.5px;">${__('department')}</th>
                         </tr>
                     </thead>
                     <tbody>`;
@@ -1486,12 +1483,15 @@
                     content += `<div style="margin-bottom: 1rem;">`;
                     dayKeys.forEach((dKey, idx) => {
                         const isPast = (weekType === 'this') && ((idx + 1) < currentDayIdx && currentDayIdx !== 0 && currentDayIdx !== 6);
-                        const dishes = menuData[dKey] || [];
-                        const curM = orderData ? (parseDishValue(orderData[dKey + '_M']).dish || '') : '';
-                        const curE = orderData ? (parseDishValue(orderData[dKey + '_E']).dish || '') : '';
-                        const adminShiftKey = `admin-shift-${weekType}-${key}-${dKey}`;
-                        const hasBoth = curM && curE;
-                        const defShift = hasBoth ? 'both' : (curE ? 'E' : 'M');
+                        const dishes = menuData[dKey] ||[];
+                        const pM = orderData ? parseDishValue(orderData[dKey + '_M']) : { status: 'not', dish: '' };
+                        const pE = orderData ? parseDishValue(orderData[dKey + '_E']) : { status: 'not', dish: '' };
+                        const curM = pM.dish || '';
+                        const curE = pE.dish || '';
+                        
+                        const validM = curM && !['ignore', 'placeholder'].includes(pM.status);
+                        const validE = curE && !['ignore', 'placeholder'].includes(pE.status);
+                        const defShift = (validM && validE) ? 'both' : (validE && !validM ? 'E' : 'M');
                         content += `<div class="day-block" style="border-bottom:1px dashed var(--border);padding-bottom:8px;margin-bottom:8px;">
                             <span class="day-label ${isPast ? 'past' : ''}" style="display:flex;justify-content:space-between;"><span>${dayNames[dKey]}</span>${isPast ? '<span style="font-size:10px;">(Đã qua)</span>' : ''}</span>`;
 
