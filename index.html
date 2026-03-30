@@ -819,10 +819,17 @@
                         extraMealHTML = `<div style="margin-top:4px;font-size:12px;opacity:0.8;">${parseDish(otherRaw)}</div>`;
                     }
 
+                    let dishContentHTML = parseDish(mainRaw);
+                    if ((state.staffProfile?.lan || 'vi').startsWith('en')) {
+                        let viName = dish.replace('[ignore]', '').split('|')[0].trim();
+                        viName = viName.replace(/"/g, '&quot;');
+                        dishContentHTML = `<span class="speakable-dish" data-speak="${viName}" title="Listen in Vietnamese" style="cursor:pointer; display:inline-flex; align-items:center; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">${parseDish(mainRaw)} <i class="fas fa-volume-up" style="margin-left:12px; font-size:22px; opacity:0.9;"></i></span>`;
+                    }
+
                     heroHtml = `<div class="card hero-card">
                         <div class="hero-content">
                             <div class="hero-greeting">${__('hi')} ${firstName}</div>
-                            <div class="hero-title">${parseDish(mainRaw)}</div>
+                            <div class="hero-title" style="display: flex; align-items: center; justify-content: center;">${dishContentHTML}</div>
                             ${extraMealHTML}
                             ${!isPlaceholder ? `<div class="action-buttons-hero">
                                 <button class="btn btn-skip ${isSkipped ? 'active' : ''}" data-action="skip-modal" data-dish="${dish}" data-day="${dayKey}" data-shift="${mainShift}" ${isSkipped || isEaten ? 'disabled' : ''}><i class="fas fa-ban"></i> ${__('skip')}</button>
@@ -2386,12 +2393,25 @@
                 }
             }
 
-            const target = e.target.closest('button, a, .profile-menu-item, .order-dish-item, .toggle-card-header, .toggle-option, .support-row, .status-icon-btn, .dropdown-item, .shift-pick-btn, .guest-shift-pick-btn, .history-cal-btn, .remove-existing-dish-btn');
+            const target = e.target.closest('button, a, .profile-menu-item, .order-dish-item, .toggle-card-header, .toggle-option, .support-row, .status-icon-btn, .dropdown-item, .shift-pick-btn, .guest-shift-pick-btn, .history-cal-btn, .remove-existing-dish-btn, .speakable-dish');
             if (!target) return;
 
             const { id, classList, dataset } = target;
 
-            if (classList.contains('nav-item')) {
+            if (classList.contains('speakable-dish')) {
+                const text = dataset.speak;
+                if (text && 'speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'vi-VN'; 
+                    utterance.rate = 0.9;     
+                    window.speechSynthesis.speak(utterance);
+                } else if (!('speechSynthesis' in window)) {
+                    showToast('Trình duyệt không hỗ trợ đọc văn bản', 'error');
+                }
+                return;
+            }
+            else if (classList.contains('nav-item')) {
                 if (dataset.tab === state.currentTab) return;
                 document.querySelector('.nav-item.active').classList.remove('active'); target.classList.add('active');
                 state.currentTab = dataset.tab; await render(); return;
@@ -2636,12 +2656,10 @@
                     requiredDays.forEach(day => {
                         const sh = state.orderShiftSelection[day] || 'M';
                         if (sh === 'M') {
-                            // Nếu người dùng chỉ chọn ca sáng, chủ động xóa dữ liệu ca chiều cũ (nếu chưa ăn)
                             if (payload[userKey][day + '_E'] && !payload[userKey][day + '_E'].toString().includes('eaten:')) {
                                 payload[userKey][day + '_E'] = deleteField();
                             }
                         } else if (sh === 'E') {
-                            // Nếu người dùng chỉ chọn ca chiều, chủ động xóa dữ liệu ca sáng cũ (nếu chưa ăn)
                             if (payload[userKey][day + '_M'] && !payload[userKey][day + '_M'].toString().includes('eaten:')) {
                                 payload[userKey][day + '_M'] = deleteField();
                             }
