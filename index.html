@@ -816,17 +816,22 @@
                     const isSkipped = status === 'giveup';
                     const isEaten = status === 'eaten';
                     const isPlaceholder = status === 'ignore' || status === 'placeholder';
+                    const shiftLabel = mainShift === 'M' ? '<span style="font-size:13px;opacity:0.85;">[M] Ca Sáng</span>' : '<span style="font-size:13px;opacity:0.85;">[E] Ca Chiều</span>';
 
                     // Nếu có cả 2 ca, hiển thị cả 2
                     let extraMealHTML = '';
                     if (rawM && rawE) {
                         const otherRaw = mainShift === 'M' ? rawE : rawM;
-                        extraMealHTML = `<div style="margin-top:4px;font-size:12px;opacity:0.8;">${parseDish(otherRaw)}</div>`;
+                        const otherShift = mainShift === 'M' ? 'E' : 'M';
+                        const { status: otherStatus, dish: otherDish } = parseDishValue(otherRaw);
+                        const otherLabel = otherShift === 'M' ? '[M] Ca Sáng' : '[E] Ca Chiều';
+                        extraMealHTML = `<div style="margin-top:4px;font-size:12px;opacity:0.8;">${otherLabel}: ${parseDish(otherRaw)}</div>`;
                     }
 
                     heroHtml = `<div class="card hero-card">
                         <div class="hero-content">
                             <div class="hero-greeting">${__('hi')} ${firstName}</div>
+                            <div style="margin-bottom:4px;">${shiftLabel}</div>
                             <div class="hero-title">${parseDish(mainRaw)}</div>
                             ${extraMealHTML}
                             ${!isPlaceholder ? `<div class="action-buttons-hero">
@@ -1527,8 +1532,9 @@
                             dishes.forEach(dish => { content += `<div class="mini-dish-item ${dish===curE?'selected':''}" data-dish="${dish}" data-day="${dKey}" data-shift="E" onclick="selectAdminDish(this)">${parseDish(dish)}</div>`; });
                             content += `</div></div>`;
                         } else if (dishes.length > 0 && isPast) {
-                            if (curM) content += `<div style="font-size:12px;padding:4px 0;">${curM}</div>`;
-                            if (curE) content += `<div style="font-size:12px;padding:4px 0;">${curE}</div>`;
+                            // Past day - read only
+                            if (curM) content += `<div style="font-size:12px;padding:4px 0;"><span style="font-size:10px;color:var(--text-muted);">Sáng: </span>${curM}</div>`;
+                            if (curE) content += `<div style="font-size:12px;padding:4px 0;"><span style="font-size:10px;color:var(--text-muted);">Chiều: </span>${curE}</div>`;
                             if (!curM && !curE) content += `<span class="text-muted" style="font-size:12px;">Chưa đặt</span>`;
                         } else {
                             content += `<span class="text-muted" style="font-size:12px;">${__('rest')}</span>`;
@@ -2335,12 +2341,6 @@
         });
 
         document.body.addEventListener('click', async (e) => {
-            // Đóng modal nhường suất ăn khi bấm ra ngoài vùng nội dung
-            if (e.target.id === 'skip-option-modal') {
-                e.target.classList.add('hidden');
-                return;
-            }
-
             if (!e.target.closest('#stats-options-btn') && !e.target.closest('.stats-dropdown')) {
                 const dropdown = el('stats-dropdown');
                 if (dropdown && dropdown.classList.contains('show')) {
