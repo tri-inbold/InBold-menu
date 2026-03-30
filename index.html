@@ -2797,6 +2797,7 @@
                 el('history-cal-modal').dataset.userKey = key;
                 await renderHistoryCalContent(key, monthVal);
             }
+            else if (id === 'add-department-btn') {
                 el('department-modal-title').textContent = 'Thêm phòng ban'; el('department-original-name').value = ''; el('department-name-input').value = ''; el('department-modal').classList.remove('hidden'); el('department-name-input').focus();
             }
             else if (classList.contains('edit-department-btn')) {
