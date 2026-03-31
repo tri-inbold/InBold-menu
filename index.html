@@ -13,29 +13,29 @@
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
         
         :root { 
-            --primary: #ffffff;
-            --primary-dark: #e0e0e0;
-            --primary-light: #cccccc;
-            --secondary: #aaaaaa;
+            --primary: #efefef;
+            --primary-dark: #cccccc;
+            --primary-light: #bbbbbb;
+            --secondary: #888888;
             --accent: #fe5c1d;
-            --success: #6abf7b;
+            --success: #5aaa72;
             --warning: #fe5c1d;
             --error: #e05555;
-            --dark-bg: #111111;
-            --card-bg: #1c1c1c;
-            --card-hover: #252525;
-            --border: #2e2e2e;
-            --text: #efefef;
-            --text-muted: #888888;
-            --gradient-1: #1c1c1c;
-            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-            --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);
-            --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.5);
+            --dark-bg: #181818;
+            --card-bg: #232323;
+            --card-hover: #2c2c2c;
+            --border: #383838;
+            --text: #e8e8e8;
+            --text-muted: #909090;
+            --gradient-1: #232323;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+            --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.45);
+            --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.55);
             --radius-sm: 8px;
             --radius-md: 12px;
             --radius-lg: 16px;
-            --loader-bg: #111111;
-            --loader-color: #ffffff;
+            --loader-bg: #181818;
+            --loader-color: #e8e8e8;
         }
         
         :root[data-theme="light"] {
@@ -102,6 +102,11 @@
         [data-theme="light"] .department-header { color: #111111 !important; }
         [data-theme="light"] .week-detail-title { color: #111111 !important; }
         [data-theme="light"] .mini-dish-item.selected { border-color: #111111; background: rgba(0,0,0,0.05); font-weight: 600; }
+        [data-theme="light"] .toast-icon.success { background: #111111; border: 1px solid #333; color: #ffffff; }
+        [data-theme="light"] .toast-icon.error { background: #fe5c1d; border: 1px solid #d94d18; color: #ffffff; }
+        [data-theme="light"] .btn-skip { background: transparent !important; color: #666666 !important; border: 1px solid #cccccc !important; box-shadow: none !important; font-size: 12px; }
+        [data-theme="light"] .btn-skip:hover { background: #f5f4f0 !important; }
+        [data-theme="light"] .btn-eaten { background-color: #111111 !important; border: 1px solid #000000 !important; }
         
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Montserrat', sans-serif; background: var(--dark-bg); color: var(--text); line-height: 1.5; font-size: 14px; }
@@ -153,9 +158,9 @@
         .tab-btn:hover { background: var(--card-hover); color: var(--text); }
         .tab-btn.active { background: var(--primary) !important; border-color: var(--primary) !important; color: white !important; }
         
-        .action-buttons-hero { display: flex; gap: 12px; margin-top: 1rem; justify-content: center; }
-        .btn-skip { background: var(--warning); color: white; flex: 1; max-width: 150px; }
-        .btn-eaten { background: var(--success); color: white; flex: 1; max-width: 150px; }
+        .action-buttons-hero { display: flex; flex-direction: column; gap: 8px; margin-top: 1rem; width: 100%; max-width: 280px; margin-left: auto; margin-right: auto; }
+        .btn-eaten { background: var(--success); color: white; width: 100%; max-width: none; }
+        .btn-skip { background: transparent; color: rgba(255,255,255,0.75); border: 1px solid rgba(255,255,255,0.25) !important; width: 100%; max-width: none; font-size: 12px; padding: 7px 16px; }
         .staff-item.skipped { opacity: 0.8; background: rgba(237, 137, 54, 0.1); border-color: var(--warning); }
         .btn-mark-eaten { padding: 6px 12px; font-size: 11px; background: var(--success); color: white; border: none; border-radius: var(--radius-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
         
@@ -299,8 +304,8 @@
         #toast-notification.show { transform: translateX(-50%) translateY(0); opacity: 1; visibility: visible; }
         #toast-notification.success, #toast-notification.error { border-left: none; }
         .toast-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; flex-shrink: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-        .toast-icon.success { background: linear-gradient(135deg, #48bb78, #2f855a); } 
-        .toast-icon.error { background: linear-gradient(135deg, #f56565, #c53030); }
+        .toast-icon.success { background: #2d2d2d; border: 1px solid #444; color: #e8e8e8; box-shadow: none; }
+        .toast-icon.error { background: #fe5c1d; border: 1px solid #d94d18; color: #ffffff; box-shadow: none; }
         #toast-notification span { font-weight: 600; font-size: 13px; color: var(--text); }
 
         @media (max-width: 768px) {
@@ -837,7 +842,7 @@
                             <div class="hero-title" style="display: flex; align-items: center; justify-content: center;">${dishContentHTML}</div>
                             ${extraMealHTML}
                             ${!isPlaceholder ? `<div class="action-buttons-hero">
-                                <button class="btn btn-skip ${isSkipped ? 'active' : ''}" data-action="skip-modal" data-dish="${dish}" data-day="${dayKey}" data-shift="${mainShift}" ${isSkipped || isEaten ? 'disabled' : ''}><i class="fas fa-ban"></i> ${__('skip')}</button>
+                                <button class="btn btn-skip ${isSkipped ? 'active' : ''}" data-action="skip-modal" data-dish="${dish}" data-day="${dayKey}" data-shift="${mainShift}" ${isSkipped || isEaten ? 'disabled' : ''}>${__('skip')} hoặc nhường cho...</button>
                                 <button class="btn btn-eaten ${isEaten ? 'active' : ''}" data-action="eaten" data-day="${dayKey}" ${isEaten ? 'disabled' : ''}><i class="fas fa-check"></i> ${__('eaten')}</button>
                             </div>` : ''}
                         </div>
