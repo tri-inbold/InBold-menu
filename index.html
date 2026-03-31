@@ -129,7 +129,7 @@
         .toggle-group-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); text-align: center; margin-bottom: 0.5rem; }
         .toggle-group { display: flex; padding: 4px; background: rgba(0,0,0,0.2); border-radius: 50px; border: 1px solid var(--border); position: relative; }
         .toggle-option { flex: 1; padding: 8px 0; text-align: center; font-size: 13px; font-weight: 500; color: var(--text-muted); cursor: pointer; border-radius: 40px; transition: all 0.3s ease; position: relative; z-index: 1; }
-        .toggle-option.active { background: var(--card-bg); color: var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-weight: 600; }
+        .toggle-option.active { background: var(--accent); color: #ffffff; box-shadow: 0 2px 5px rgba(0,0,0,0.15); font-weight: 600; }
         .toggle-option:hover:not(.active) { color: var(--text); }
         .card-title { font-size: 16px; font-weight: 600; color: var(--text); }
         @media (min-width: 769px) { .card-title { font-size: 20px; } }
@@ -158,9 +158,8 @@
         .tab-btn.active { background: var(--accent) !important; border-color: var(--accent) !important; color: white !important; }
         
         .action-buttons-hero { display: flex; flex-direction: column; gap: 8px; margin-top: 1rem; width: 100%; max-width: 280px; margin-left: auto; margin-right: auto; }
-        .btn-eaten { background: var(--success); color: white; width: 100%; max-width: none; }
-        .btn-skip { background: transparent; color: rgba(255,255,255,0.75); border: 1px solid rgba(255,255,255,0.25) !important; width: 100%; max-width: none; font-size: 12px; padding: 7px 16px; }
-        .staff-item.skipped { opacity: 0.8; background: rgba(237, 137, 54, 0.1); border-color: var(--warning); }
+        .btn-eaten { background: var(--success); color: white; width: 100%; max-width: none; padding: 14px 20px; font-size: 15px; font-weight: 700; border-radius: var(--radius-md); }
+        .btn-skip { background: transparent; color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.2) !important; width: auto; align-self: center; font-size: 11px; padding: 5px 14px; }        .staff-item.skipped { opacity: 0.8; background: rgba(237, 137, 54, 0.1); border-color: var(--warning); }
         .btn-mark-eaten { padding: 6px 12px; font-size: 11px; background: var(--success); color: white; border: none; border-radius: var(--radius-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
         
         .department-group { margin-bottom: 0.75rem; }
@@ -290,7 +289,7 @@
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
         .close-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; }
         
-        #tab-bar { position: fixed; bottom: 0.75rem; left: 50%; transform: translateX(-50%); background: rgba(30, 41, 59, 0.98); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 20px; padding: 6px; display: flex; gap: 4px; box-shadow: var(--shadow-lg); z-index: 100; width: calc(100% - 1.5rem); max-width: 400px; position: fixed; overflow: hidden; }
+        #tab-bar { position: fixed; bottom: 0.75rem; left: 50%; transform: translateX(-50%); background: var(--card-bg); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 20px; padding: 6px; display: flex; gap: 4px; box-shadow: var(--shadow-lg); z-index: 100; width: calc(100% - 1.5rem); max-width: 400px; }
         @media (min-width: 769px) { #tab-bar { top: 1rem; bottom: auto; border-radius: 24px; padding: 8px; max-width: 500px; } }
         #tab-bar-slider { position: absolute; top: 6px; bottom: 6px; border-radius: 14px; background: var(--accent); transition: left 0.3s cubic-bezier(0.4,0,0.2,1), width 0.3s cubic-bezier(0.4,0,0.2,1); pointer-events: none; z-index: 0; }
         @media (min-width: 769px) { #tab-bar-slider { top: 8px; bottom: 8px; } }
@@ -336,6 +335,9 @@
         .mb-1 { margin-bottom: 0.5rem; } .mb-2 { margin-bottom: 1rem; } .mb-3 { margin-bottom: 1.5rem; }
         .p-3 { padding: 1.5rem; }
         @media (max-width: 768px) { .hide-mobile { display: none; } }
+
+        #main-content { transition: opacity 0.15s ease; }
+        #main-content.fading { opacity: 0; }
     </style>
 </head>
 <body>
@@ -725,8 +727,12 @@
 
         async function render() {
             if (!state.authReady || !state.staffProfile) { hideLoader(); return; }
-            showLoader();
+            const isInitialLoad = !el('main-content').innerHTML.trim();
+            if (isInitialLoad) showLoader();
+            const mainContent = el('main-content');
+            mainContent.classList.add('fading');
             try {
+                await new Promise(r => setTimeout(r, isInitialLoad ? 0 : 100));
                 switch (state.currentTab) {
                     case 'today': await renderToday(); break;
                     case 'menu': await renderMenu(); break;
@@ -735,11 +741,11 @@
                 }
             } catch (error) {
                 console.error('Render error:', error);
-                el('main-content').innerHTML = `<div class="card text-center" style="color: var(--error);"><i class="fas fa-exclamation-circle"></i> Có lỗi xảy ra.</div>`;
+                mainContent.innerHTML = `<div class="card text-center" style="color: var(--error);"><i class="fas fa-exclamation-circle"></i> Có lỗi xảy ra.</div>`;
             }
-            hideLoader();
+            mainContent.classList.remove('fading');
+            if (isInitialLoad) hideLoader();
         }
-
         async function renderToday() {
             const dayKey = getDayKey();
             const firstName = getFirstName(state.staffProfile.name);
