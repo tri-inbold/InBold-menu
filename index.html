@@ -943,7 +943,7 @@
                             const rawM = state.orderSelection[dayKey + '_M'];
                             const rawE = state.orderSelection[dayKey + '_E'];
                             if (rawM && rawE) {
-                                summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish" style="display:flex;flex-direction:column;gap:2px;"><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">Sáng</span>${parseDish(rawM)}</span><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">Chiều</span>${parseDish(rawE)}</span></div></div></li>`;
+                                summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish" style="display:flex;flex-direction:column;gap:2px;"><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">${lblM}</span>${parseDish(rawM)}</span><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">${lblE}</span>${parseDish(rawE)}</span></div></div></li>`;
                             } else if (rawM) {
                                 summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(rawM)}</div></div></li>`;
                             } else if (rawE) {
@@ -2031,7 +2031,7 @@
                     const rawM = state.guestOrderSelection[dayKey + '_M'];
                     const rawE = state.guestOrderSelection[dayKey + '_E'];
                     if (rawM && rawE) {
-                        summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish" style="display:flex;flex-direction:column;gap:2px;"><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">Sáng</span>${parseDish(rawM)}</span><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">Chiều</span>${parseDish(rawE)}</span></div></div></li>`;
+                        summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish" style="display:flex;flex-direction:column;gap:2px;"><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">${lblM}</span>${parseDish(rawM)}</span><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">${lblE}</span>${parseDish(rawE)}</span></div></div></li>`;
                     } else if (rawM) {
                         summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(rawM)}</div></div></li>`;
                     } else if (rawE) {
