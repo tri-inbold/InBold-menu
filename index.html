@@ -842,8 +842,8 @@
                             <div class="hero-title" style="display: flex; align-items: center; justify-content: center;">${dishContentHTML}</div>
                             ${extraMealHTML}
                             ${!isPlaceholder ? `<div class="action-buttons-hero">
-                                <button class="btn btn-skip ${isSkipped ? 'active' : ''}" data-action="skip-modal" data-dish="${dish}" data-day="${dayKey}" data-shift="${mainShift}" ${isSkipped || isEaten ? 'disabled' : ''}>${__('skip')} hoặc nhường cho...</button>
                                 <button class="btn btn-eaten ${isEaten ? 'active' : ''}" data-action="eaten" data-day="${dayKey}" ${isEaten ? 'disabled' : ''}><i class="fas fa-check"></i> ${__('eaten')}</button>
+                                <button class="btn btn-skip ${isSkipped ? 'active' : ''}" data-action="skip-modal" data-dish="${dish}" data-day="${dayKey}" data-shift="${mainShift}" ${isSkipped || isEaten ? 'disabled' : ''}>${__('skip')} hoặc nhường cho...</button>
                             </div>` : ''}
                         </div>
                     </div>`;
