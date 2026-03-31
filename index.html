@@ -13,111 +13,117 @@
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
         
         :root { 
-            /* DARK MODE - Tông Navy sâu */
-            --primary: #fe5c1d; /* Cam nổi bật */
+            --primary: #fe5c1d;
             --primary-dark: #e64a19;
             --primary-light: #ff7d4d;
-            --secondary: #0e9c91; /* Teal */
-            --accent: #0a316d; /* Navy */
+            --secondary: #0e9c91;
+            --accent: #fe5c1d;
             --success: #0e9c91;
             --warning: #fe5c1d;
             --error: #f56565;
-            --dark-bg: #0a316d; /* Nền Navy */
-            --card-bg: #113d7a; /* Card Navy sáng hơn */
-            --card-hover: #1a4b8f;
-            --border: #1e4a8f;
-            --text: #f7f6f0; /* Chữ trắng kem */
-            --text-muted: #bcc8db;
-            --gradient-1: linear-gradient(135deg, #fe5c1d 0%, #ff8c00 100%);
-            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
-            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
-            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
-            --radius-sm: 8px;
-            --radius-md: 12px;
-            --radius-lg: 16px;
+            --dark-bg: #0a316d; 
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --card-hover: rgba(255, 255, 255, 0.1);
+            --border: rgba(232, 229, 212, 0.2);
+            --text: #f7f6f0;
+            --text-muted: #a0aec0;
+            --gradient-1: linear-gradient(135deg, #0a316d 0%, #0e9c91 100%);
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.2);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.3);
+            --radius-sm: 10px;
+            --radius-md: 16px;
+            --radius-lg: 24px;
             --loader-bg: #0a316d;
-            --loader-color: #ffffff;
+            --loader-color: #f7f6f0;
         }
 
         :root[data-theme="light"] {
-            /* LIGHT MODE - Tông Kem & Navy */
-            --dark-bg: #f7f6f0;    /* Nền chính Kem */
-            --card-bg: #ffffff;    /* Card Trắng */
-            --card-hover: #F0ebe9; /* Hover hồng nhạt */
-            --border: #E8E5D4;     /* Viền Beige */
-            --text: #000000;       /* Chữ đen */
-            --text-muted: #666666;
-            --primary: #0a316d;    /* Primary là Navy */
+            --dark-bg: #f7f6f0;
+            --card-bg: #ffffff;
+            --card-hover: #fcfbf7; 
+            --border: #E8E5D4;
+            --text: #0a316d;
+            --text-muted: #718096;
+            --primary: #0a316d;
             --primary-dark: #072552;
-            --primary-light: #154185;
-            --secondary: #0e9c91;  /* Teal */
-            --accent: #fe5c1d;     /* Cam nhấn mạnh */
+            --primary-light: #1c4a8e;
+            --secondary: #0e9c91;
+            --accent: #fe5c1d;
             --success: #0e9c91; 
             --warning: #fe5c1d;
-            --error: #dc2626;
-            --gradient-1: linear-gradient(135deg, #0a316d 0%, #0e9c91 100%);
+            --error: #e53e3e;
+            --gradient-1: linear-gradient(135deg, #0a316d 0%, #1c4a8e 100%);
             --loader-bg: #f7f6f0;
             --loader-color: #0a316d;
         }
 
-        /* Tinh chỉnh đặc thù cho Light Mode */
-        [data-theme="light"] .btn-primary,
-        [data-theme="light"] .nav-item.active,
-        [data-theme="light"] .tab-btn.active,
-        [data-theme="light"] .shift-toggle input[type="radio"]:checked + label { 
-            color: #ffffff !important; 
-            background: #0a316d !important;
+        [data-theme="light"] .btn-primary { 
+            background: var(--primary) !important;
+            box-shadow: 0 4px 12px rgba(10, 49, 109, 0.15);
         }
-        
+
         [data-theme="light"] .btn-skip { 
-            background-color: #fe5c1d !important; 
-            color: #ffffff !important; 
-            border: none !important;
-            box-shadow: 0 4px 10px rgba(254, 92, 29, 0.3);
+            background-color: rgba(254, 92, 29, 0.1) !important; 
+            color: #fe5c1d !important; 
+            border: 1px solid rgba(254, 92, 29, 0.2) !important;
+            font-weight: 600;
         }
-        
+        [data-theme="light"] .btn-skip:hover { background-color: rgba(254, 92, 29, 0.15) !important; }
+
         [data-theme="light"] .btn-eaten,
         [data-theme="light"] .btn-mark-eaten { 
-            background-color: #0e9c91 !important; 
-            color: #ffffff !important; 
-            border: none !important;
-            box-shadow: 0 4px 10px rgba(14, 156, 145, 0.3);
+            background-color: rgba(14, 156, 145, 0.1) !important; 
+            color: #0e9c91 !important; 
+            border: 1px solid rgba(14, 156, 145, 0.2) !important;
+            font-weight: 600;
         }
 
         [data-theme="light"] .hero-card { 
-            background: linear-gradient(135deg, #0a316d 0%, #154185 100%);
-            box-shadow: 0 10px 25px -5px rgba(10, 49, 109, 0.3); 
+            background: linear-gradient(135deg, #0a316d 0%, #0e9c91 100%) !important;
+            border-radius: var(--radius-lg);
+            box-shadow: 0 15px 30px -10px rgba(10, 49, 109, 0.25);
         }
 
-        [data-theme="light"] .form-input, 
-        [data-theme="light"] .form-select, 
-        [data-theme="light"] .search-input { 
-            background: #ffffff !important; 
-            border: 1px solid #E8E5D4 !important; 
-            color: #000000 !important; 
+        [data-theme="light"] .tab-btn { 
+            background: #ffffff; 
+            border: 1px solid var(--border);
+            color: var(--text-muted);
         }
-
-        [data-theme="light"] #tab-bar { 
-            background: rgba(255, 255, 255, 0.95) !important; 
-            border: 1px solid #E8E5D4 !important; 
-        }
-
-        [data-theme="light"] .toggle-option.active { 
-            background: #fe5c1d !important; 
+        [data-theme="light"] .tab-btn.active { 
+            background: var(--primary) !important; 
             color: #ffffff !important; 
-            box-shadow: 0 4px 10px rgba(254, 92, 29, 0.3);
         }
-        
-        [data-theme="light"] .toggle-group { background: #E8E5D4; }
-        
+
+        [data-theme="light"] .toggle-group { background: #E8E5D4; padding: 3px; }
+        [data-theme="light"] .toggle-option.active { 
+            background: #ffffff !important; 
+            color: var(--primary) !important; 
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
         [data-theme="light"] .staff-item {
             background: #ffffff !important;
-            border-bottom: 1px solid #E8E5D4 !important;
+            border: none !important;
+            border-bottom: 1px solid rgba(232, 229, 212, 0.5) !important;
+            margin-bottom: 0;
+            border-radius: 0;
+        }
+        [data-theme="light"] .staff-item:last-child { border-bottom: none !important; }
+
+        [data-theme="light"] #tab-bar { 
+            background: rgba(255, 255, 255, 0.8) !important;
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(232, 229, 212, 0.6) !important;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.03) !important;
         }
 
-        [data-theme="light"] .shift-toggle, 
-        [data-theme="light"] thead { background: #F0ebe9 !important; }
-        
+        [data-theme="light"] .nav-item.needs-attention::after {
+            background: #fe5c1d;
+            box-shadow: 0 0 0 3px rgba(254, 92, 29, 0.2);
+        }
+
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Montserrat', sans-serif; background: var(--dark-bg); color: var(--text); line-height: 1.5; font-size: 14px; }
         #app { max-width: 900px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; padding-bottom: 100px; }
