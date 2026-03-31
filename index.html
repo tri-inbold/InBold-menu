@@ -2409,34 +2409,48 @@
 
             if (classList.contains('speakable-dish')) {
                 const text = dataset.speak;
-                if (text && 'speechSynthesis' in window) {
-                    window.speechSynthesis.cancel();
-                    document.querySelectorAll('.speakable-dish').forEach(el => {
-                        el.style.opacity = '1';
-                        el.dataset.speaking = 'false';
-                    });
-                    
-                    target.style.opacity = '0.5';
-                    target.dataset.speaking = 'true';
-                    
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.lang = 'vi-VN'; 
-                    utterance.rate = 0.55; 
-                    
-                    utterance.onend = () => {
-                        target.style.opacity = '1';
-                        target.dataset.speaking = 'false';
-                    };
-                    
-                    utterance.onerror = () => {
-                        target.style.opacity = '1';
-                        target.dataset.speaking = 'false';
-                    };
-                    
-                    window.speechSynthesis.speak(utterance);
-                } else if (!('speechSynthesis' in window)) {
-                    showToast('Trình duyệt không hỗ trợ đọc văn bản', 'error');
-                }
+                if (!text) return;
+                
+                document.querySelectorAll('.speakable-dish').forEach(el => {
+                    el.style.opacity = '1';
+                    el.dataset.speaking = 'false';
+                });
+                
+                target.style.opacity = '0.5';
+                target.dataset.speaking = 'true';
+
+                const resetUI = () => {
+                    target.style.opacity = '1';
+                    target.dataset.speaking = 'false';
+                };
+
+                if (window.currentAudioTTS) window.currentAudioTTS.pause();
+                if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+
+                const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=vi&client=tw-ob&q=${encodeURIComponent(text)}`;
+                const audio = new Audio(audioUrl);
+                window.currentAudioTTS = audio;
+                audio.playbackRate = 0.9;  // Tốc độ chuẩn 1.0
+                audio.onended = resetUI;
+                audio.onerror = () => {
+                    if ('speechSynthesis' in window) {
+                        const utterance = new SpeechSynthesisUtterance(text);
+                        utterance.lang = 'vi-VN';
+                        utterance.rate = 0.65; // Giọng máy thường nhanh, nên giảm xuống 0.65
+                        utterance.onend = resetUI;
+                        utterance.onerror = resetUI;
+                        window.speechSynthesis.speak(utterance);
+                    } else {
+                        resetUI();
+                        showToast('Không thể phát âm', 'error');
+                    }
+                };
+
+                audio.play().catch(e => {
+                    console.warn("Chuyển sang giọng offline do lỗi play audio:", e);
+                    audio.onerror(); 
+                });
+
                 return;
             }
             else if (classList.contains('nav-item')) {
