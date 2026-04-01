@@ -2554,11 +2554,12 @@
                     const data = { name, email, depart, lan: 'vi' };
                     if (originalKey && originalKey !== newKey) await updateDoc(doc(db, "staff_list", "staffs"), { [originalKey]: deleteField(), [newKey]: data });
                     else await updateDoc(doc(db, "staff_list", "staffs"), { [newKey]: data });
+                    invalidateStore('staff_list/staffs');
                     showToast(originalKey ? 'Đã cập nhật' : 'Đã thêm'); el('personnel-modal').classList.add('hidden'); await renderAdminPersonnel();
                 } catch { showToast(__('error'), 'error'); } finally { hideLoader(); }
             }
             else if (id === 'confirm-delete-personnel-btn') {
-                showLoader(); try { await updateDoc(doc(db, "staff_list", "staffs"), { [state.deleteTarget.key]: deleteField() }); showToast('Đã xóa'); el('delete-personnel-modal').classList.add('hidden'); await renderAdminPersonnel(); } catch { showToast(__('error'), 'error'); } finally { hideLoader(); }
+                showLoader(); try { await updateDoc(doc(db, "staff_list", "staffs"), { [state.deleteTarget.key]: deleteField() }); invalidateStore('staff_list/staffs'); showToast('Đã xóa'); el('delete-personnel-modal').classList.add('hidden'); await renderAdminPersonnel(); } catch { showToast(__('error'), 'error'); } finally { hideLoader(); }
             }
             
             else if (classList.contains('lang-toggle-btn')) {
@@ -3007,7 +3008,7 @@
                             if (affectedUserKeys.length > 0) {
                                 const targetWeeks = getWeeksInMonth(new Date());
                                 await Promise.all(targetWeeks.map(async (weekStr) => {
-                                    const weekDocRef = doc(db, "order_list", weekStr); const weekDoc = await getDocument("order_list", weekStr); invalidateStore(`order_list/${weekString}`);
+                                    const weekDocRef = doc(db, "order_list", weekStr); const weekDoc = await getDocument("order_list", weekStr); invalidateStore(`order_list/${weekStr}`);
                                     if (weekDoc) {
                                         const orderUpdates = {}; let hasUpdate = false;
                                         Object.keys(weekDoc).forEach(userKey => { if (weekDoc[userKey] && typeof weekDoc[userKey] === 'object') { if (weekDoc[userKey].depart === oldName) { orderUpdates[`${userKey}.depart`] = newName; hasUpdate = true; } } });
@@ -3020,6 +3021,7 @@
                     } else {
                         departments.push(newName); departments.sort(); await setDoc(deptDocRef, { list: departments }, { merge: true }); showToast('Đã thêm phòng ban');
                     }
+                    invalidateStore('admin_list/departments', 'staff_list/staffs');
                     el('department-modal').classList.add('hidden'); await renderAdminPersonnel();
                 } catch (err) { console.error(err); showToast('Lỗi: ' + err.message, 'error'); } finally { hideLoader(); }
             }
@@ -3052,6 +3054,7 @@
                             }
                         }));
                     }
+                    invalidateStore('admin_list/departments', 'staff_list/staffs');
                     showToast(`Đã xóa "${oldName}" và chuyển ${affectedUserKeys.length} nhân sự sang "${newName}".`);
                     el('delete-department-modal').classList.add('hidden'); await renderAdminPersonnel();
                 } catch (err) { console.error(err); showToast('Lỗi: ' + err.message, 'error'); } finally { hideLoader(); }
@@ -3077,6 +3080,7 @@
                     if (Object.keys(updates).length > 0) {
                         await updateDoc(doc(db, 'order_list', weekString), updates); 
                         invalidateStore(`order_list/${weekString}`);
+                    }
                     showToast(__('eatenSuccess')); 
                     await render(); 
                 } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); } 
@@ -3091,7 +3095,8 @@
                     const fk = day + '_' + (shiftTag || 'M');
                     const { dish } = parseDishValue(weekDoc[userKey][fk]); 
                     await updateDoc(doc(db, 'order_list', weekString), { [`${userKey}.${fk}`]: `eaten: ${dish}` }); 
-                    const updatedDoc = await getDocument('order_list', weekString); 
+                    invalidateStore(`order_list/${weekString}`);
+                    const updatedDoc = await getDocument('order_list', weekString);
                     showToast(__('eatenSuccess')); 
                     updateStaffListView(updatedDoc); 
                 } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); } 
