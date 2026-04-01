@@ -497,6 +497,7 @@
         const SUPPORT_EMAIL = 'truc.tran@inbold.com'; // email người hỗ trợ
 
         const state = {
+            _store: {},
             isEditingMenu: false,
             personnelViewMode: 'staff',
             adminMenuTab: 'this',
@@ -720,10 +721,20 @@
             }, 1750);
         };
 
-        async function getDocument(collection, documentId) {
+        async function getDocument(collection, documentId, { forceRefresh = false } = {}) {
+            const key = `${collection}/${documentId}`;
+            if (!forceRefresh && state._store.hasOwnProperty(key)) {
+                return state._store[key];
+            }
             const docRef = doc(db, collection, documentId);
             const docSnap = await getDoc(docRef);
-            return docSnap.exists() ? docSnap.data() : null;
+            const data = docSnap.exists() ? docSnap.data() : null;
+            state._store[key] = data;
+            return data;
+        }
+        
+        function invalidateStore(...keys) {
+            keys.forEach(key => delete state._store[key]);
         }
 
         async function render() {
@@ -2491,10 +2502,13 @@
                 return;
             }
             else if (classList.contains('nav-item')) {
+                const newTab = dataset.tab;
+                if (state.currentTab === newTab) return; // không re-fetch
                 document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
                 target.classList.add('active');
                 updateNavSlider();
-                state.currentTab = dataset.tab; await render();
+                state.currentTab = newTab;
+                await render();
             }
             else if (dataset.subtab) { state.adminSubTab = dataset.subtab; await renderAdmin(); return; }
 
@@ -2772,7 +2786,7 @@
                     });
                     
                     await setDoc(doc(db, 'order_list', targetWeek), payload, { merge: true });
-                    
+                    invalidateStore(`order_list/${targetWeek}`);
                     showToast(__('orderSuccess')); 
                     state.orderSelection = {};
                     state.orderShiftSelection = {};
@@ -2877,6 +2891,7 @@
                     });
 
                     await setDoc(doc(db, 'order_list', weekStr), payload, { merge: true });
+                    invalidateStore(`order_list/${weekStr}`);
                     
                     showToast(`Đã cập nhật thực đơn (${weekType === 'this' ? 'Tuần này' : 'Tuần sau'})`);
                     await renderAdminSupport();
@@ -2926,6 +2941,8 @@
                         await updateDoc(doc(db, 'order_list', weekStr), {
                             [userKey]: deleteField()
                         });
+                        invalidateStore(`order_list/${weekStr}`);
+                        
                         showToast('Đã xóa toàn bộ đơn đặt hàng.');
                     } else {
 
@@ -3054,7 +3071,7 @@
                             updates[`${userKey}.${fk}`] = `eaten: ${dish}`;
                         }
                     });
-                    if (Object.keys(updates).length > 0) await updateDoc(doc(db, 'order_list', weekString), updates);
+                    if (Object.keys(updates).length > 0) await updateDoc(doc(db, 'order_list', weekString), updates); invalidateStore(`order_list/${weekString}`);
                     showToast(__('eatenSuccess')); 
                     await render(); 
                 } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); } 
@@ -3155,6 +3172,7 @@
                     await setDoc(doc(db, 'order_list', targetWeekString), { 
                         [state.reopenTarget.key]: { order: 'reopen', name: state.reopenTarget.name } 
                     }, { merge: true }); 
+                    invalidateStore(`order_list/${targetWeekString}`);
                     
                     showToast(__('reopenSuccess')); 
                     el('reopen-order-modal').classList.add('hidden'); 
@@ -3202,6 +3220,7 @@
                     }
 
                     await setDoc(doc(db, 'order_list', weekStr), { menu: newMenu }, { merge: true });
+                    invalidateStore(`order_list/${weekStr}`);
 
                     const updates = {};
                     const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
