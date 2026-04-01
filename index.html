@@ -503,7 +503,6 @@
             currentUser: null, staffProfile: null, isAdmin: false,
             currentTab: 'today', adminSubTab: 'stats', authReady: false,
             menuFilterMode: 'auto', orderSelection: {},
-            // orderShiftSelection[dayKey] = 'M' | 'E' | 'both'
             orderShiftSelection: {},
             currentOrderDay: 'mon',
             guestCurrentOrderDay: 'mon', guestShiftSelection: {},
@@ -875,7 +874,9 @@
             const lblM = (state.staffProfile?.lan || 'vi').startsWith('en') ? 'Morning' : 'Sáng';
             const lblE = (state.staffProfile?.lan || 'vi').startsWith('en') ? 'Evening' : 'Chiều';
             
-            const isCurrentWeekPeriod = (dayOfWeek >= 1 && dayOfWeek <= 3) || (dayOfWeek === 4 && hour < 15);
+            //const isCurrentWeekPeriod = (dayOfWeek >= 1 && dayOfWeek <= 3) || (dayOfWeek === 4 && hour < 15);
+            const isCurrentWeekPeriod = (dayOfWeek >= 1 && dayOfWeek < 3) || (dayOfWeek === 3 && hour < 12);
+
             const currentWeekString = getWeekString(today);
             const nextWeekString = getWeekString(new Date(today.getTime() + 7 * 86400000));
             
@@ -1424,8 +1425,9 @@
             const thisWeekStr = getWeekString(today);
             const nextWeekStr = getWeekString(new Date(today.getTime() + 7 * 86400000));
         
-            const isNextWeekOpen = (currentDayIdx === 4 && currentHour >= 15) || currentDayIdx === 5 || currentDayIdx === 6 || currentDayIdx === 0;
-        
+            //const isNextWeekOpen = (currentDayIdx === 4 && currentHour >= 15) || currentDayIdx === 5 || currentDayIdx === 6 || currentDayIdx === 0;
+            const isNextWeekOpen = (currentDayIdx === 3 && currentHour >= 12) || currentDayIdx === 4 || currentDayIdx === 5 || currentDayIdx === 6 || currentDayIdx === 0;
+
             const [allStaff, thisWeekDoc, nextWeekDoc] = await Promise.all([
                 getDocument("staff_list", "staffs"), 
                 getDocument('order_list', thisWeekStr),
@@ -1636,12 +1638,11 @@
         };
         async function renderStatsContent() {
             const statsContent = el('stats-content');
-            const headers = { ordered: `<i class="fas fa-list-ul" title="${__('ordered')}"></i>`, eaten: `<i class="fas fa-check" title="${__('eaten')}"></i>`, notEaten: `<i class="fas fa-xmark" title="${__('notEaten')}"></i>` };
+            const hStyle = 'style="font-size: 8.5px; text-align: center; width: 55px;"';
             
             if (state.statsViewMode === 'day') {
                 const dayKey = getDayKey(state.statsViewDate);
                 const weekStr = getWeekString(state.statsViewDate);
-                
                 const weekDoc = await getDocument('order_list', weekStr);
                 
                 if (!weekDoc) { 
@@ -1680,7 +1681,12 @@
                 const createTable = (data, name) => {
                     if (Object.keys(data).length === 0) return '';
                     const totals = Object.values(data).reduce((acc, curr) => ({ordered: acc.ordered + curr.ordered, eaten: acc.eaten + curr.eaten, notEaten: acc.notEaten + curr.notEaten}), {ordered: 0, eaten: 0, notEaten: 0});
-                    return `<div class="table-wrapper"><table><thead><tr><th>${name}</th><th>${headers.ordered}</th><th>${headers.eaten}</th><th>${headers.notEaten}</th></tr></thead><tbody>${Object.entries(data).map(([dish, d]) => `<tr><td>${dish}</td><td>${d.ordered}</td><td>${d.eaten}</td><td>${d.notEaten}</td></tr>`).join('')}<tr style="font-weight:600;background:rgba(102,126,234,0.1)"><td>${__('total')}</td><td>${totals.ordered}</td><td>${totals.eaten}</td><td>${totals.notEaten}</td></tr></tbody></table></div>`;
+                    return `<div class="table-wrapper"><table><thead><tr>
+                        <th style="font-size: 8.5px;">${name}</th>
+                        <th ${hStyle}>Đã đặt</th>
+                        <th ${hStyle}>Đã ăn</th>
+                        <th ${hStyle}>Chưa ăn</th>
+                    </tr></thead><tbody>${Object.entries(data).map(([dish, d]) => `<tr><td>${dish}</td><td class="text-center">${d.ordered}</td><td class="text-center">${d.eaten}</td><td class="text-center">${d.notEaten}</td></tr>`).join('')}<tr style="font-weight:600;background:rgba(102,126,234,0.1)"><td>${__('total')}</td><td class="text-center">${totals.ordered}</td><td class="text-center">${totals.eaten}</td><td class="text-center">${totals.notEaten}</td></tr></tbody></table></div>`;
                 };
                 
                 statsContent.innerHTML = createTable(stats.morning, __('morning')) + createTable(stats.evening, __('evening'));
@@ -1714,9 +1720,14 @@
                 }
                 if (Object.keys(departStats).length === 0) { statsContent.innerHTML = `<p class="text-center text-muted p-3">${__('noData')}</p>`; return; }
                 const totals = Object.values(departStats).reduce((acc, curr) => ({ordered: acc.ordered + curr.ordered, eaten: acc.eaten + curr.eaten, notEaten: acc.notEaten + curr.notEaten}), {ordered: 0, eaten: 0, notEaten: 0});
-                statsContent.innerHTML = `<div class="table-wrapper"><table><thead><tr><th>${__('department')}</th><th>${headers.ordered}</th><th>${headers.eaten}</th><th>${headers.notEaten}</th></tr></thead><tbody>${Object.entries(departStats).map(([dep, d]) => `<tr><td>${dep}</td><td>${d.ordered}</td><td>${d.eaten}</td><td>${d.notEaten}</td></tr>`).join('')}<tr style="font-weight:600;background:rgba(102,126,234,0.1)"><td>${__('total')}</td><td>${totals.ordered}</td><td>${totals.eaten}</td><td>${totals.notEaten}</td></tr></tbody></table></div>`;
+                statsContent.innerHTML = `<div class="table-wrapper"><table><thead><tr>
+                    <th style="font-size: 8.5px;">${__('department')}</th>
+                    <th ${hStyle}>Đã đặt</th>
+                    <th ${hStyle}>Đã ăn</th>
+                    <th ${hStyle}>Chưa ăn</th>
+                </tr></thead><tbody>${Object.entries(departStats).map(([dep, d]) => `<tr><td>${dep}</td><td class="text-center">${d.ordered}</td><td class="text-center">${d.eaten}</td><td class="text-center">${d.notEaten}</td></tr>`).join('')}<tr style="font-weight:600;background:rgba(102,126,234,0.1)"><td>${__('total')}</td><td class="text-center">${totals.ordered}</td><td class="text-center">${totals.eaten}</td><td class="text-center">${totals.notEaten}</td></tr></tbody></table></div>`;
             }
-        }        
+        }
         async function renderAdminMenu() {
             const today = new Date();
             const thisWeekStr = getWeekString(today);
@@ -2099,7 +2110,9 @@
             const hour = today.getHours();
             const userEmailKey = emailToKey(state.currentUser.email);
             
-            const isCurrentWeekPeriod = (dayOfWeek >= 1 && dayOfWeek <= 3) || (dayOfWeek === 4 && hour < 15);
+            //const isCurrentWeekPeriod = (dayOfWeek >= 1 && dayOfWeek <= 3) || (dayOfWeek === 4 && hour < 15);
+            const isCurrentWeekPeriod = (dayOfWeek >= 1 && dayOfWeek < 3) || (dayOfWeek === 3 && hour < 12);
+
             const checkWeekString = isCurrentWeekPeriod ? getWeekString(today) : getWeekString(new Date(today.getTime() + 7 * 86400000));
             const weekDoc = await getDocument('order_list', checkWeekString);
             const userData = weekDoc && weekDoc[userEmailKey];
@@ -2460,7 +2473,7 @@
 
                     const utterance = new SpeechSynthesisUtterance(text);
                     utterance.lang = 'vi-VN';
-                    utterance.rate = 0.5; // Tốc độ đọc)
+                    utterance.rate = 0.5; // Tốc độ đọc
                     utterance.pitch = 0.8; // Cao độ
 
                     utterance.onend = resetUI;
@@ -2672,7 +2685,10 @@
                     } else {
                         const dayOfWeek = today.getDay(); 
                         const hour = today.getHours();
-                        const canOrderNextWeek = (dayOfWeek === 4 && hour >= 15) || dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0;
+                        
+                        //const canOrderNextWeek = (dayOfWeek === 4 && hour >= 15) || dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0;
+                        const canOrderNextWeek = (dayOfWeek === 3 && hour >= 12) || dayOfWeek === 4 || dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0;
+                        
                         targetWeek = canOrderNextWeek ? getWeekString(new Date(today.getTime() + 7 * 86400000)) : getWeekString(today);
                     }
                     
@@ -3200,8 +3216,6 @@
                                 if (!rawValue) return;
 
                                 const parsed = parseDishValue(rawValue);
-                                if (parsed.status === 'eaten') return;
-
                                 const oldDishName = parsed.dish;
                                 const oldDayMenu = oldMenu[day] || [];
                                 
