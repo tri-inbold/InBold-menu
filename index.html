@@ -7,7 +7,7 @@
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js">
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js">
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js">
-    <link rel="icon" href="data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3e%3cpath fill='%23000000' d='M63.9 14.4C63.1 6.2 56.2 0 48 0s-15.1 6.2-16 14.3L17.9 149.7c-1.3 6-1.9 12.1-1.9 18.2 0 45.9 35.1 83.6 80 87.7L96 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-224.4c44.9-4.1 80-41.8 80-87.7 0-6.1-.6-12.2-1.9-18.2L223.9 14.3C223.1 6.2 216.2 0 208 0s-15.1 6.2-15.9 14.4L178.5 149.9c-.6 5.7-5.4 10.1-11.1 10.1-5.8 0-10.6-4.4-11.2-10.2L143.9 14.6C143.2 6.3 136.3 0 128 0s-15.2 6.3-15.9 14.6L99.8 149.8c-.5 5.8-5.4 10.2-11.2 10.2-5.8 0-10.6-4.4-11.1-10.1L63.9 14.4zM448 0C432 0 320 32 320 176l0 112c0 35.3 28.7 64 64 64l32 0 0 128c0 17.7 14.3 32 32 32s32-14.3 32-32l0-448c0-17.7-14.3-32-32-32z'/%3e%3c/svg%3e">
+    <link rel="icon" href="data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3e%3cpath fill='%23fe5c1d' d='M63.9 14.4C63.1 6.2 56.2 0 48 0s-15.1 6.2-16 14.3L17.9 149.7c-1.3 6-1.9 12.1-1.9 18.2 0 45.9 35.1 83.6 80 87.7L96 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-224.4c44.9-4.1 80-41.8 80-87.7 0-6.1-.6-12.2-1.9-18.2L223.9 14.3C223.1 6.2 216.2 0 208 0s-15.1 6.2-15.9 14.4L178.5 149.9c-.6 5.7-5.4 10.1-11.1 10.1-5.8 0-10.6-4.4-11.2-10.2L143.9 14.6C143.2 6.3 136.3 0 128 0s-15.2 6.3-15.9 14.6L99.8 149.8c-.5 5.8-5.4 10.2-11.2 10.2-5.8 0-10.6-4.4-11.1-10.1L63.9 14.4zM448 0C432 0 320 32 320 176l0 112c0 35.3 28.7 64 64 64l32 0 0 128c0 17.7 14.3 32 32 32s32-14.3 32-32l0-448c0-17.7-14.3-32-32-32z'/%3e%3c/svg%3e">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
@@ -506,6 +506,7 @@
             menuFilterMode: 'auto', orderSelection: {},
             orderShiftSelection: {},
             currentOrderDay: 'mon',
+            weekDefaultShift: 'M',
             guestCurrentOrderDay: 'mon', guestShiftSelection: {},
             reopenTarget: { key: null, name: null, weekStr: null }, deleteTarget: { key: null, name: null },
             statsViewMode: 'day', statsViewDate: new Date(), guestOrderSelection: {},
@@ -978,16 +979,17 @@
         }
 
         function buildShiftPickerHTML(dayKey, prefix = 'user') {
-            const sh = state.orderShiftSelection[dayKey] || 'M';
+            const isEn = (state.staffProfile?.lan || 'vi').startsWith('en');
+            const sh = state.orderShiftSelection[dayKey] || state.weekDefaultShift || 'M';
             return `<div style="display:flex; gap:6px; margin-bottom:12px; background:var(--card-bg); padding:4px; border-radius:8px; border:1px solid var(--border);">
-                <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="M" style="flex:1;padding:8px 4px;border-radius:6px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${sh==='M'?'var(--primary)':'transparent'};color:${sh==='M'?'white':'var(--text-muted)'};">Ca Sáng</button>
-                <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="E" style="flex:1;padding:8px 4px;border-radius:6px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${sh==='E'?'var(--primary)':'transparent'};color:${sh==='E'?'white':'var(--text-muted)'};">Ca Chiều</button>
-                <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="both" style="flex:1;padding:8px 4px;border-radius:6px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${sh==='both'?'var(--primary)':'transparent'};color:${sh==='both'?'white':'var(--text-muted)'};">Hai ca</button>
+                <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="M" style="flex:1;padding:8px 4px;border-radius:6px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${sh==='M'?'var(--accent)':'transparent'};color:${sh==='M'?'#ffffff':'var(--text-muted)'};">${isEn ? 'Morning' : 'Ca Sáng'}</button>
+                <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="E" style="flex:1;padding:8px 4px;border-radius:6px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${sh==='E'?'var(--accent)':'transparent'};color:${sh==='E'?'#ffffff':'var(--text-muted)'};">${isEn ? 'Evening' : 'Ca Chiều'}</button>
+                <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="both" style="flex:1;padding:8px 4px;border-radius:6px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all 0.2s;background:${sh==='both'?'var(--accent)':'transparent'};color:${sh==='both'?'#ffffff':'var(--text-muted)'};">${isEn ? 'Both' : 'Hai ca'}</button>
             </div>`;
         }
 
-
         function buildOrderFormHTML(menu, targetWeekString, isReopen, currentDayIndex = 0, existingUserOrder = {}) {
+            const isEn = (state.staffProfile?.lan || 'vi').startsWith('en');
             const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
             const dayMap = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5 };
             const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
@@ -1026,14 +1028,14 @@
                             daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item ${dish === sel ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="${sh}"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
                         } else {
                             if (!selM) {
-                                daysContentHTML += `<div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">Ca Sáng</div>`;
+                                daysContentHTML += `<div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">${isEn ? 'Morning' : 'Ca Sáng'}</div>`;
                                 daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="M"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
                             } else {
                                 daysContentHTML += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(102,126,234,0.08);border-radius:8px;margin-bottom:10px;border:1px solid rgba(102,126,234,0.2);">
-                                    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:2px;">Ca Sáng</span><span style="font-size:14px;font-weight:500;">${parseDish(selM)}</span></div>
-                                    <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="both" data-clear-m="1" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;">Đổi</button>
+                                    <div><span style="font-size:11px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:2px;">${isEn ? 'Morning' : 'Ca Sáng'}</span><span style="font-size:14px;font-weight:500;">${parseDish(selM)}</span></div>
+                                    <button class="shift-pick-btn" data-shift-day="${dayKey}" data-shift-val="both" data-clear-m="1" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;">${isEn ? 'Change' : 'Đổi'}</button>
                                 </div>`;
-                                daysContentHTML += `<div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">Ca Chiều</div>`;
+                                daysContentHTML += `<div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">${isEn ? 'Evening' : 'Ca Chiều'}</div>`;
                                 daysContentHTML += `<div class="order-dish-list">${dishes.map(dish => `<div class="order-dish-item ${dish === selE ? 'selected' : ''}" data-dish="${dish}" data-day-key="${dayKey}" data-shift-key="E"><div class="order-dish-name">${parseDish(dish)}</div></div>`).join('')}</div>`;
                             }
                         }
@@ -2670,7 +2672,8 @@
             else if (id === 'reset-order-btn') {
                 state.orderSelection = {};
                 state.orderShiftSelection = {};
-                
+                state._weekDefaultShiftSet = false;
+                state.weekDefaultShift = 'M';
                 const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
                 const dayMap = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5 };
                 
@@ -2793,6 +2796,9 @@
                     showToast(__('orderSuccess')); 
                     state.orderSelection = {};
                     state.orderShiftSelection = {};
+                    state._weekDefaultShiftSet = false;
+                    state.weekDefaultShift = 'M';
+                    
                     state.currentOrderDay = 'mon'; 
                     state.reopenTargetWeek = null; 
                     state.reopenIsCurrentWeek = false;
@@ -3104,6 +3110,10 @@
             else if (classList.contains('shift-pick-btn')) {
                 const { shiftDay, shiftVal, clearM } = dataset;
                 state.orderShiftSelection[shiftDay] = shiftVal;
+                if (!state._weekDefaultShiftSet) {
+                    state.weekDefaultShift = shiftVal;
+                    state._weekDefaultShiftSet = true;
+                }
                 if (clearM === '1') {
                     delete state.orderSelection[shiftDay + '_M'];
                 } else {
