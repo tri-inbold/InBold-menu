@@ -1009,7 +1009,7 @@
             for (const dayKey of dayKeys) {
                 const isPast = isReopen && (dayMap[dayKey] < currentDayIndex);
                 const dishes = menu[dayKey] || [];
-                const sh = state.orderShiftSelection[dayKey] || 'M';
+                const sh = state.orderShiftSelection[dayKey] || state.weekDefaultShift || 'M';
                 const selM = state.orderSelection[dayKey + '_M'];
                 const selE = state.orderSelection[dayKey + '_E'];
 
@@ -2651,10 +2651,11 @@
             }
             else if (classList.contains('order-dish-item') && !classList.contains('guest-dish-item')) {
                 const { dayKey, dish, shiftKey } = dataset;
-                const sh = shiftKey || (state.orderShiftSelection[dayKey] || 'M');
+                const effectiveDefault = state.weekDefaultShift || 'M';
+                const sh = shiftKey || (state.orderShiftSelection[dayKey] || effectiveDefault);
                 state.orderSelection[dayKey + '_' + sh] = dish;
                 
-                const curSh = state.orderShiftSelection[dayKey] || 'M';
+                const curSh = state.orderShiftSelection[dayKey] || effectiveDefault;
                 const doneM = curSh !== 'E' ? !!state.orderSelection[dayKey + '_M'] : true;
                 const doneE = curSh !== 'M' ? !!state.orderSelection[dayKey + '_E'] : true;
                 if (doneM && doneE) {
