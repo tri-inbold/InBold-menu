@@ -1127,7 +1127,7 @@
                 const fieldKey = day + '_' + (shiftTag || 'M');
                 const newStatus = `giveup[${receiverName}]`;
                 await updateDoc(doc(db, 'order_list', weekString), { [`${userKey}.${fieldKey}`]: `${newStatus}: ${dish}` });
-                
+                invalidateStore(`order_list/${weekString}`);
                 showToast(__('skipSuccess')); 
                 el('skip-receiver-input').value = '';
                 await render();
@@ -2410,10 +2410,12 @@
                     const finalData = { ...newStaffData, ...guests };
                     
                     await setDoc(doc(db, "staff_list", "staffs"), finalData);
-        
+                    invalidateStore('staff_list/staffs');
+
                     const sortedDepartments = Array.from(newDepartmentsSet).sort();
                     await setDoc(doc(db, "admin_list", "departments"), { list: sortedDepartments });
-        
+                    invalidateStore('admin_list/departments');
+
                     showToast(`Đã nhập ${count} nhân viên và cập nhật ${sortedDepartments.length} phòng ban.`, 'success');
                     
                     await renderAdminPersonnel();
@@ -2967,6 +2969,7 @@
                     const { giverKey, day, dish, shift: shiftTag } = dataset; 
                     const fieldKey = day + '_' + (shiftTag || 'M');
                     await updateDoc(doc(db, 'order_list', weekString), { [`${giverKey}.${fieldKey}`]: `eaten: ${dish}` }); 
+                    invalidateStore(`order_list/${weekString}`);
                     showToast('Đã xác nhận ăn món được nhường!'); 
                     await render(); 
                 } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); }
@@ -3004,7 +3007,7 @@
                             if (affectedUserKeys.length > 0) {
                                 const targetWeeks = getWeeksInMonth(new Date());
                                 await Promise.all(targetWeeks.map(async (weekStr) => {
-                                    const weekDocRef = doc(db, "order_list", weekStr); const weekDoc = await getDocument("order_list", weekStr);
+                                    const weekDocRef = doc(db, "order_list", weekStr); const weekDoc = await getDocument("order_list", weekStr); invalidateStore(`order_list/${weekString}`);
                                     if (weekDoc) {
                                         const orderUpdates = {}; let hasUpdate = false;
                                         Object.keys(weekDoc).forEach(userKey => { if (weekDoc[userKey] && typeof weekDoc[userKey] === 'object') { if (weekDoc[userKey].depart === oldName) { orderUpdates[`${userKey}.depart`] = newName; hasUpdate = true; } } });
@@ -3071,7 +3074,9 @@
                             updates[`${userKey}.${fk}`] = `eaten: ${dish}`;
                         }
                     });
-                    if (Object.keys(updates).length > 0) await updateDoc(doc(db, 'order_list', weekString), updates); invalidateStore(`order_list/${weekString}`);
+                    if (Object.keys(updates).length > 0) {
+                        await updateDoc(doc(db, 'order_list', weekString), updates); 
+                        invalidateStore(`order_list/${weekString}`);
                     showToast(__('eatenSuccess')); 
                     await render(); 
                 } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); } 
@@ -3086,8 +3091,8 @@
                     const fk = day + '_' + (shiftTag || 'M');
                     const { dish } = parseDishValue(weekDoc[userKey][fk]); 
                     await updateDoc(doc(db, 'order_list', weekString), { [`${userKey}.${fk}`]: `eaten: ${dish}` }); 
-                    showToast(__('eatenSuccess')); 
                     const updatedDoc = await getDocument('order_list', weekString); 
+                    showToast(__('eatenSuccess')); 
                     updateStaffListView(updatedDoc); 
                 } catch (err) { console.error(err); showToast(__('error'), 'error'); } finally { hideLoader(); } 
             }
@@ -3152,6 +3157,7 @@
                         payload[guestKey][fk] = `${prefix}${dishName}`; 
                     } 
                     await setDoc(doc(db, 'order_list', targetWeek), payload, { merge: true }); 
+                    invalidateStore(`order_list/${targetWeek}`);
                     showToast(`${__('orderSuccess')} cho khách ${guestName}`); 
                     state.guestOrderSelection = {}; state.guestShiftSelection = {};
                     el('guest-order-modal').classList.add('hidden'); 
