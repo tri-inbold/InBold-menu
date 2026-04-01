@@ -945,7 +945,7 @@
                 } 
                 else {
                     const allSelected = dayKeys.every(day => {
-                        const sh = state.orderShiftSelection[day] || 'M';
+                        const sh = state.orderShiftSelection[day] || state.weekDefaultShift || 'M';
                         if (sh === 'both') return state.orderSelection[day + '_M'] && state.orderSelection[day + '_E'];
                         return state.orderSelection[day + '_' + sh];
                     });
@@ -956,15 +956,15 @@
                             const rawM = state.orderSelection[dayKey + '_M'];
                             const rawE = state.orderSelection[dayKey + '_E'];
                             if (rawM && rawE) {
-                                summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[key]}</div><div class="staff-dish" style="display:flex;flex-direction:column;gap:2px;"><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">${lblM}</span>${parseDish(rawM)}</span><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">${lblE}</span>${parseDish(rawE)}</span></div></div></li>`;
+                                summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish" style="display:flex;flex-direction:column;gap:2px;"><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">${lblM}</span>${parseDish(rawM)}</span><span><span style="font-size:11px;color:var(--text-muted);margin-right:4px;">${lblE}</span>${parseDish(rawE)}</span></div></div></li>`;
                             } else if (rawM) {
                                 summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(rawM)}</div></div></li>`;
                             } else if (rawE) {
                                 summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(rawE)}</div></div></li>`;
                             }
                         }
-                        htmlContent += summaryHTML + `</ul><button id="reset-order-btn" class="btn btn-secondary btn-block mt-3"><i class="fas fa-undo"></i> Đặt lại từ đầu</button><button id="submit-order-btn" class="btn btn-primary btn-block mt-1"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;                    
-                        } else {
+                        htmlContent += summaryHTML + `</ul><button id="reset-order-btn" class="btn btn-secondary btn-block mt-3"><i class="fas fa-undo"></i> Đặt lại từ đầu</button><button id="submit-order-btn" class="btn btn-primary btn-block mt-1"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;
+                    } else {
                         const menu = nextWeekDoc ? nextWeekDoc.menu : null;
                         if (!menu) { 
                             htmlContent += `<div class="card text-center"><p class="text-muted">${__('noMenu')}</p></div>`; 
