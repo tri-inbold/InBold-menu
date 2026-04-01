@@ -950,8 +950,8 @@
                                 summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${parseDish(rawE)}</div></div></li>`;
                             }
                         }
-                        htmlContent += summaryHTML + `</ul><button id="submit-order-btn" class="btn btn-primary btn-block mt-3"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;
-                    } else {
+                        htmlContent += summaryHTML + `</ul><button id="reset-order-btn" class="btn btn-secondary btn-block mt-3"><i class="fas fa-undo"></i> Đặt lại từ đầu</button><button id="submit-order-btn" class="btn btn-primary btn-block mt-1"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;                    
+                        } else {
                         const menu = nextWeekDoc ? nextWeekDoc.menu : null;
                         if (!menu) { 
                             htmlContent += `<div class="card text-center"><p class="text-muted">${__('noMenu')}</p></div>`; 
@@ -1086,7 +1086,7 @@
                         summaryHTML += `<li class="staff-item summary-list-item"><div class="staff-details"><div class="staff-name">${dayNames[dayKey]}</div><div class="staff-dish">${e}</div></div></li>`;
                     }
                 }
-                summaryHTML += `</ul><button id="submit-reopen-order-btn" class="btn btn-primary btn-block mt-3"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;
+                summaryHTML += `</ul><button id="reset-order-btn" class="btn btn-secondary btn-block mt-3" data-is-reopen="1"><i class="fas fa-undo"></i> Đặt lại từ đầu</button><button id="submit-reopen-order-btn" class="btn btn-primary btn-block mt-1"><i class="fas fa-check"></i> ${__('complete')}</button></div>`;
                 container.innerHTML = summaryHTML;
                 return;
             }
@@ -2455,32 +2455,25 @@
                     target.dataset.speaking = 'false';
                 };
 
-                if (window.currentAudioTTS) window.currentAudioTTS.pause();
-                if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
 
-                const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=vi&client=tw-ob&q=${encodeURIComponent(text)}`;
-                const audio = new Audio(audioUrl);
-                window.currentAudioTTS = audio;
-                audio.playbackRate = 0.9;  // Tốc độ chuẩn 1.0
-                audio.onended = resetUI;
-                audio.onerror = () => {
-                    if ('speechSynthesis' in window) {
-                        const utterance = new SpeechSynthesisUtterance(text);
-                        utterance.lang = 'vi-VN';
-                        utterance.rate = 0.65; // Giọng máy thường nhanh, nên giảm xuống 0.65
-                        utterance.onend = resetUI;
-                        utterance.onerror = resetUI;
-                        window.speechSynthesis.speak(utterance);
-                    } else {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'vi-VN';
+                    utterance.rate = 0.5; // Tốc độ đọc)
+                    utterance.pitch = 0.8; // Cao độ
+
+                    utterance.onend = resetUI;
+                    utterance.onerror = (event) => {
+                        console.error('SpeechSynthesis Error:', event);
                         resetUI();
-                        showToast('Không thể phát âm', 'error');
-                    }
-                };
+                    };
 
-                audio.play().catch(e => {
-                    console.warn("Chuyển sang giọng offline do lỗi play audio:", e);
-                    audio.onerror(); 
-                });
+                    window.speechSynthesis.speak(utterance);
+                } else {
+                    resetUI();
+                    showToast('Trình duyệt của bạn không hỗ trợ phát âm (Voice API)', 'error');
+                }
 
                 return;
             }
@@ -2643,6 +2636,28 @@
                 } else {
                     renderOrderSection(el('order-section-container'));
                 }
+            }
+            else if (id === 'reset-order-btn') {
+                state.orderSelection = {};
+                state.orderShiftSelection = {};
+                
+                const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
+                const dayMap = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5 };
+                
+                if (dataset.isReopen === '1') {
+                    if (state.reopenIsCurrentWeek) {
+                        const today = new Date();
+                        const currentDayIndex = today.getDay();
+                        const firstAvailable = dayKeys.find(d => dayMap[d] >= currentDayIndex);
+                        state.currentOrderDay = firstAvailable || 'mon';
+                    } else {
+                        state.currentOrderDay = 'mon';
+                    }
+                } else {
+                    state.currentOrderDay = 'mon';
+                }
+                await render();
+                showToast('Đã xóa các lựa chọn tạm thời', 'info');
             }
             else if (id === 'submit-order-btn' || id === 'submit-reopen-order-btn') {
                 showLoader();
@@ -3153,59 +3168,65 @@
                 try {
                     const weekStr = dataset.week;
                     const weekKey = dataset.weektype;
+                    
                     const weekDoc = await getDocument('order_list', weekStr) || {};
                     const oldMenu = weekDoc.menu || {};
-                    const menuToSave = {};
-
+                    
+                    const newMenu = {};
                     for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
                         const existingInputs = document.querySelectorAll(`.menu-existing-dish[data-week="${weekKey}"][data-day="${day}"]`);
                         const existingDishes = Array.from(existingInputs).map(i => i.value.trim()).filter(Boolean);
                         const newDishes = Array.from(document.querySelectorAll(`.menu-dish-textarea[data-week="${weekKey}"][data-day="${day}"]`)).map(t => t.value.trim()).filter(Boolean);
                         const combined = [...existingDishes, ...newDishes];
-                        if (combined.length > 0 && !combined.some(d => d.toLowerCase().includes('không đặt cơm'))) combined.push('Không đặt cơm | No order');
-                        menuToSave[day] = combined;
+                        
+                        if (combined.length > 0 && !combined.some(d => d.toLowerCase().includes('không đặt cơm'))) {
+                            combined.push('Không đặt cơm | No order');
+                        }
+                        newMenu[day] = combined;
                     }
 
-                    const removedByDay = {};
-                    for (const day of ['mon', 'tue', 'wed', 'thu', 'fri']) {
-                        const oldDishes = (oldMenu[day] || []).filter(d => !d.toLowerCase().includes('không đặt cơm'));
-                        const newDishes = (menuToSave[day] || []).filter(d => !d.toLowerCase().includes('không đặt cơm'));
-                        const removed = oldDishes.filter(d => !newDishes.includes(d));
-                        if (removed.length > 0) removedByDay[day] = removed;
-                    }
+                    await setDoc(doc(db, 'order_list', weekStr), { menu: newMenu }, { merge: true });
 
-                    await setDoc(doc(db, 'order_list', weekStr), { menu: menuToSave }, { merge: true });
+                    const updates = {};
+                    const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
 
-                    if (Object.keys(removedByDay).length > 0) {
-                        const freshDoc = await getDocument('order_list', weekStr);
-                        const updates = {};
-                        const dayNames = { mon: __('mon'), tue: __('tue'), wed: __('wed'), thu: __('thu'), fri: __('fri') };
+                    Object.entries(weekDoc).forEach(([userKey, userData]) => {
+                        if (userKey === 'menu' || typeof userData !== 'object' || !userData) return;
 
-                        for (const [day, removedDishes] of Object.entries(removedByDay)) {
-                            const newOptions = (menuToSave[day] || []).filter(d => !d.toLowerCase().includes('không đặt cơm'));
-                            const replacement = newOptions[0] || 'Không đặt cơm | No order';
+                        dayKeys.forEach(day => {
+                            ['M', 'E'].forEach(sh => {
+                                const fk = day + '_' + sh;
+                                const rawValue = userData[fk];
+                                if (!rawValue) return;
 
-                            for (const [userKey, val] of Object.entries(freshDoc || {})) {
-                                if (userKey === 'menu' || typeof val !== 'object' || !val) continue;
-                                for (const sh of ['M', 'E']) {
-                                    const fk = day + '_' + sh;
-                                    const raw = val[fk];
-                                    if (!raw) continue;
-                                    const { dish, status } = parseDishValue(raw);
-                                    if (removedDishes.includes(dish) && status !== 'eaten') {
-                                        const isNoOrder = replacement.toLowerCase().includes('không đặt cơm');
-                                        const prefix = isNoOrder ? '[ignore] ' : 'not: ';
-                                        updates[`${userKey}.${fk}`] = `${prefix}${replacement}`;
+                                const parsed = parseDishValue(rawValue);
+                                if (parsed.status === 'eaten') return;
+
+                                const oldDishName = parsed.dish;
+                                const oldDayMenu = oldMenu[day] || [];
+                                
+                                const dishIndex = oldDayMenu.indexOf(oldDishName);
+                                
+                                if (dishIndex !== -1) {
+                                    const newDayMenu = newMenu[day] || [];
+                                    const newDishName = newDayMenu[dishIndex];
+
+                                    if (newDishName && newDishName !== oldDishName) {
+                                        const isNoOrder = newDishName.toLowerCase().includes('không đặt cơm');
+                                        let prefix = 'not: ';
+                                        if (parsed.status === 'giveup') prefix = `giveup[${parsed.receiver}]: `;
+                                        else if (isNoOrder) prefix = '[ignore] ';
+
+                                        updates[`${userKey}.${fk}`] = `${prefix}${newDishName}`;
                                     }
                                 }
-                            }
-                        }
-                        if (Object.keys(updates).length > 0) {
-                            await updateDoc(doc(db, 'order_list', weekStr), updates);
-                            showToast(`Đã lưu menu. Cập nhật ${Object.keys(updates).length} lựa chọn bị ảnh hưởng.`);
-                        } else {
-                            showToast(__('menuSaved'));
-                        }
+                            });
+                        });
+                    });
+
+                    if (Object.keys(updates).length > 0) {
+                        await updateDoc(doc(db, 'order_list', weekStr), updates);
+                        showToast(`Đã lưu menu và đồng bộ món ăn cho toàn bộ nhân sự.`);
                     } else {
                         showToast(__('menuSaved'));
                     }
@@ -3213,7 +3234,7 @@
                     state.isEditingMenu = false;
                     await renderAdminMenu();
                 } catch (err) {
-                    console.error(err);
+                    console.error("Lỗi đồng bộ menu:", err);
                     showToast(__('error'), 'error');
                 } finally {
                     hideLoader();
